@@ -129,6 +129,24 @@ public static class PuppetLayout
     public const int LOCAL_APPEARANCE_STATUS_COLOR = 0x04;
     /// <summary>outfit change waiting for the running event to end</summary>
     public const int LOCAL_APPEARANCE_STATUS_DEFERRED = 0x08;
+    /// <summary>u32 C: names block (game heap), 0 = none yet</summary>
+    public const uint PUPPET_NAMES_PTR_ADDR = 0x803FD168;
+    /// <summary>"NAME"</summary>
+    public const int PUPPET_NAMES_MAGIC = 0x4E414D45;
+    /// <summary>header + PUPPET_MAX_SLOTS names</summary>
+    public const int PUPPET_NAMES_BLOCK_SIZE = 0x50;
+    /// <summary>u32 C: PUPPET_NAMES_MAGIC once the block is set up</summary>
+    public const int PUPPET_NAMES_OFF_MAGIC = 0x00;
+    /// <summary>u32 C#: PUPPET_NAMES_FLAG_* (0 in a new block)</summary>
+    public const int PUPPET_NAMES_OFF_FLAGS = 0x04;
+    /// <summary>char[PUPPET_NAME_BYTES] per slot, slot i at + i * PUPPET_NAME_BYTES</summary>
+    public const int PUPPET_NAMES_OFF_NAME0 = 0x08;
+    /// <summary>per slot, NUL included</summary>
+    public const int PUPPET_NAME_BYTES = 24;
+    /// <summary>C# truncates names to this many characters</summary>
+    public const int PUPPET_NAME_MAX_CHARS = 16;
+    /// <summary>the local player wants names shown ("Show player names")</summary>
+    public const int PUPPET_NAMES_FLAG_SHOW = 0x01;
     public const int APPEARANCE_CLOTHES_HERO = 0;
     public const int APPEARANCE_CLOTHES_CASUAL = 1;
     /// <summary>follow the save: playerInit's rule, d_a_player_main.cpp:12362</summary>

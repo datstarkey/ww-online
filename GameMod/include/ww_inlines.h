@@ -540,6 +540,14 @@ static inline daPy_ProcFunc dapy_lk_getCurProcFunc(daPy_lk_c *link)
 #define GAMEINFO_EVENT_BITS(gameInfo)     ((volatile u8*)((u8*)(gameInfo) + 0x624))
 // save.mSavedata.mPlayer.mInfo (d_save.h:600, 0x148) .mClearCount (d_save.h:467, +0x58) — dComIfGs_getClearCount()
 #define GAMEINFO_CLEAR_COUNT(gameInfo)    (*(volatile u8*)((u8*)(gameInfo) + 0x1A0))
+// play.m2dShow (d_com_inf_game.h:866, 0x12A0+0x4979): dComIfGp_2dShowCheck(), 0 while the game hides its
+// 2D/HUD (dMeter_statusCheck d_meter.cpp:746; DOL 0x801EFC68: lbz r0,0x5C19(gameInfo))
+#define GAMEINFO_2D_SHOW(gameInfo)        (*(volatile u8*)((u8*)(gameInfo) + 0x5C19))
+// play.mPlayerStatus[0][1] (d_com_inf_game.h:874, 0x12A0+0x4A2C): dComIfGp_checkPlayerStatus1(0, ...)
+#define GAMEINFO_PLAYERSTATUS1(gameInfo)  (*(u32*)((u8*)(gameInfo) + 0x5CCC))
+// play.mCurrentGrafPort (d_com_inf_game.h:883, 0x12A0+0x4A60): the painter's 2D J2DOrthoGraph, set before the 2D
+// lists draw (m_Do_graphic.cpp:1572-1576). DOL dDlst_2DNumber_c::draw 0x800C8664: lwz r3,0x5D00(gameInfo)
+#define GAMEINFO_CURRENT_GRAF_PORT(gameInfo) (*(J2DOrthoGraph**)((u8*)(gameInfo) + 0x5D00))
 
 // ResTIMG (JSystem/JUtility/JUTTexture.h:14-37). Offsets are relative to the header itself;
 // J3DTexture::setResTIMG (J3DTexture.h:47) rebases them when a header is copied into TEX1.
@@ -583,6 +591,23 @@ static inline daPy_ProcFunc dapy_lk_getCurProcFunc(daPy_lk_c *link)
 #define DDLST_LIST_MPXLULIST(drawlist)          (*(J3DDrawBuffer**)((u8*)(drawlist) + 0x20))
 #define DDLST_LIST_MPOPALISTINVISIBLE(drawlist) (*(J3DDrawBuffer**)((u8*)(drawlist) + 0x30))
 #define DDLST_LIST_MPXLULISTINVISIBLE(drawlist) (*(J3DDrawBuffer**)((u8*)(drawlist) + 0x34))
+// 2D opaque list cursor/end (d_drawlist.h:686-687), what dComIfGd_set2DOpa passes to dDlst_list_c::set
+// (DOL dPn_c::_draw 0x80161570: addi r4,drawlist,0x19C; addi r5,drawlist,0x1A0)
+#define DDLST_LIST_MP2DOPA_P(drawlist)          ((dDlst_base_c***)((u8*)(drawlist) + 0x19C))
+#define DDLST_LIST_MP2DOPAEND_P(drawlist)       ((dDlst_base_c***)((u8*)(drawlist) + 0x1A0))
+// mpViewPort / mpView (d_drawlist.h:692-693): NULL until a camera has set them; mDoLib_pos2camera and
+// mDoLib_project dereference them unchecked (m_Do_lib.cpp:82, 109)
+#define DDLST_LIST_MPVIEWPORT(drawlist)         (*(void**)((u8*)(drawlist) + 0x230))
+#define DDLST_LIST_MPVIEW(drawlist)             (*(void**)((u8*)(drawlist) + 0x234))
+
+// JUTFont (JUTFont.h): vtable at +0 (verified against __vt__10JUTResFont 0x8039D1A8 in main.dol),
+// mValid +0x04, mColor1..4 (TColor = RGBA u32, what drawChar_scale's GXColor1u32 sends) +0x0C..+0x18.
+#define JUTFONT_VALID(font)                     (*(u8*)((u8*)(font) + 0x04))
+#define JUTFONT_COLORS(font)                    ((u32*)((u8*)(font) + 0x0C))
+#define JUTFONT_VT_SET_GX                       (0x0C / 4)  // setGX()
+#define JUTFONT_VT_GET_WIDTH_ENTRY              (0x2C / 4)  // getWidthEntry(int, TWidth*) const
+#define JUTFONT_VT_GET_CELL_WIDTH               (0x30 / 4)
+#define JUTFONT_VT_GET_CELL_HEIGHT              (0x34 / 4)
 // Legacy names (previously pointed at the sky lists). Kept as aliases to the lists they were
 // meant to name so nothing silently regresses if an old caller reappears.
 #define DDLST_LIST_MPLINKBUF(drawlist)              DDLST_LIST_MPOPALISTP0(drawlist)
