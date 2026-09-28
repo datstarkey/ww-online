@@ -27,14 +27,14 @@
                            <DolphinUserRoot>\user<N>\Logs\dolphin.log
 
 .EXAMPLE
-  .\dev-test.ps1                 # build C#, check game build, launch everything
-  .\dev-test.ps1 -Patch          # also recompile the C code and re-patch the game first
-  .\dev-test.ps1 -Patch -Patches skip_intro,instant_text   # ...with these optional patches
+  .\scripts\dev-test.ps1                 # build C#, check game build, launch everything
+  .\scripts\dev-test.ps1 -Patch          # also recompile the C code and re-patch the game first
+  .\scripts\dev-test.ps1 -Patch -Patches skip_intro,instant_text   # ...with these optional patches
                                  # (default: each patch's @default; 'none' = no optional patches)
-  .\dev-test.ps1 -Collect        # copy the live Dolphin logs into logs/latest
-  .\dev-test.ps1 -Stop           # stop everything (and collect logs)
-  .\dev-test.ps1 -ResetSaves     # re-copy your main Dolphin save into both test profiles
-  .\dev-test.ps1 -DedicatedServer  # separate server process instead of Player1 hosting
+  .\scripts\dev-test.ps1 -Collect        # copy the live Dolphin logs into logs/latest
+  .\scripts\dev-test.ps1 -Stop           # stop everything (and collect logs)
+  .\scripts\dev-test.ps1 -ResetSaves     # re-copy your main Dolphin save into both test profiles
+  .\scripts\dev-test.ps1 -DedicatedServer  # separate server process instead of Player1 hosting
 #>
 [CmdletBinding()]
 param(
@@ -60,7 +60,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Repo = $PSScriptRoot
+$Repo = Split-Path -Parent $PSScriptRoot   # scripts\ -> repo root
 $LogsRoot = Join-Path $Repo 'logs'
 $Latest = Join-Path $LogsRoot 'latest'
 $ServerExe = Join-Path $Repo 'WWOnline.Server\bin\Debug\net9.0\WWOnline.Server.exe'
@@ -312,4 +312,4 @@ Set-Content -Path (Join-Path $Latest 'session.txt') -Value $session -Encoding UT
 Write-Step 'Running'
 Write-Host "Logs: $Latest"
 Write-Host 'Get both Links into the same stage + room, then check the [diag] lines in the client logs.'
-Write-Host 'When done: .\dev-test.ps1 -Stop   (collects Dolphin logs too)'
+Write-Host 'When done: .\scripts\dev-test.ps1 -Stop   (collects Dolphin logs too)'
