@@ -4,7 +4,8 @@
  *
  * Names come from the C# client through the names block (puppet_shared.h PUPPET_NAMES_*): one
  * small game-heap block, allocated by the first REL instance and never freed, so the client can
- * write it at any time without racing a free. Each REL instance adopts it by its magic.
+ * write it at any time without racing a free. Each REL instance adopts it by its magic and boot
+ * stamp (a block from before a soft reset is not ours any more: puppet_shared.h).
  */
 
 #include "puppet_nametag.h"
@@ -46,11 +47,22 @@ static int nametag_isBlockPtr(u32 a)
   return a >= 0x80000000 && a <= 0x83000000 - PUPPET_NAMES_BLOCK_SIZE && (a & 3) == 0; /* MEM1, 48MB */
 }
 
-/* The published names block, or NULL. */
+/* __OSStartTime (u64, dolphin/os/OS.c:39): set once per boot by OSInit (:230). */
+static const volatile u32 *nametag_bootTime(void)
+{
+  return (const volatile u32 *)&os____OSStartTime;
+}
+
+/* The published names block, or NULL. Only a block made in THIS boot: the pointer word and the old
+ * block's bytes survive a soft reset, the game heap they pointed into does not (puppet_shared.h). */
 static u8 *nametag_block(void)
 {
   u32 a = *(volatile u32 *)PUPPET_NAMES_PTR_ADDR;
   if (!nametag_isBlockPtr(a) || *(volatile u32 *)(a + PUPPET_NAMES_OFF_MAGIC) != PUPPET_NAMES_MAGIC)
+    return NULL;
+  const volatile u32 *stamp = (const volatile u32 *)(a + PUPPET_NAMES_OFF_BOOT);
+  const volatile u32 *boot = nametag_bootTime();
+  if (stamp[0] != boot[0] || stamp[1] != boot[1])
     return NULL;
   return (u8 *)a;
 }
@@ -59,15 +71,23 @@ void puppet_nametag_onCreate(void)
 {
   if (nametag_block())
     return;
+  /* None, or one from an earlier boot (never touch it: that memory is someone else's now). */
+  *(volatile u32 *)PUPPET_NAMES_PTR_ADDR = 0;
   /* From the heap's tail (negative alignment, JKRExpHeap::do_alloc JKRExpHeap.cpp:110) so the
    * permanent block doesn't split the free space the stage allocates from. */
   AppAllocFn alloc = (AppAllocFn)(u32)JKRHeap__alloc; /* JKRHeap::alloc(u32, int, JKRHeap*) returns void* */
   u8 *block = (u8 *)alloc(PUPPET_NAMES_BLOCK_SIZE, -4, mDoExt_getGameHeap());
   if (!block)
     return;
-  for (u32 i = 0; i < PUPPET_NAMES_BLOCK_SIZE; i += 4)
-    *(u32 *)(block + i) = 0;
-  *(u32 *)(block + PUPPET_NAMES_OFF_MAGIC) = PUPPET_NAMES_MAGIC;
+  /* Magic last, then the pointer: C# reads the block concurrently and needs magic + stamp to use it
+   * (after a reboot the new block often lands where the stale one was). */
+  volatile u32 *words = (volatile u32 *)block;
+  for (u32 i = 0; i < PUPPET_NAMES_BLOCK_SIZE / 4; i++)
+    words[i] = 0;
+  const volatile u32 *boot = nametag_bootTime();
+  words[PUPPET_NAMES_OFF_BOOT / 4] = boot[0];
+  words[PUPPET_NAMES_OFF_BOOT / 4 + 1] = boot[1];
+  words[PUPPET_NAMES_OFF_MAGIC / 4] = PUPPET_NAMES_MAGIC;
   *(volatile u32 *)PUPPET_NAMES_PTR_ADDR = (u32)block;
 }
 

@@ -10,7 +10,8 @@ namespace WWOnline.Services;
 ///
 /// The REL allocates the block on the game heap the first time a puppet is created, publishes its
 /// address at PUPPET_NAMES_PTR_ADDR and never frees it (the next REL instance adopts it), so the
-/// client may write it whenever the pointer is in MEM1 and the block's magic matches. The client
+/// client may write it whenever the pointer is in MEM1, the block's magic matches and its boot stamp
+/// is this boot's __OSStartTime (a soft reset leaves the pointer but recreates the heap). The client
 /// compares the block with what it wants each tick and writes only what differs: the SHOW flag
 /// ("Show player names") and one NUL-terminated name per puppet slot. The REL draws the names in the
 /// game's message font, which only has the characters the game's English text uses, so names are
@@ -101,7 +102,8 @@ public static class PuppetNameTags
     /// <summary>
     /// Bring the names block in line with <paramref name="show"/> and <paramref name="names"/> (one
     /// already-sanitised name per slot, "" = none), writing only what differs. Null when there is no
-    /// usable block (no puppet created since boot, or a bad pointer / magic), in which case nothing is written.
+    /// usable block (no puppet created since boot, a bad pointer / magic, or a block from before a reboot),
+    /// in which case nothing is written.
     /// </summary>
     public static PublishResult? Publish(IDolphinService dolphin, bool show, IReadOnlyList<string> names)
     {
@@ -115,6 +117,15 @@ public static class PuppetNameTags
         var current = dolphin.ReadMemory(block, PuppetLayout.PUPPET_NAMES_BLOCK_SIZE);
         if (current is not { Length: PuppetLayout.PUPPET_NAMES_BLOCK_SIZE } ||
             ReadU32(current, PuppetLayout.PUPPET_NAMES_OFF_MAGIC) != PuppetLayout.PUPPET_NAMES_MAGIC)
+            return null;
+
+        // Only a block made in this boot. The pointer word (and the old block's bytes, magic
+        // included) survive a soft reset, but the game heap is recreated, so a stale block is
+        // someone else's memory now: writing it would corrupt the game.
+        var bootTime = GameMemoryAddresses.System.OSStartTime;
+        var boot = dolphin.ReadMemory(bootTime.Address, bootTime.Length);
+        if (boot is not { Length: 8 } || boot.All(b => b == 0) ||
+            !current.AsSpan(PuppetLayout.PUPPET_NAMES_OFF_BOOT, 8).SequenceEqual(boot))
             return null;
 
         uint wantFlags = show ? PuppetLayout.PUPPET_NAMES_FLAG_SHOW : 0u;

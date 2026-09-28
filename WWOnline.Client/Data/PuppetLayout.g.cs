@@ -134,13 +134,15 @@ public static class PuppetLayout
     /// <summary>"NAME"</summary>
     public const int PUPPET_NAMES_MAGIC = 0x4E414D45;
     /// <summary>header + PUPPET_MAX_SLOTS names</summary>
-    public const int PUPPET_NAMES_BLOCK_SIZE = 0x50;
+    public const int PUPPET_NAMES_BLOCK_SIZE = 0x58;
     /// <summary>u32 C: PUPPET_NAMES_MAGIC once the block is set up</summary>
     public const int PUPPET_NAMES_OFF_MAGIC = 0x00;
     /// <summary>u32 C#: PUPPET_NAMES_FLAG_* (0 in a new block)</summary>
     public const int PUPPET_NAMES_OFF_FLAGS = 0x04;
+    /// <summary>u32[2] C: __OSStartTime (u64) of the boot that allocated the block</summary>
+    public const int PUPPET_NAMES_OFF_BOOT = 0x08;
     /// <summary>char[PUPPET_NAME_BYTES] per slot, slot i at + i * PUPPET_NAME_BYTES</summary>
-    public const int PUPPET_NAMES_OFF_NAME0 = 0x08;
+    public const int PUPPET_NAMES_OFF_NAME0 = 0x10;
     /// <summary>per slot, NUL included</summary>
     public const int PUPPET_NAME_BYTES = 24;
     /// <summary>C# truncates names to this many characters</summary>

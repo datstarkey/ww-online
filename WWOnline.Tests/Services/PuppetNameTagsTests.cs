@@ -101,11 +101,15 @@ public class PuppetNameTagsTests
         Assert.Equal(valid, PuppetNameTags.IsValidBlockAddress(address));
     }
 
+    private static readonly byte[] BootTime = [0x00, 0x00, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC];
+
     private static FakeDolphin GameWithBlock(uint block = Block)
     {
         var game = new FakeDolphin();
+        game.Set(GameMemoryAddresses.System.OSStartTime.Address, BootTime);
         game.SetU32(PuppetLayout.PUPPET_NAMES_PTR_ADDR, block);
         game.SetU32(block + PuppetLayout.PUPPET_NAMES_OFF_MAGIC, PuppetLayout.PUPPET_NAMES_MAGIC);
+        game.Set(block + PuppetLayout.PUPPET_NAMES_OFF_BOOT, BootTime);
         return game;
     }
 
@@ -144,6 +148,33 @@ public class PuppetNameTagsTests
     }
 
     [Fact]
+    public void Publish_BlockFromAnEarlierBoot_WritesNothing()
+    {
+        // A soft reset reloads the DOL without clearing RAM: the pointer word and the old block
+        // (magic and all) survive, but the game heap is new and that memory belongs to someone else.
+        var game = GameWithBlock();
+        game.Set(GameMemoryAddresses.System.OSStartTime.Address, [0x00, 0x00, 0x12, 0x35, 0x00, 0x00, 0x00, 0x01]);
+        int writes = 0;
+        game.BeforeWrite = _ => writes++;
+
+        Assert.Null(PuppetNameTags.Publish(game, true, ["Link", "", ""]));
+        Assert.Equal(0, writes);
+    }
+
+    [Fact]
+    public void Publish_UnreadableOrZeroBootTime_WritesNothing()
+    {
+        var game = GameWithBlock();
+        game.Set(GameMemoryAddresses.System.OSStartTime.Address, new byte[8]);
+        game.Set(Block + PuppetLayout.PUPPET_NAMES_OFF_BOOT, new byte[8]);
+        int writes = 0;
+        game.BeforeWrite = _ => writes++;
+
+        Assert.Null(PuppetNameTags.Publish(game, true, ["Link", "", ""]));
+        Assert.Equal(0, writes);
+    }
+
+    [Fact]
     public void Publish_WritesFlagsAndNames_ThenNothingWhileUnchanged()
     {
         var game = GameWithBlock();
@@ -155,6 +186,7 @@ public class PuppetNameTagsTests
         Assert.Equal("", NameAt(game, 1));
         Assert.Equal("Tetra", NameAt(game, 2));
         Assert.Equal((uint)PuppetLayout.PUPPET_NAMES_MAGIC, game.GetU32(Block)); // never touched
+        Assert.Equal(BootTime, game.ReadMemory(Block + PuppetLayout.PUPPET_NAMES_OFF_BOOT, 8)); // nor the boot stamp
 
         int writes = 0;
         game.BeforeWrite = _ => writes++;
@@ -204,7 +236,9 @@ public class PuppetNameTagsTests
         // the client compares with memory, not with what it wrote last time.
         var game = GameWithBlock();
         PuppetNameTags.Publish(game, true, ["Link", "", ""]);
-        game.Set(Block + PuppetLayout.PUPPET_NAMES_OFF_FLAGS, new byte[PuppetLayout.PUPPET_NAMES_BLOCK_SIZE - 4]);
+        game.Set(Block + PuppetLayout.PUPPET_NAMES_OFF_FLAGS, new byte[4]);
+        game.Set(Block + PuppetLayout.PUPPET_NAMES_OFF_NAME0,
+                 new byte[PuppetLayout.PUPPET_NAMES_BLOCK_SIZE - PuppetLayout.PUPPET_NAMES_OFF_NAME0]);
 
         var result = PuppetNameTags.Publish(game, true, ["Link", "", ""]);
         Assert.Equal(new PuppetNameTags.PublishResult(Block, true, 0b001), result);

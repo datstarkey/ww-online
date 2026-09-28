@@ -158,19 +158,27 @@
 /* ============================================================================
  * Player names above puppets (puppet_nametag.c). The names live in ONE small block on the game
  * heap, not in scratch (no room): the REL allocates it the first time a puppet is created and
- * publishes its address here. The block is never freed; the next REL instance adopts it by its
- * magic, so C# may write it whenever the pointer is in MEM1 and the magic matches, even while no
- * REL is loaded. C# compares the block with what it wants and writes FLAGS / a name only when
- * they differ. Names are printable ASCII (C# sanitises: no Shift-JIS lead bytes), NUL-terminated
- * within PUPPET_NAME_BYTES; the REL copies at most PUPPET_NAME_BYTES - 1 of them.
+ * publishes its address here. The block is never freed; the next REL instance adopts it, so C#
+ * may write it whenever the pointer is in MEM1, the magic matches AND the block's BOOT stamp
+ * equals the live __OSStartTime, even while no REL is loaded.
+ * The boot stamp matters because this word survives a game reboot (soft reset = OSResetSystem
+ * restart, d_s_logo.cpp:503: the DOL is reloaded but RAM is not cleared, and in the vanilla layout
+ * the scratch region is untouched boot stack) while the game heap is created afresh: the old
+ * pointer and even the old magic can outlive the reboot in memory that now belongs to someone
+ * else. OSInit stamps __OSStartTime once per boot (dolphin/os/OS.c:230), so a block from an
+ * earlier boot never matches: the REL allocates a new one and C# writes nothing until it has.
+ * C# compares the block with what it wants and writes FLAGS / a name only when they differ.
+ * Names are printable ASCII (C# sanitises: no Shift-JIS lead bytes), NUL-terminated within
+ * PUPPET_NAME_BYTES; the REL copies at most PUPPET_NAME_BYTES - 1 of them.
  * 0x803FD16C..0x803FD16F stays free.
  * ============================================================================ */
 #define PUPPET_NAMES_PTR_ADDR         0x803FD168  /* u32 C: names block (game heap), 0 = none yet */
 #define PUPPET_NAMES_MAGIC            0x4E414D45  /* "NAME" */
-#define PUPPET_NAMES_BLOCK_SIZE       0x50        /* header + PUPPET_MAX_SLOTS names */
+#define PUPPET_NAMES_BLOCK_SIZE       0x58        /* header + PUPPET_MAX_SLOTS names */
 #define PUPPET_NAMES_OFF_MAGIC        0x00        /* u32 C: PUPPET_NAMES_MAGIC once the block is set up */
 #define PUPPET_NAMES_OFF_FLAGS        0x04        /* u32 C#: PUPPET_NAMES_FLAG_* (0 in a new block) */
-#define PUPPET_NAMES_OFF_NAME0        0x08        /* char[PUPPET_NAME_BYTES] per slot, slot i at + i * PUPPET_NAME_BYTES */
+#define PUPPET_NAMES_OFF_BOOT         0x08        /* u32[2] C: __OSStartTime (u64) of the boot that allocated the block */
+#define PUPPET_NAMES_OFF_NAME0        0x10        /* char[PUPPET_NAME_BYTES] per slot, slot i at + i * PUPPET_NAME_BYTES */
 #define PUPPET_NAME_BYTES             24          /* per slot, NUL included */
 #define PUPPET_NAME_MAX_CHARS         16          /* C# truncates names to this many characters */
 #define PUPPET_NAMES_FLAG_SHOW        0x01        /* the local player wants names shown ("Show player names") */
@@ -324,7 +332,8 @@ typedef char puppet_check_names_word[
      (PUPPET_NAMES_PTR_ADDR % 4) == 0) ? 1 : -1];
 typedef char puppet_check_names_block[
     (PUPPET_NAMES_OFF_NAME0 + (PUPPET_MAX_SLOTS * PUPPET_NAME_BYTES) <= PUPPET_NAMES_BLOCK_SIZE &&
-     PUPPET_NAMES_OFF_FLAGS + 4 <= PUPPET_NAMES_OFF_NAME0 && PUPPET_NAME_MAX_CHARS < PUPPET_NAME_BYTES &&
+     PUPPET_NAMES_OFF_FLAGS + 4 <= PUPPET_NAMES_OFF_BOOT && PUPPET_NAMES_OFF_BOOT + 8 <= PUPPET_NAMES_OFF_NAME0 &&
+     (PUPPET_NAMES_OFF_BOOT % 4) == 0 && PUPPET_NAME_MAX_CHARS < PUPPET_NAME_BYTES &&
      (PUPPET_NAMES_BLOCK_SIZE % 4) == 0) ? 1 : -1];
 
 #endif /* PUPPET_SHARED_H */

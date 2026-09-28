@@ -192,6 +192,12 @@ public static class GameMemoryAddresses
         public static readonly MemoryAddress<byte> DebugModeEnabled = new(0x803F7678, "DebugModeEnabled", "Debug mode enabled flag");
         public static readonly MemoryAddress<uint> RandomSeed = new(0x803D7970, "RandomSeed", "Random number generator seed");
         public static readonly MemoryAddress<byte> Language = new(0x803F9F48, "Language", "Game language setting");
+
+        /// <summary>
+        /// __OSStartTime (u64, dolphin/os/OS.c:39; symbols.txt .sbss 0x803F79B8, ww_linker.ld os____OSStartTime):
+        /// OSInit stamps it once per boot (OS.c:230), so it tells this boot from the one before a soft reset.
+        /// </summary>
+        public static readonly ByteArrayMemoryAddress OSStartTime = new(0x803F79B8, 8, "OSStartTime", "OS boot time (changes on every boot / soft reset)");
     }
     
     /// <summary>

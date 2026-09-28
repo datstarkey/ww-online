@@ -179,7 +179,10 @@ public class PuppetLayoutTests
     public void NamesBlock_HoldsEverySlotsName_WithRoomForTheNul()
     {
         Assert.True(PuppetLayout.PUPPET_NAMES_OFF_MAGIC + 4 <= PuppetLayout.PUPPET_NAMES_OFF_FLAGS);
-        Assert.True(PuppetLayout.PUPPET_NAMES_OFF_FLAGS + 4 <= PuppetLayout.PUPPET_NAMES_OFF_NAME0);
+        Assert.True(PuppetLayout.PUPPET_NAMES_OFF_FLAGS + 4 <= PuppetLayout.PUPPET_NAMES_OFF_BOOT);
+        Assert.True(PuppetLayout.PUPPET_NAMES_OFF_BOOT + GameMemoryAddresses.System.OSStartTime.Length
+                    <= PuppetLayout.PUPPET_NAMES_OFF_NAME0);
+        Assert.Equal(0, PuppetLayout.PUPPET_NAMES_OFF_BOOT % 4);
         Assert.True(PuppetLayout.PUPPET_NAMES_OFF_NAME0 + PuppetLayout.PUPPET_MAX_SLOTS * PuppetLayout.PUPPET_NAME_BYTES
                     <= PuppetLayout.PUPPET_NAMES_BLOCK_SIZE);
         Assert.Equal(0, PuppetLayout.PUPPET_NAMES_BLOCK_SIZE % 4);
