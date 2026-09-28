@@ -18,7 +18,7 @@ on:
       version:
         description: 'Version for the dry run (nothing is released)'
         required: true
-        default: '0.0.0-dryrun'
+        default: '0.0.1-dryrun'
 
 permissions:
   contents: write

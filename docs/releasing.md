@@ -13,7 +13,7 @@ Releases are GitHub Releases in this repo. Players install the app once (`WWOnli
    ```
    That's all. You don't edit a version file: the tag is the version. `Directory.Build.props` only holds the version that dev builds report.
 
-To rehearse without releasing, run the **Release** workflow by hand (Actions → Release → Run workflow) with a version like `0.0.0-dryrun`. It builds and packs everything and keeps the packages as a workflow artifact, but doesn't create a release.
+To rehearse without releasing, run the **Release** workflow by hand (Actions → Release → Run workflow) with a version like `0.0.1-dryrun`. It builds and packs everything and keeps the packages as a workflow artifact, but doesn't create a release.
 
 ## What the release workflow does
 
