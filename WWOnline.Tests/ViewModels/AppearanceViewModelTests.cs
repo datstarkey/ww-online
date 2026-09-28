@@ -123,4 +123,32 @@ public sealed class AppearanceViewModelTests : IDisposable
         Assert.Equal(PuppetLayout.APPEARANCE_CLOTHES_DEFAULT, _settings.Load().ClothesType);
         Assert.Single(vm.ClothesChoices, c => c.IsSelected);
     }
+
+    [Fact]
+    public void ShowPlayerNames_DefaultsOn_AndIsPublishedOnLoad()
+    {
+        var shown = new List<bool>();
+        var vm = new AppearanceViewModel(_settings, _published.Add, shown.Add);
+
+        Assert.True(vm.ShowPlayerNames);
+        Assert.Equal(new[] { true }, shown);
+        Assert.False(File.Exists(Path.Combine(_dir, "game-settings.json"))); // loading never writes
+    }
+
+    [Fact]
+    public void ShowPlayerNames_Toggle_PublishesLive_AndSaves()
+    {
+        var shown = new List<bool>();
+        var vm = new AppearanceViewModel(_settings, _published.Add, shown.Add);
+
+        vm.ShowPlayerNames = false;
+
+        Assert.Equal(new[] { true, false }, shown);
+        Assert.False(_settings.Load().ShowPlayerNames);
+        Assert.Single(_published); // the look isn't re-sent for a names toggle
+
+        var reloaded = new AppearanceViewModel(_settings, _ => { }, shown.Add);
+        Assert.False(reloaded.ShowPlayerNames);
+        Assert.False(shown[^1]);
+    }
 }

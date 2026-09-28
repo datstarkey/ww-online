@@ -40,6 +40,7 @@
 - Other players appear as real Links: running, rolling, climbing, crouching, sword combos, shield, sheathing and the Master Sword glow.
 - Their equipment shows: sword, shield (including the Mirror Shield) and hero's clothes or pajamas.
 - Each player picks their own tunic colour (black Link, purple Link, anything), and everyone sees it change live.
+- Player names above heads: each player's name floats above their Link, in the game's own font. It shrinks with distance and hides in cutscenes and menus (turn it off under **Appearance**).
 - Out on the Great Sea you see each other sailing in your own King of Red Lions.
 
 **Play one adventure together (a "room")**
@@ -104,7 +105,7 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 
 - **Host a room:** on the **Room** page choose **Host**. WW-Online starts the room on your PC (port `6969`) and launches the game. You're the room owner: press **Edit room** to pick Full sync, Co-op or your own mix of rules. Rules stay locked until you press Edit, so nothing changes by accident.
 - **Join a room:** enter the host's address and your name, then **Connect**. You see the room's rules and items read-only, and anything you pick up still counts for the room.
-- **Your look:** open **Appearance** to pick your clothes (game default, hero's tunic or pajamas) and your tunic colour. It changes live for everyone.
+- **Your look:** open **Appearance** to pick your clothes (game default, hero's tunic or pajamas) and your tunic colour. It changes live for everyone. **Show player names** there turns the names above the other Links on or off, for your screen only.
 - **Story flags:** on the **Room** page, see which story events the room has reached. The room owner can edit them.
 - **Dolphin** shows the connection to your game and your live stats.
 - **Tools** holds local-only helpers (warp, stats, memory). They only affect your own game.

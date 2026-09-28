@@ -183,6 +183,7 @@ public class GameSyncService : IDisposable
         if (connectionId == _signalR.Connection?.ConnectionId)
             return;
 
+        _puppetSync.SetPlayerName(connectionId, playerName); // shown above their puppet
         int slot = _puppetSync.AssignSlot(connectionId);
         if (slot >= 0)
             Logger.Information("Player {Name} ({Id}) assigned to puppet slot {Slot}", playerName, connectionId, slot);

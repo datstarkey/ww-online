@@ -50,9 +50,10 @@ public partial class ClothesChoiceViewModel : ObservableObject
 }
 
 /// <summary>
-/// The local player's look (Appearance page): clothes and tunic colour. The single owner of that
-/// state: a pick is published at once (PuppetSyncService.LocalAppearance, which the sync loop sends
-/// to the game and to peers) and saved to GameSettings right away.
+/// The local player's look (Appearance page): clothes and tunic colour, plus whether the other
+/// players' names show above their Links. The single owner of that state: a pick is published at
+/// once (PuppetSyncService.LocalAppearance / ShowPlayerNames, which the sync loop sends to the game
+/// and, for the look, to peers) and saved to GameSettings right away.
 /// </summary>
 public partial class AppearanceViewModel : ViewModelBase
 {
@@ -65,6 +66,7 @@ public partial class AppearanceViewModel : ViewModelBase
 
     private readonly GameSettingsService _settings;
     private readonly Action<AppearanceState> _publish;
+    private readonly Action<bool>? _publishShowNames;
     private bool _loading;
 
     // Clothes are a 3-way choice exposed as an index:
@@ -106,6 +108,10 @@ public partial class AppearanceViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(PreviewBrush), nameof(LookText), nameof(ColorNote), nameof(IsCasual))]
     private int _selectedClothesIndex = ClothesHero;
 
+    /// <summary>"Show player names": the other players' names above their Links, in game. Live.</summary>
+    [ObservableProperty]
+    private bool _showPlayerNames = true;
+
     public TunicColorPreset SelectedColor => ColorPresets[SelectedColorIndex];
 
     public bool IsCasual => SelectedClothesIndex == ClothesCasual;
@@ -130,26 +136,30 @@ public partial class AppearanceViewModel : ViewModelBase
     };
 
     public AppearanceViewModel(GameSettingsService settings, PuppetSyncService puppetSync)
-        : this(settings, look => puppetSync.LocalAppearance = look)
+        : this(settings, look => puppetSync.LocalAppearance = look, show => puppetSync.ShowPlayerNames = show)
     {
     }
 
     /// <param name="settings">Where the choice is loaded from and saved to.</param>
     /// <param name="publish">Receives every look (PuppetSyncService.LocalAppearance in the app).</param>
-    public AppearanceViewModel(GameSettingsService settings, Action<AppearanceState> publish)
+    /// <param name="publishShowNames">Receives every "Show player names" value (PuppetSyncService.ShowPlayerNames in the app).</param>
+    public AppearanceViewModel(GameSettingsService settings, Action<AppearanceState> publish, Action<bool>? publishShowNames = null)
     {
         _settings = settings;
         _publish = publish;
+        _publishShowNames = publishShowNames;
         Swatches = new ReadOnlyCollection<TunicSwatchViewModel>(ColorPresets.Select(p => new TunicSwatchViewModel(p)).ToList());
 
         var saved = settings.Load();
         _loading = true;
         SelectedClothesIndex = ClothesTypeToIndex(saved.ClothesType);
         SelectedColorIndex = FindColorIndex(saved.TunicColorName);
+        ShowPlayerNames = saved.ShowPlayerNames;
         _loading = false;
 
         UpdateSelectionFlags();
         Publish(save: false);
+        _publishShowNames?.Invoke(ShowPlayerNames);
     }
 
     /// <summary>What goes to the game and to peers.</summary>
@@ -184,6 +194,16 @@ public partial class AppearanceViewModel : ViewModelBase
         if (_loading) return;
         UpdateSelectionFlags();
         Publish(save: true);
+    }
+
+    // Live like the look: the sync loop publishes it on its next tick. Saved right away.
+    partial void OnShowPlayerNamesChanged(bool value)
+    {
+        if (_loading) return;
+        _publishShowNames?.Invoke(value);
+        var settings = _settings.Load();
+        settings.ShowPlayerNames = value;
+        _settings.Save(settings);
     }
 
     private void UpdateSelectionFlags()

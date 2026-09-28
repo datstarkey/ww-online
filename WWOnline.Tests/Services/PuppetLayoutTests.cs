@@ -59,6 +59,7 @@ public class PuppetLayoutTests
             PuppetLayout.LOCAL_APPEARANCE_TAG_ADDR, PuppetLayout.LOCAL_APPEARANCE_WORD_ADDR,
             PuppetLayout.LOCAL_APPEARANCE_BLOCK_ADDR, PuppetLayout.LOCAL_APPEARANCE_IMAGE_ADDR,
             PuppetLayout.LOCAL_APPEARANCE_APPLIED_ADDR, PuppetLayout.LOCAL_APPEARANCE_STATUS_ADDR,
+            PuppetLayout.PUPPET_NAMES_PTR_ADDR,
         ];
         Assert.Equal(scratch.Length, scratch.Distinct().Count());
         Assert.All(scratch, a => Assert.Equal(0u, a % 4));
@@ -163,6 +164,29 @@ public class PuppetLayoutTests
         Assert.True(BoatState.IsHeadBck(PuppetLayout.SHIP_BCK_FN_LOOK_L));
         Assert.True(BoatState.IsHeadBck(PuppetLayout.SHIP_BCK_DAMAGE1));
         Assert.False(BoatState.IsHeadBck(PuppetLayout.SHIP_BCK_MAST_ON2));
+    }
+
+    [Fact]
+    public void NamesPointer_SitsInTheFreeWordsBeforeTheBoats()
+    {
+        // 0x803FD168..0x803FD16F was the only free scratch; the names block itself lives on the game heap.
+        Assert.True(PuppetLayout.PUPPET_NAMES_PTR_ADDR >= PuppetLayout.LOCAL_APPEARANCE_STATUS_ADDR + 4);
+        Assert.True(PuppetLayout.PUPPET_NAMES_PTR_ADDR + 4 <= PuppetLayout.PUPPET_BOAT_0);
+        Assert.Equal(0u, PuppetLayout.PUPPET_NAMES_PTR_ADDR % 4);
+    }
+
+    [Fact]
+    public void NamesBlock_HoldsEverySlotsName_WithRoomForTheNul()
+    {
+        Assert.True(PuppetLayout.PUPPET_NAMES_OFF_MAGIC + 4 <= PuppetLayout.PUPPET_NAMES_OFF_FLAGS);
+        Assert.True(PuppetLayout.PUPPET_NAMES_OFF_FLAGS + 4 <= PuppetLayout.PUPPET_NAMES_OFF_NAME0);
+        Assert.True(PuppetLayout.PUPPET_NAMES_OFF_NAME0 + PuppetLayout.PUPPET_MAX_SLOTS * PuppetLayout.PUPPET_NAME_BYTES
+                    <= PuppetLayout.PUPPET_NAMES_BLOCK_SIZE);
+        Assert.Equal(0, PuppetLayout.PUPPET_NAMES_BLOCK_SIZE % 4);
+        Assert.Equal(0, PuppetLayout.PUPPET_NAMES_OFF_FLAGS % 4);
+        Assert.InRange(PuppetLayout.PUPPET_NAME_MAX_CHARS, 1, PuppetLayout.PUPPET_NAME_BYTES - 1);
+        Assert.Equal(1, System.Numerics.BitOperations.PopCount((uint)PuppetLayout.PUPPET_NAMES_FLAG_SHOW));
+        Assert.Equal(0x4E414D45, PuppetLayout.PUPPET_NAMES_MAGIC); // "NAME"
     }
 
     [Fact]
