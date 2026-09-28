@@ -1,0 +1,225 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             x:Class="WWOnline.Views.DebugToolsView"
+             x:DataType="vm:DebugToolsViewModel"
+             x:Name="Root">
+
+    <UserControl.Styles>
+        <!-- Stat editor row label -->
+        <Style Selector="TextBlock.stat-label">
+            <Setter Property="FontFamily" Value="{StaticResource FontMono}" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,14,0" />
+        </Style>
+        <Style Selector="Button.compact">
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="Padding" Value="14,0" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="32,28,32,32" Spacing="20">
+
+            <!-- Header -->
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Tools" Classes="ww-title" />
+                    <TextBlock Text="These change your own game only. Room-wide settings live on the Room page."
+                               FontSize="14" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Border Grid.Column="1" Classes="ww-chip" VerticalAlignment="Center" Margin="16,0,0,0">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                            <Path Classes="icon" StrokeThickness="1.9" Data="{StaticResource IconMonitor}" Stroke="{StaticResource TextNavBrush}" />
+                        </Viewbox>
+                        <TextBlock Text="Local only" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextNavBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Tab bar -->
+            <Border Classes="ww-inset" Padding="4" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Classes="ww-seg" Classes.active="{Binding IsToolWarp}" Content="Warp" Command="{Binding PickWarpCommand}" />
+                    <Button Classes="ww-seg" Classes.active="{Binding IsToolStats}" Content="Stats" Command="{Binding PickStatsCommand}" />
+                    <Border Width="1" Margin="6,8" Background="{StaticResource InputLineBrush}" />
+                    <Button Classes="ww-seg mono dev" Classes.active="{Binding IsToolMemory}" Content="Memory" Command="{Binding PickMemoryCommand}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Status message -->
+            <TextBlock Text="{Binding StatusMessage}" Classes="ww-mono" FontSize="13"
+                       Foreground="{StaticResource AccentHoverBrush}" TextWrapping="Wrap"
+                       IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+            <!-- ═══ Warp ═══ -->
+            <Grid ColumnDefinitions="*,20,420" IsVisible="{Binding IsToolWarp}">
+                <Border Classes="ww-card" Padding="24,22" VerticalAlignment="Top">
+                    <StackPanel Spacing="14">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Stages" Classes="ww-card-title" VerticalAlignment="Center" />
+                            <Border Grid.Column="1" Width="280" Height="44" CornerRadius="12" Padding="14,0"
+                                    Background="{StaticResource InputBrush}" BorderBrush="{StaticResource InputLineBrush}" BorderThickness="1">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                        <Path Classes="icon" StrokeThickness="1.9" Data="{StaticResource IconSearch}" Stroke="{StaticResource Text3Brush}" />
+                                    </Viewbox>
+                                    <TextBox Grid.Column="1" Classes="bare" Margin="8,0,0,0" Text="{Binding WarpSearch}"
+                                             Watermark="Search stages" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding WarpStageGroups}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:WarpGroupViewModel">
+                                    <StackPanel Spacing="4" Margin="0,0,16,0" VerticalAlignment="Top">
+                                        <TextBlock Text="{Binding Title}" Classes="ww-label" Margin="4,6" />
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:WarpStageItem">
+                                                    <Button Classes="ww-row" Classes.active="{Binding IsSelected}" Margin="0,0,0,6"
+                                                            Command="{Binding #Root.((vm:DebugToolsViewModel)DataContext).SelectWarpCommand}"
+                                                            CommandParameter="{Binding}" AutomationProperties.Name="{Binding Info.Name}">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <TextBlock Text="{Binding Info.Name}" FontSize="14" FontWeight="SemiBold"
+                                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding Info.Code}" FontFamily="{StaticResource FontMono}"
+                                                                       FontSize="12" Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="No stages match." FontSize="13" Foreground="{StaticResource Text2Brush}"
+                                   IsVisible="{Binding !WarpStageGroups.Count}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Classes="ww-card" Padding="24,22" VerticalAlignment="Top">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="WARP TO" Classes="ww-label" />
+                        <TextBlock Text="{Binding SelectedWarp.Name}" FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
+                                   FontSize="26" Margin="0,-6,0,0" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding SelectedWarp.Code}" FontFamily="{StaticResource FontMono}" FontSize="13"
+                                   Foreground="{StaticResource Text2Brush}" Margin="0,-8,0,0" />
+                        <Grid ColumnDefinitions="*,12,*">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Room" FontSize="12" Foreground="{StaticResource Text2Brush}" />
+                                <TextBox Text="{Binding WarpRoom}" Classes="mono" FontSize="15" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="6">
+                                <TextBlock Text="Spawn point" FontSize="12" Foreground="{StaticResource Text2Brush}" />
+                                <TextBox Text="{Binding WarpSpawn}" Classes="mono" FontSize="15" />
+                            </StackPanel>
+                        </Grid>
+                        <Button Classes="ww-accent" MinHeight="48" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                Command="{Binding WarpToDestinationCommand}" AutomationProperties.Name="Warp">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="Warp" FontSize="15" VerticalAlignment="Center" />
+                                <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                    <Path Classes="icon" StrokeThickness="2.2" Data="{StaticResource IconArrowRight}" Stroke="{StaticResource OnAccentBrush}" />
+                                </Viewbox>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="A stage that isn't in your game files is refused, so a warp can't crash the game."
+                                   FontSize="13" Foreground="{StaticResource Text3Brush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ═══ Stats ═══ -->
+            <Border Classes="ww-card" Padding="24,22" IsVisible="{Binding IsToolStats}" HorizontalAlignment="Left" MinWidth="620">
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Stats" Classes="ww-card-title" />
+                            <TextBlock Text="Health, rupees, magic and ammo in your game right now." FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Max all stats" Classes="ww-accent" Command="{Binding MaxStatsCommand}" VerticalAlignment="Center" />
+                    </Grid>
+                    <Border Classes="ww-terminal">
+                        <Grid ColumnDefinitions="Auto,90,Auto,90,Auto" RowDefinitions="Auto,10,Auto,10,Auto,10,Auto,10,Auto">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Health" Classes="stat-label" Foreground="{StaticResource HeartTextBrush}" />
+                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditHealth}" Classes="terminal" />
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="/" VerticalAlignment="Center" Margin="8,0" Foreground="{StaticResource Text3Brush}" />
+                            <TextBox Grid.Row="0" Grid.Column="3" Text="{Binding EditMaxHealth}" Classes="terminal" />
+                            <StackPanel Grid.Row="0" Grid.Column="4" Orientation="Horizontal" Spacing="6" Margin="10,0,0,0">
+                                <Button Content="Set" Command="{Binding SetHealthCommand}" Classes="ww-secondary compact" />
+                                <Button Content="Set max" Command="{Binding SetMaxHealthCommand}" Classes="ww-ghost compact" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Rupees" Classes="stat-label" Foreground="{StaticResource RupeeLightBrush}" />
+                            <TextBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding EditRupees}" Classes="terminal" />
+                            <Button Grid.Row="2" Grid.Column="4" Content="Set" Command="{Binding SetRupeesCommand}" Classes="ww-secondary compact"
+                                    Margin="10,0,0,0" HorizontalAlignment="Left" />
+
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Magic" Classes="stat-label" Foreground="{StaticResource StoryLightBrush}" />
+                            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EditMagic}" Classes="terminal" />
+                            <TextBlock Grid.Row="4" Grid.Column="2" Text="/" VerticalAlignment="Center" Margin="8,0" Foreground="{StaticResource Text3Brush}" />
+                            <TextBox Grid.Row="4" Grid.Column="3" Text="{Binding EditMaxMagic}" Classes="terminal" />
+                            <StackPanel Grid.Row="4" Grid.Column="4" Orientation="Horizontal" Spacing="6" Margin="10,0,0,0">
+                                <Button Content="Set" Command="{Binding SetMagicCommand}" Classes="ww-secondary compact" />
+                                <Button Content="Set max" Command="{Binding SetMaxMagicCommand}" Classes="ww-ghost compact" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Arrows" Classes="stat-label" />
+                            <TextBox Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding EditArrows}" Classes="terminal" />
+                            <Button Grid.Row="6" Grid.Column="4" Content="Set" Command="{Binding SetArrowsCommand}" Classes="ww-secondary compact"
+                                    Margin="10,0,0,0" HorizontalAlignment="Left" />
+
+                            <TextBlock Grid.Row="8" Grid.Column="0" Text="Bombs" Classes="stat-label" />
+                            <TextBox Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="3" Text="{Binding EditBombs}" Classes="terminal" />
+                            <Button Grid.Row="8" Grid.Column="4" Content="Set" Command="{Binding SetBombsCommand}" Classes="ww-secondary compact"
+                                    Margin="10,0,0,0" HorizontalAlignment="Left" />
+                        </Grid>
+                    </Border>
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,0,0">
+                            <Path Classes="icon" Data="{StaticResource IconInfo}" Stroke="{StaticResource Text2Brush}" />
+                        </Viewbox>
+                        <TextBlock Grid.Column="1" Margin="10,0,0,0" FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
+                                   Text="Items, sword and shield, heart containers and capacities moved to Room → Room items. Event flags moved to Room → Story flags." />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- ═══ Memory (dev) ═══ -->
+            <Border Classes="ww-card" Padding="24,22" IsVisible="{Binding IsToolMemory}" HorizontalAlignment="Left" MinWidth="620">
+                <StackPanel Spacing="14">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Memory read / write" Classes="ww-card-title" />
+                        <TextBlock Text="Raw 32-bit reads and writes. For development." FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                    </StackPanel>
+                    <Border Classes="ww-terminal">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnDefinitions="96,*">
+                                <TextBlock Text="Address 0x" Classes="stat-label" Foreground="{StaticResource Text2Brush}" />
+                                <TextBox Grid.Column="1" Text="{Binding MemoryAddress}" Watermark="803C525C" Classes="terminal" />
+                            </Grid>
+                            <Grid ColumnDefinitions="96,*">
+                                <TextBlock Text="Value 0x" Classes="stat-label" Foreground="{StaticResource Text2Brush}" />
+                                <TextBox Grid.Column="1" Text="{Binding MemoryValue}" Watermark="00000000" Classes="terminal" />
+                            </Grid>
+                            <TextBlock Text="{Binding MemoryReadResult}" FontFamily="{StaticResource FontMono}" FontSize="15"
+                                       Foreground="{StaticResource AccentHoverBrush}"
+                                       IsVisible="{Binding MemoryReadResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Content="Read" Command="{Binding ReadMemoryCommand}" Classes="ww-secondary" />
+                        <Button Content="Write" Command="{Binding WriteMemoryCommand}" Classes="ww-accent" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

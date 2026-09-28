@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             xmlns:svc="using:WWOnline.Services"
+             x:Class="WWOnline.Views.GameLogView"
+             x:DataType="vm:GameLogViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Border.legend">
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="Background" Value="{StaticResource CardBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardLineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.legend TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TextNavBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="32,28,32,32" Spacing="20">
+
+            <!-- Header -->
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Activity" Classes="ww-title" />
+                    <TextBlock Text="Everything happening across the room." FontSize="14" Foreground="{StaticResource Text2Brush}" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="Clear" Classes="ww-ghost"
+                        VerticalAlignment="Center" Command="{Binding ClearCommand}" />
+            </Grid>
+
+            <!-- Legend -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Classes="legend">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource RupeeBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Join" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="legend">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource DangerBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Leave" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="legend">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Zone" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="legend">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource GoldCBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Info" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Empty state -->
+            <Border Classes="ww-card" Padding="40" IsVisible="{Binding !HasEntries}">
+                <StackPanel Spacing="12" HorizontalAlignment="Center">
+                    <Border Width="52" Height="52" CornerRadius="14" Background="{StaticResource AccentTint2Brush}" HorizontalAlignment="Center">
+                        <Viewbox Width="26" Height="26">
+                            <Path Classes="icon" Data="{StaticResource IconList}" Stroke="{StaticResource AccentBrush}" />
+                        </Viewbox>
+                    </Border>
+                    <TextBlock Text="No activity yet" FontSize="18" FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="Events appear here as players join, leave, or move between zones."
+                               FontSize="13" HorizontalAlignment="Center" Foreground="{StaticResource Text2Brush}"
+                               TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420" />
+                </StackPanel>
+            </Border>
+
+            <!-- Feed -->
+            <Border Classes="ww-card" Padding="0" IsVisible="{Binding HasEntries}" ClipToBounds="True">
+                <ItemsControl ItemsSource="{Binding Entries}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="svc:GameLogEntry">
+                            <Border Padding="22,14" BorderThickness="0,0,0,1" BorderBrush="{StaticResource CardLineBrush}">
+                                <Grid ColumnDefinitions="76,74,*">
+                                    <TextBlock Grid.Column="0" Text="{Binding TimestampText}" FontFamily="{StaticResource FontMono}"
+                                               FontSize="12" Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" />
+                                    <Border Grid.Column="1" Width="58" Height="22" CornerRadius="6" HorizontalAlignment="Left"
+                                            Background="{Binding TagBackground}" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding EventTypeText}" FontFamily="{StaticResource FontMono}" FontSize="10"
+                                                   LetterSpacing="0.6" Foreground="{Binding TagForeground}"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Grid.Column="2" Text="{Binding Message}" FontSize="14"
+                                               Foreground="{StaticResource TextSoftBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

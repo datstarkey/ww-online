@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>WinExe</OutputType>
+        <TargetFramework>net9.0</TargetFramework>
+        <Platforms>AnyCPU</Platforms>
+        <RootNamespace>WWOnline</RootNamespace>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+        <ApplicationManifest>app.manifest</ApplicationManifest>
+        <ApplicationIcon>Assets\Branding\app.ico</ApplicationIcon>
+        <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="HotAvalonia" Version="3.*" PrivateAssets="All" Publish="True" />
+        <PackageReference Include="Avalonia" Version="11.2.3" />
+        <PackageReference Include="Avalonia.Desktop" Version="11.2.3" />
+        <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.3" />
+        <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.3" />
+        <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+        <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.1" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.1" />
+        <PackageReference Include="Serilog" Version="4.1.0" />
+        <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+        <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+        <!-- Auto-update from GitHub Releases. Keep in step with the vpk CLI version in .github/workflows/release.yml. -->
+        <PackageReference Include="Velopack" Version="1.2.158" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\WWOnline.Shared\WWOnline.Shared.csproj" />
+        <ProjectReference Include="..\WWOnline.Patcher\WWOnline.Patcher.csproj" />
+    </ItemGroup>
+
+    <!-- Data/PuppetLayout.g.cs ← GameMod/src/puppet_link/puppet_shared.h (single source of truth) -->
+    <Import Project="build\PuppetLayout.targets" />
+
+    <ItemGroup>
+        <Watch Include="**\*.axaml" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <AvaloniaResource Include="Assets\Fonts\*.ttf" />
+        <AvaloniaResource Include="Assets\Branding\*" />
+    </ItemGroup>
+
+    <!-- Licences travel with every build/release: ours, the MIT notices we owe, the fonts' OFL. -->
+    <ItemGroup>
+        <None Include="..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+        <None Include="..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+        <None Include="Assets\Fonts\*-OFL.txt" Link="licenses\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
+    <!-- PatchData/ = pre-built fallback for GamePatcherService when devkitPPC isn't available.
+         Dev builds copy it from GameMod/ here. The diffs and the REL are build output (gitignored):
+         they exist only after a patch run, so each item is optional and a fresh clone still builds.
+         Releases replace the whole folder with the CI's build-patchdata output (complete, with
+         patchdata-stamp.json); see docs/releasing.md. -->
+    <ItemGroup>
+        <Content Include="..\GameMod\src\patches\patch_diffs\*.yaml">
+            <Link>PatchData\patch_diffs\%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="..\GameMod\build\d_a_puppet.rel" Condition="Exists('..\GameMod\build\d_a_puppet.rel')">
+            <Link>PatchData\d_a_puppet.rel</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="..\GameMod\src\patches\patch_diffs\optional\*.yaml">
+            <Link>PatchData\patch_diffs\optional\%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <!-- Optional patch catalogue: each .asm header is the single source of truth for its
+             name/description/default (OptionalPatchCatalogService reads it at runtime), and the
+             assets their replace-file edits copy into the game. -->
+        <Content Include="..\GameMod\src\patches\optional\*.asm">
+            <Link>PatchData\optional\%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="..\GameMod\assets\*">
+            <Link>PatchData\assets\%(Filename)%(Extension)</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="..\GameMod\src\patches\free_space_start_offsets.txt">
+            <Link>PatchData\free_space_start_offsets.txt</Link>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,31 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+logs/
+
+# GameMod: machine-specific config, Nintendo's vanilla files, and everything the patcher generates
+GameMod/config.json
+GameMod/vanilla/
+GameMod/build/
+GameMod/src/patches/patch_diffs/
+GameMod/src/patches/link_draw_hook.asm
+GameMod/src/patches/custom_symbols.txt
+GameMod/src/puppet_link/link_draw_hook_linker.ld
+*.dol
+RELS.arc
+bi2.bin
+
+# Per-user IDE state
+*.DotSettings.user
+.idea/
+.vscode/
+
+# Release/packaging output (docs/releasing.md)
+publish/
+Releases/
+
+# Local Claude Code state (permissions, worktrees)
+.claude/settings.local.json
+.claude/worktrees/

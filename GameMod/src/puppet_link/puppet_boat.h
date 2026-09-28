@@ -1,0 +1,86 @@
+/**
+ * puppet_boat.h - the peer's King of Red Lions, drawn by their puppet.
+ *
+ * A second daShip_c can't be spawned: its create takes over the global ship pointer
+ * (dComIfGp_setShipActor, d_a_ship.cpp:4746), its execute writes the local player's SAIL
+ * status and sail audio every frame (:4340-4347), and it spawns a sail-cloth Grid, a
+ * WindArrow and a sea-encounter spawner that all assume one ship. So each puppet draws its
+ * own copy of the boat instead: the hull and head models from the "Ship" archive, placed at
+ * the peer's boat position (PUPPET_BOAT_* in puppet_shared.h), with height and tilt taken
+ * from the local sea the way daShip_c::setYPos / setWaveAngle do. The puppet then sits in
+ * it at the seat daPy_lk_c::setShipRidePos uses.
+ *
+ * Posed like daShip_c: both models are mDoExt_McaMorfs playing the peer's mast bck
+ * (FN_MAST_ON2 / FN_MAST_OFF2) and head bck at the peer's frames, and our joint callback
+ * repeats daShip_c's body and head callbacks (d_a_ship.cpp:110-231) with the peer's sail,
+ * tiller and head-look angles and mast scale.
+ *
+ * Not drawn yet: the sail cloth (d_a_grid), cannon / crane, wake effects, the talk mouth
+ * (headJointCallBack0's mAnmTransform swap) and the boat's shadow. The hull's water effect
+ * texture matrix is shared material state that the local ship sets (d_a_ship.cpp:259-282), so
+ * ours shows the local ship's projection. The boat has no collision.
+ *
+ * Compiled into the puppet REL: puppet.c #includes puppet_boat.c after puppet_execute.c.
+ */
+#ifndef PUPPET_BOAT_H
+#define PUPPET_BOAT_H
+
+#include "../../include/ww_defines.h"
+#include "../../include/ww_inlines.h"
+#include "puppet_shared.h"
+
+#if !defined(PUPPET_BOAT_0) || !defined(PUPPET_BOAT_OFF_FLAGS) || !defined(PUPPET_BOAT_FLAG_ACTIVE)
+#error "puppet_shared.h is missing the PUPPET_BOAT_* defines (see puppet_boat.h)"
+#endif
+
+/* PuppetBoat.state */
+#define PUPPET_BOAT_STATE_NONE    0  /* nothing loaded yet */
+#define PUPPET_BOAT_STATE_READY   1  /* archive loaded, models built */
+#define PUPPET_BOAT_STATE_FAILED  2  /* load or model build failed: never retried for this puppet */
+
+typedef struct PuppetBoat
+{
+  request_of_phase_process_class phase; /* "Ship" archive: dComIfG_resLoad / dComIfG_resDelete */
+  u8 state;                             /* PUPPET_BOAT_STATE_* */
+  u8 visible;                           /* posed this frame: draw it and seat the puppet */
+  u8 hasPose;                           /* pos/angles hold a pose (0: snap on the next sample) */
+  u8 framesSinceNet;                    /* game frames since the network position last changed */
+  u8 seated;                            /* the puppet was pinned to the seat last frame */
+  u8 mastBck;                           /* SHIP_BCK_* bodyAnm plays (daShip_c::m0392) */
+  u8 headBck;                           /* SHIP_BCK_* headAnm plays (daShip_c::m03B4) */
+  u8 mastHide;                          /* PUPPET_BOAT_FLAG_MAST_HIDE this frame */
+  JKRSolidHeap *heap;                   /* our own heap for the two morfs */
+  mDoExt_McaMorf *bodyAnm;              /* FN_BODY + mast bck, as daShip_c::mpBodyAnm */
+  mDoExt_McaMorf *headAnm;              /* FN_HEAD_H + head bck, as daShip_c::mpHeadAnm */
+  J3DModel *body;                       /* bodyAnm's model: hull, mast, tiller */
+  J3DModel *head;                       /* headAnm's model: the King of Red Lions' head */
+  cXyz net;                             /* last network position (a change = a new sample) */
+  cXyz pos;                             /* drawn position */
+  s16 rotY;
+  s16 pitch;                            /* shape_angle.x */
+  s16 roll;                             /* shape_angle.z */
+  s16 sailAngle;                        /* mSailAngle */
+  s16 tiller;                           /* m0366 */
+  s16 headX;                            /* m03A0 */
+  s16 headY;                            /* m03A2 */
+  s16 pad2;
+  u32 tevStr[0xB0 / 4];                 /* dKy_tevstr_c (d_kankyo.h, size 0xB0) */
+} PuppetBoat;
+
+/* Zero the boat. Call once from the puppet's create. */
+void puppet_boatInit(PuppetBoat *boat);
+
+/* Load / pose the boat for this frame from the slot's PUPPET_BOAT_* block. Call before
+ * puppet_execute so the puppet can be seated in this frame's pose. */
+void puppet_boatExecute(fopAc_ac_c *actor, PuppetBoat *boat, u32 slotIndex);
+
+/* The seat (setShipRidePos's l_ship_offset on the hull matrix) and the boat's angles.
+ * Returns 0 when the boat isn't posed this frame. */
+int puppet_boatSeat(PuppetBoat *boat, cXyz *pos, csXyz *angle);
+
+void puppet_boatDraw(fopAc_ac_c *actor, PuppetBoat *boat);
+
+/* Free the models and drop our reference on the "Ship" archive. Call from the puppet's delete. */
+void puppet_boatDelete(PuppetBoat *boat);
+
+#endif /* PUPPET_BOAT_H */

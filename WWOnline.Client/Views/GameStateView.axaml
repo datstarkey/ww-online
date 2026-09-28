@@ -1,0 +1,216 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             x:Class="WWOnline.Views.GameStateView"
+             x:DataType="vm:GameStateViewModel">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="32,28,32,32" Spacing="20">
+
+            <!-- Header -->
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Dolphin" Classes="ww-title" />
+                    <TextBlock Text="{Binding StageName, StringFormat='{}{0} · streaming from Dolphin'}"
+                               FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding HasData}" />
+                    <TextBlock Text="Attach to Dolphin to stream your game's live state."
+                               FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding !HasData}" />
+                </StackPanel>
+                <Border Grid.Column="1" Classes="ww-chip" Background="{StaticResource RupeeTintBrush}"
+                        VerticalAlignment="Center" IsVisible="{Binding HasData}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Ellipse Classes="ww-status-dot ww-pulse" Fill="{StaticResource RupeeBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Live" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource RupeeBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Dolphin attach bar -->
+            <Border Classes="ww-card" Padding="18,14">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                    <TextBlock Grid.Column="0" Text="DOLPHIN" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableDolphins}"
+                              SelectedItem="{Binding SelectedDolphin}"
+                              DisplayMemberBinding="{Binding DisplayName}"
+                              PlaceholderText="No Dolphin processes found"
+                              HorizontalAlignment="Stretch" Margin="0,0,10,0"
+                              IsEnabled="{Binding !IsBusy}" />
+                    <Button Grid.Column="2" Content="Refresh" Margin="0,0,10,0" Classes="ww-secondary"
+                            Command="{Binding RefreshDolphinsCommand}" IsEnabled="{Binding !IsBusy}" />
+                    <Button Grid.Column="3" Content="Attach" Classes="ww-accent"
+                            Command="{Binding ConnectDolphinCommand}"
+                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding !IsBusy}" />
+                    <Button Grid.Column="3" Content="Detach" Classes="ww-danger"
+                            Command="{Binding DisconnectDolphinCommand}"
+                            IsVisible="{Binding IsDolphinConnected}" IsEnabled="{Binding !IsBusy}" />
+                </Grid>
+            </Border>
+
+            <Border Classes="ww-error-banner"
+                    IsVisible="{Binding DolphinError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding DolphinError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap" />
+            </Border>
+
+            <!-- Waiting state -->
+            <Border Classes="ww-card" Padding="40" IsVisible="{Binding !HasData}">
+                <StackPanel Spacing="14" HorizontalAlignment="Center">
+                    <Border Width="52" Height="52" CornerRadius="14" Background="{StaticResource AccentTint2Brush}" HorizontalAlignment="Center">
+                        <Viewbox Width="26" Height="26">
+                            <Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource AccentBrush}" />
+                        </Viewbox>
+                    </Border>
+                    <TextBlock Text="Waiting for game data…" FontSize="18" FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" />
+                    <ProgressBar IsIndeterminate="True" Width="200" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="Attach to Dolphin and load a save to see your live state."
+                               FontSize="13" HorizontalAlignment="Center" Foreground="{StaticResource Text2Brush}"
+                               TextWrapping="Wrap" TextAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <!-- Stats grid -->
+            <Grid ColumnDefinitions="*,20,*" RowDefinitions="Auto,20,Auto" IsVisible="{Binding HasData}">
+
+                <!-- Health -->
+                <Border Grid.Row="0" Grid.Column="0" Classes="ww-card">
+                    <StackPanel Spacing="14">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                <Path Width="24" Height="24" Data="{StaticResource IconHeart}" Fill="{StaticResource HeartBrush}" />
+                            </Viewbox>
+                            <TextBlock Text="HEALTH" Classes="ww-section-header" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Hearts}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:CompileBindings="False">
+                                    <Viewbox Width="22" Height="22" Margin="0,0,4,4">
+                                        <Path Width="24" Height="24" Data="{StaticResource IconHeart}" Fill="{Binding}" />
+                                    </Viewbox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding HealthText}" FontSize="34"
+                                   FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
+                                   Foreground="{StaticResource HeartTextBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Rupees -->
+                <Border Grid.Row="0" Grid.Column="2" Classes="ww-card">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconRupeeOutline}" Stroke="{StaticResource RupeeBrush}" />
+                            </Viewbox>
+                            <TextBlock Text="RUPEES" Classes="ww-section-header" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Rupees}" FontSize="48"
+                                   FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
+                                   Foreground="{StaticResource RupeeLightBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Magic -->
+                <Border Grid.Row="2" Grid.Column="0" Classes="ww-card">
+                    <StackPanel Spacing="14">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Ellipse Width="10" Height="10" Fill="{StaticResource StoryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="MAGIC" Classes="ww-section-header" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <ProgressBar Minimum="0" Maximum="{Binding MaxMagic}" Value="{Binding CurrentMagic}" Classes="ww-magic" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding CurrentMagic}" FontSize="34"
+                                       FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
+                                       Foreground="{StaticResource StoryLightBrush}" />
+                            <TextBlock Text="/" FontFamily="{StaticResource FontMono}" FontSize="16" Foreground="{StaticResource Text3Brush}" VerticalAlignment="Bottom" Margin="0,0,0,7" />
+                            <TextBlock Text="{Binding MaxMagic}" FontFamily="{StaticResource FontMono}" FontSize="16" Foreground="{StaticResource Text3Brush}" VerticalAlignment="Bottom" Margin="0,0,0,7" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Equipment -->
+                <Border Grid.Row="2" Grid.Column="2" Classes="ww-card">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="EQUIPMENT" Classes="ww-section-header" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Border Classes="ww-icon-tile" Width="40" Height="40">
+                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSwords}" Stroke="{StaticResource GoldCBrush}" /></Viewbox>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="SWORD" Classes="ww-label" />
+                                <TextBlock Text="{Binding SwordName}" FontSize="15" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Border Classes="ww-icon-tile" Width="40" Height="40">
+                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconChest}" Stroke="{StaticResource GoldCBrush}" /></Viewbox>
+                            </Border>
+                            <StackPanel VerticalAlignment="Center" Spacing="1">
+                                <TextBlock Text="SHIELD" Classes="ww-label" />
+                                <TextBlock Text="{Binding ShieldName}" FontSize="15" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Ammo -->
+            <Grid ColumnDefinitions="*,20,*" IsVisible="{Binding HasData}">
+                <Border Grid.Column="0" Classes="ww-card">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="ARROWS" Classes="ww-section-header" />
+                        <TextBlock Text="{Binding CurrentArrows}" FontSize="34"
+                                   FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="ww-card">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="BOMBS" Classes="ww-section-header" />
+                        <TextBlock Text="{Binding CurrentBombs}" FontSize="34"
+                                   FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Position / sea chart -->
+            <Border Classes="ww-card" Padding="24,22" IsVisible="{Binding HasData}">
+                <StackPanel Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="POSITION · SEA CHART" Classes="ww-section-header" VerticalAlignment="Center" />
+                        <Border Grid.Column="1" Classes="ww-pill" Background="{StaticResource GoldTintBrush}">
+                            <TextBlock Text="{Binding Sector, StringFormat='Sector {0}'}" FontFamily="{StaticResource FontMono}"
+                                       FontWeight="Medium" LetterSpacing="0" Foreground="{StaticResource GoldTextBrush}" />
+                        </Border>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="26">
+                        <Border Width="150" Height="108" CornerRadius="12" Background="{StaticResource InputBrush}"
+                                BorderBrush="{StaticResource InputLineBrush}" BorderThickness="1">
+                            <Ellipse Width="11" Height="11" Fill="{StaticResource GoldCBrush}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <Grid ColumnDefinitions="*,*,*" VerticalAlignment="Center" Width="520">
+                            <StackPanel Grid.Column="0" Spacing="3">
+                                <TextBlock Text="X" Classes="ww-label" />
+                                <TextBlock Text="{Binding PositionX, StringFormat={}{0:F1}}" FontFamily="{StaticResource FontMono}"
+                                           FontSize="24" Foreground="{StaticResource AccentHoverBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="3">
+                                <TextBlock Text="Y" Classes="ww-label" />
+                                <TextBlock Text="{Binding PositionY, StringFormat={}{0:F1}}" FontFamily="{StaticResource FontMono}"
+                                           FontSize="24" Foreground="{StaticResource AccentHoverBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="3">
+                                <TextBlock Text="Z" Classes="ww-label" />
+                                <TextBlock Text="{Binding PositionZ, StringFormat={}{0:F1}}" FontFamily="{StaticResource FontMono}"
+                                           FontSize="24" Foreground="{StaticResource AccentHoverBrush}" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,186 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             x:Class="WWOnline.Views.AppearanceView"
+             x:DataType="vm:AppearanceViewModel">
+
+    <UserControl.Styles>
+        <!-- Colour swatch: a ring (accent when picked) around the colour tile -->
+        <Style Selector="Border.swatch-ring">
+            <Setter Property="Width" Value="76" />
+            <Setter Property="Height" Value="76" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Button:pointerover Border.swatch-ring">
+            <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+        </Style>
+        <Style Selector="Border.swatch-ring.selected, Button:pointerover Border.swatch-ring.selected">
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        </Style>
+        <Style Selector="TextBlock.swatch-name">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.swatch-name.selected">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- Clothes choice: a tall option card -->
+        <Style Selector="Button.clothes">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="CornerRadius" Value="14" />
+        </Style>
+    </UserControl.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="32,28,32,32" Spacing="20">
+
+            <!-- Header -->
+            <StackPanel Spacing="6">
+                <TextBlock Text="Appearance" Classes="ww-title" />
+                <TextBlock Text="How your Link looks, on your screen and on your crew's. Changes save and apply straight away."
+                           FontSize="14" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Grid ColumnDefinitions="300,20,*">
+
+                <!-- Current look -->
+                <Border Grid.Column="0" Classes="ww-card" Padding="22" VerticalAlignment="Top">
+                    <StackPanel Spacing="16">
+                        <TextBlock Text="YOUR LOOK" Classes="ww-section-header" />
+                        <Border Classes="ww-inset" Height="230">
+                            <Viewbox Width="170" Height="170" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Canvas Width="100" Height="100">
+                                    <Path Data="{StaticResource ShapeTunic}" Fill="{Binding PreviewBrush}"
+                                          Stroke="#40000000" StrokeThickness="1.5" StrokeJoin="Round" />
+                                    <!-- Belt + buckle (hero's tunic) -->
+                                    <Rectangle Canvas.Left="29" Canvas.Top="54" Width="42" Height="8" Fill="#5C3A1E"
+                                               IsVisible="{Binding !IsCasual}" />
+                                    <Rectangle Canvas.Left="45" Canvas.Top="53" Width="10" Height="10" RadiusX="1.5" RadiusY="1.5"
+                                               Fill="{StaticResource GoldCBrush}" IsVisible="{Binding !IsCasual}" />
+                                    <!-- Pajama stripes -->
+                                    <Rectangle Canvas.Left="29" Canvas.Top="46" Width="42" Height="5" Fill="#33FFFFFF"
+                                               IsVisible="{Binding IsCasual}" />
+                                    <Rectangle Canvas.Left="29" Canvas.Top="62" Width="42" Height="5" Fill="#33FFFFFF"
+                                               IsVisible="{Binding IsCasual}" />
+                                </Canvas>
+                            </Viewbox>
+                        </Border>
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding LookText}" Classes="ww-heading" FontSize="20" TextWrapping="Wrap" />
+                            <TextBlock Text="This is what your crew sees on your puppet Link, and what your own Link wears."
+                                       Classes="ww-muted" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Grid.Column="2" Spacing="20">
+
+                    <!-- Clothes -->
+                    <Border Classes="ww-card" Padding="24,22">
+                        <StackPanel Spacing="14">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Viewbox Width="20" Height="20" VerticalAlignment="Center">
+                                    <Path Classes="icon" Data="{StaticResource IconShirt}" Stroke="{StaticResource AccentBrush}" />
+                                </Viewbox>
+                                <TextBlock Text="Clothes" Classes="ww-card-title" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <ItemsControl ItemsSource="{Binding ClothesChoices}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><UniformGrid Columns="3" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ClothesChoiceViewModel">
+                                        <Button Classes="ww-option clothes" Classes.active="{Binding IsSelected}" Margin="0,0,10,0"
+                                                AutomationProperties.Name="{Binding Title}"
+                                                Command="{Binding $parent[UserControl].((vm:AppearanceViewModel)DataContext).SelectClothesCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Spacing="4">
+                                                <Grid ColumnDefinitions="*,Auto">
+                                                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TextBrush}" />
+                                                    <Viewbox Grid.Column="1" Width="16" Height="16" IsVisible="{Binding IsSelected}">
+                                                        <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource AccentBrush}" />
+                                                    </Viewbox>
+                                                </Grid>
+                                                <TextBlock Text="{Binding Description}" FontSize="13" FontWeight="Normal"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Tunic colour -->
+                    <Border Classes="ww-card" Padding="24,22">
+                        <StackPanel Spacing="16">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Border Width="20" Height="20" CornerRadius="6" Background="{Binding PreviewBrush}"
+                                            BorderBrush="{StaticResource OutlineBrush}" BorderThickness="1" VerticalAlignment="Center" />
+                                    <TextBlock Text="Tunic colour" Classes="ww-card-title" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Classes="ww-pill on">
+                                    <TextBlock Text="{Binding SelectedColor.Name}" />
+                                </Border>
+                            </Grid>
+
+                            <Border Classes="ww-info-banner" Padding="14,10">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <Viewbox Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,10,0">
+                                        <Path Classes="icon" Data="{StaticResource IconInfo}" Stroke="{StaticResource AccentBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource TextSoftBrush}"
+                                               Text="The colour recolours the hero's tunic. Pajamas always stay as they are." />
+                                </Grid>
+                            </Border>
+
+                            <ItemsControl ItemsSource="{Binding Swatches}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TunicSwatchViewModel">
+                                        <Button Classes="ww-bare" Margin="0,0,12,12" ToolTip.Tip="{Binding Name}"
+                                                AutomationProperties.Name="{Binding Name}"
+                                                Command="{Binding $parent[UserControl].((vm:AppearanceViewModel)DataContext).SelectColorCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Spacing="6">
+                                                <Border Classes="swatch-ring" Classes.selected="{Binding IsSelected}">
+                                                    <Border CornerRadius="15" Background="{Binding Brush}"
+                                                            BorderBrush="#33FFFFFF" BorderThickness="1">
+                                                        <Viewbox Width="26" Height="26" IsVisible="{Binding IsSelected}">
+                                                            <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{Binding CheckBrush}" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </Border>
+                                                <TextBlock Text="{Binding Name}" Classes="swatch-name" Classes.selected="{Binding IsSelected}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="{Binding ColorNote}" FontSize="13" TextWrapping="Wrap"
+                                       Foreground="{StaticResource Text2Brush}" IsVisible="{Binding !IsCasual}" />
+                            <Border Classes="ww-warn-banner" IsVisible="{Binding IsCasual}">
+                                <TextBlock Text="{Binding ColorNote}" FontSize="13" TextWrapping="Wrap"
+                                           Foreground="{StaticResource GoldTextBrush}" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

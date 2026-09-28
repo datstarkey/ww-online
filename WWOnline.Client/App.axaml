@@ -1,0 +1,25 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:WWOnline"
+             x:Class="WWOnline.App"
+             RequestedThemeVariant="Dark">
+    <Application.DataTemplates>
+        <local:ViewLocator />
+    </Application.DataTemplates>
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="/Styles/WindWakerTheme.axaml" />
+    </Application.Styles>
+
+    <Application.Resources>
+        <!-- Override Fluent accent to the sea-teal accent (must be Colors, not brushes) -->
+        <Color x:Key="SystemAccentColor">#37D3BF</Color>
+        <Color x:Key="SystemAccentColorDark1">#2BB3A2</Color>
+        <Color x:Key="SystemAccentColorDark2">#1F8F82</Color>
+        <Color x:Key="SystemAccentColorDark3">#146B61</Color>
+        <Color x:Key="SystemAccentColorLight1">#7BE6D8</Color>
+        <Color x:Key="SystemAccentColorLight2">#A6F0E6</Color>
+        <Color x:Key="SystemAccentColorLight3">#D2F8F3</Color>
+    </Application.Resources>
+</Application>

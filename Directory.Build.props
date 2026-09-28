@@ -1,0 +1,28 @@
+<Project>
+    <!--
+      Shared by every project in the solution (client, server, shared, patcher, tests).
+
+      Version: the ONE app version. Release builds override it from the git tag
+      (tag v1.2.3 -> dotnet publish -p:Version=1.2.3; see .github/workflows/release.yml).
+      Bump it here only to change what local/dev builds report. Read it at runtime through
+      WWOnline.Shared.AppInfo, never from a hardcoded string.
+
+      WwoRepositoryUrl: the ONE place the GitHub owner/repo lives. The client's updater reads it
+      (AppInfo.RepositoryUrl -> Velopack GithubSource). The release workflow overrides it with the
+      repo it runs in, so a release always updates from where it was published. (README.md badges
+      and links name the repo too; change them by hand if the repo moves.)
+    -->
+    <PropertyGroup>
+        <Version>0.1.0</Version>
+        <Product>WW-Online</Product>
+        <Company>datstarkey</Company>
+        <Authors>datstarkey</Authors>
+        <Copyright>Copyright (c) 2026 datstarkey</Copyright>
+        <WwoRepositoryUrl>https://github.com/datstarkey/ww-online</WwoRepositoryUrl>
+        <RepositoryUrl>$(WwoRepositoryUrl)</RepositoryUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyMetadata Include="WwoRepositoryUrl" Value="$(WwoRepositoryUrl)" />
+    </ItemGroup>
+</Project>

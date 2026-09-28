@@ -1,0 +1,988 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Styles.Resources>
+        <!-- ═══════════════════════════════════════════════ -->
+        <!--  Wind Waker Design System — Dark Sea            -->
+        <!--  (wwo-design-canvas: Main / Inventory / Viewer / Tools) -->
+        <!-- ═══════════════════════════════════════════════ -->
+
+        <!-- Surfaces -->
+        <Color x:Key="Ground">#0A1015</Color>
+        <Color x:Key="Sidebar">#0D151B</Color>
+        <Color x:Key="SidebarBorder">#1B2932</Color>
+        <Color x:Key="Card">#121C23</Color>
+        <Color x:Key="CardLine">#1F2E38</Color>
+        <Color x:Key="Raised">#17232C</Color>
+        <Color x:Key="RaisedAlt">#16252E</Color>
+        <Color x:Key="Inset">#0F171D</Color>
+        <Color x:Key="Input">#0B1217</Color>
+        <Color x:Key="InputLine">#22323D</Color>
+        <Color x:Key="Outline">#2A3B47</Color>
+        <Color x:Key="Track">#1B2932</Color>
+        <Color x:Key="SwitchOff">#2A3A46</Color>
+
+        <!-- Text -->
+        <Color x:Key="Text">#E7EEF2</Color>
+        <Color x:Key="TextSoft">#D5E0E6</Color>
+        <Color x:Key="TextNav">#B7C6D0</Color>
+        <Color x:Key="Text2">#9AAEBB</Color>
+        <Color x:Key="Text3">#8397A5</Color>
+
+        <!-- Accent: sea teal -->
+        <Color x:Key="Accent">#37D3BF</Color>
+        <Color x:Key="AccentHover">#7BE6D8</Color>
+        <Color x:Key="AccentTint">#0F2A2A</Color>
+        <Color x:Key="AccentTint2">#13303A</Color>
+        <Color x:Key="AccentLine">#1B4644</Color>
+        <Color x:Key="OnAccent">#06120F</Color>
+
+        <!-- Owner / editing: gold -->
+        <Color x:Key="GoldC">#F4B942</Color>
+        <Color x:Key="GoldTint">#2A2311</Color>
+        <Color x:Key="GoldLine">#5A4618</Color>
+        <Color x:Key="GoldText">#F6D58E</Color>
+        <Color x:Key="GoldTextStrong">#FFF1D0</Color>
+        <Color x:Key="GoldTextSoft">#D9B866</Color>
+
+        <!-- Status -->
+        <Color x:Key="Rupee">#5BD17A</Color>
+        <Color x:Key="RupeeLight">#7EE29A</Color>
+        <Color x:Key="RupeeTint">#123026</Color>
+        <Color x:Key="Heart">#FF6B6B</Color>
+        <Color x:Key="HeartText">#FF8A8A</Color>
+        <Color x:Key="Story">#A98BFF</Color>
+        <Color x:Key="StoryLight">#C4B0FF</Color>
+        <Color x:Key="StoryTint">#211A36</Color>
+        <Color x:Key="Danger">#FF9A9A</Color>
+        <Color x:Key="DangerLine">#3A2A2E</Color>
+        <Color x:Key="DangerTint">#2A1618</Color>
+
+        <!-- ── Brushes (new names) ── -->
+        <SolidColorBrush x:Key="GroundBrush" Color="{StaticResource Ground}" />
+        <SolidColorBrush x:Key="SidebarBrush" Color="{StaticResource Sidebar}" />
+        <SolidColorBrush x:Key="SidebarBorderBrush" Color="{StaticResource SidebarBorder}" />
+        <SolidColorBrush x:Key="CardBrush" Color="{StaticResource Card}" />
+        <SolidColorBrush x:Key="CardLineBrush" Color="{StaticResource CardLine}" />
+        <SolidColorBrush x:Key="RaisedBrush" Color="{StaticResource Raised}" />
+        <SolidColorBrush x:Key="RaisedAltBrush" Color="{StaticResource RaisedAlt}" />
+        <SolidColorBrush x:Key="InsetBrush" Color="{StaticResource Inset}" />
+        <SolidColorBrush x:Key="InputBrush" Color="{StaticResource Input}" />
+        <SolidColorBrush x:Key="InputLineBrush" Color="{StaticResource InputLine}" />
+        <SolidColorBrush x:Key="OutlineBrush" Color="{StaticResource Outline}" />
+        <SolidColorBrush x:Key="TrackBrush" Color="{StaticResource Track}" />
+        <SolidColorBrush x:Key="SwitchOffBrush" Color="{StaticResource SwitchOff}" />
+        <SolidColorBrush x:Key="TextBrush" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="TextSoftBrush" Color="{StaticResource TextSoft}" />
+        <SolidColorBrush x:Key="TextNavBrush" Color="{StaticResource TextNav}" />
+        <SolidColorBrush x:Key="Text2Brush" Color="{StaticResource Text2}" />
+        <SolidColorBrush x:Key="Text3Brush" Color="{StaticResource Text3}" />
+        <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHover}" />
+        <SolidColorBrush x:Key="AccentTintBrush" Color="{StaticResource AccentTint}" />
+        <SolidColorBrush x:Key="AccentTint2Brush" Color="{StaticResource AccentTint2}" />
+        <SolidColorBrush x:Key="AccentLineBrush" Color="{StaticResource AccentLine}" />
+        <SolidColorBrush x:Key="OnAccentBrush" Color="{StaticResource OnAccent}" />
+        <SolidColorBrush x:Key="GoldCBrush" Color="{StaticResource GoldC}" />
+        <SolidColorBrush x:Key="GoldTintBrush" Color="{StaticResource GoldTint}" />
+        <SolidColorBrush x:Key="GoldLineBrush" Color="{StaticResource GoldLine}" />
+        <SolidColorBrush x:Key="GoldTextBrush" Color="{StaticResource GoldText}" />
+        <SolidColorBrush x:Key="GoldTextStrongBrush" Color="{StaticResource GoldTextStrong}" />
+        <SolidColorBrush x:Key="GoldTextSoftBrush" Color="{StaticResource GoldTextSoft}" />
+        <SolidColorBrush x:Key="RupeeBrush" Color="{StaticResource Rupee}" />
+        <SolidColorBrush x:Key="RupeeLightBrush" Color="{StaticResource RupeeLight}" />
+        <SolidColorBrush x:Key="RupeeTintBrush" Color="{StaticResource RupeeTint}" />
+        <SolidColorBrush x:Key="HeartBrush" Color="{StaticResource Heart}" />
+        <SolidColorBrush x:Key="HeartTextBrush" Color="{StaticResource HeartText}" />
+        <SolidColorBrush x:Key="StoryBrush" Color="{StaticResource Story}" />
+        <SolidColorBrush x:Key="StoryLightBrush" Color="{StaticResource StoryLight}" />
+        <SolidColorBrush x:Key="StoryTintBrush" Color="{StaticResource StoryTint}" />
+        <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource Danger}" />
+        <SolidColorBrush x:Key="DangerLineBrush" Color="{StaticResource DangerLine}" />
+        <SolidColorBrush x:Key="DangerTintBrush" Color="{StaticResource DangerTint}" />
+
+        <!-- ── Legacy brush names (light-parchment era) remapped to the dark palette,
+             so anything still using them stays readable ── -->
+        <SolidColorBrush x:Key="ParchmentLightBrush" Color="{StaticResource Ground}" />
+        <SolidColorBrush x:Key="ParchmentDarkBrush" Color="{StaticResource Raised}" />
+        <SolidColorBrush x:Key="CardBgBrush" Color="{StaticResource Card}" />
+        <SolidColorBrush x:Key="CardBorderBrush" Color="{StaticResource CardLine}" />
+        <SolidColorBrush x:Key="FieldBgBrush" Color="{StaticResource Input}" />
+        <SolidColorBrush x:Key="FieldBorderBrush" Color="{StaticResource InputLine}" />
+        <SolidColorBrush x:Key="FieldBorderSoftBrush" Color="{StaticResource CardLine}" />
+        <SolidColorBrush x:Key="TrackBgBrush" Color="{StaticResource Track}" />
+        <SolidColorBrush x:Key="DividerBrush" Color="{StaticResource CardLine}" />
+        <SolidColorBrush x:Key="InkDeepBrush" Color="{StaticResource Input}" />
+        <SolidColorBrush x:Key="InkBrush" Color="{StaticResource Raised}" />
+        <SolidColorBrush x:Key="InkTextBrush" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="TerminalBgBrush" Color="{StaticResource Ground}" />
+        <SolidColorBrush x:Key="TerminalBorderBrush" Color="{StaticResource InputLine}" />
+        <SolidColorBrush x:Key="TealBrush" Color="{StaticResource Accent}" />
+        <SolidColorBrush x:Key="TealHoverBrush" Color="{StaticResource AccentHover}" />
+        <SolidColorBrush x:Key="TealDarkBrush" Color="{StaticResource AccentHover}" />
+        <SolidColorBrush x:Key="GoldBrush" Color="{StaticResource GoldC}" />
+        <SolidColorBrush x:Key="GoldHoverBrush" Color="#F7C866" />
+        <SolidColorBrush x:Key="GoldLightBrush" Color="{StaticResource GoldText}" />
+        <SolidColorBrush x:Key="GoldDarkBrush" Color="{StaticResource GoldTextSoft}" />
+        <SolidColorBrush x:Key="Muted1Brush" Color="{StaticResource Text2}" />
+        <SolidColorBrush x:Key="Muted2Brush" Color="{StaticResource Text2}" />
+        <SolidColorBrush x:Key="Muted3Brush" Color="{StaticResource Text3}" />
+        <SolidColorBrush x:Key="Muted4Brush" Color="{StaticResource TextNav}" />
+        <SolidColorBrush x:Key="MutedTanBrush" Color="{StaticResource Text3}" />
+        <SolidColorBrush x:Key="OnInkBrush" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="OnInkBrightBrush" Color="{StaticResource AccentHover}" />
+        <SolidColorBrush x:Key="OnInkMutedBrush" Color="{StaticResource Text2}" />
+        <SolidColorBrush x:Key="HeartRedBrush" Color="{StaticResource Heart}" />
+        <SolidColorBrush x:Key="HeartDeepBrush" Color="{StaticResource HeartText}" />
+        <SolidColorBrush x:Key="HeartEmptyBrush" Color="{StaticResource SwitchOff}" />
+        <SolidColorBrush x:Key="MagicPurpleBrush" Color="{StaticResource Story}" />
+        <SolidColorBrush x:Key="RupeeGreenBrush" Color="{StaticResource Rupee}" />
+        <SolidColorBrush x:Key="GreenDarkBrush" Color="{StaticResource RupeeLight}" />
+        <SolidColorBrush x:Key="GreenBgBrush" Color="{StaticResource RupeeTint}" />
+        <SolidColorBrush x:Key="GreenBorderBrush" Color="#1E4A36" />
+
+        <!-- ── Fluent control resources (dark inputs / dropdowns) ── -->
+        <SolidColorBrush x:Key="TextControlBackground" Color="{StaticResource Input}" />
+        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#0E161C" />
+        <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="{StaticResource Input}" />
+        <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="{StaticResource Inset}" />
+        <SolidColorBrush x:Key="TextControlBorderBrush" Color="{StaticResource InputLine}" />
+        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="{StaticResource Outline}" />
+        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="{StaticResource Accent}" />
+        <SolidColorBrush x:Key="TextControlForeground" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="TextControlForegroundFocused" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="{StaticResource Text3}" />
+        <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#71879A" />
+        <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#71879A" />
+        <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#71879A" />
+        <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="#5537D3BF" />
+
+        <SolidColorBrush x:Key="ComboBoxBackground" Color="{StaticResource Input}" />
+        <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="#0E161C" />
+        <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="{StaticResource Raised}" />
+        <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="{StaticResource Inset}" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrush" Color="{StaticResource InputLine}" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPointerOver" Color="{StaticResource Outline}" />
+        <SolidColorBrush x:Key="ComboBoxBorderBrushPressed" Color="{StaticResource Accent}" />
+        <SolidColorBrush x:Key="ComboBoxForeground" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="{StaticResource Text3}" />
+        <SolidColorBrush x:Key="ComboBoxPlaceHolderForeground" Color="#71879A" />
+        <SolidColorBrush x:Key="ComboBoxDropDownGlyphForeground" Color="{StaticResource Text2}" />
+        <SolidColorBrush x:Key="ComboBoxDropDownBackground" Color="{StaticResource Card}" />
+        <SolidColorBrush x:Key="ComboBoxDropDownBorderBrush" Color="{StaticResource Outline}" />
+        <SolidColorBrush x:Key="ComboBoxItemForeground" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="ComboBoxItemBackgroundPointerOver" Color="{StaticResource RaisedAlt}" />
+        <SolidColorBrush x:Key="ComboBoxItemBackgroundSelected" Color="{StaticResource AccentTint2}" />
+        <SolidColorBrush x:Key="ComboBoxItemBackgroundSelectedPointerOver" Color="{StaticResource AccentTint2}" />
+        <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="{StaticResource Text}" />
+
+        <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="ToolTipBackground" Color="{StaticResource Raised}" />
+        <SolidColorBrush x:Key="ToolTipForeground" Color="{StaticResource Text}" />
+        <SolidColorBrush x:Key="ToolTipBorderBrush" Color="{StaticResource Outline}" />
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!--  Fonts (bundled, see Assets/Fonts)              -->
+        <!--  Static weight instances (Medium / SemiBold / Bold …) cut from the OFL variable fonts:
+              Avalonia 11.2 doesn't apply a variable font's wght axis, so FontWeight picks the
+              matching file from the folder instead. -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <FontFamily x:Key="FontHeading">avares://WWOnline.Client/Assets/Fonts#Fredoka</FontFamily>
+        <FontFamily x:Key="FontBody">avares://WWOnline.Client/Assets/Fonts#Hanken Grotesk</FontFamily>
+        <FontFamily x:Key="FontMono">avares://WWOnline.Client/Assets/Fonts#JetBrains Mono</FontFamily>
+
+        <!-- Radii -->
+        <CornerRadius x:Key="CardRadius">18</CornerRadius>
+        <CornerRadius x:Key="ButtonRadius">12</CornerRadius>
+        <CornerRadius x:Key="PillRadius">999</CornerRadius>
+        <CornerRadius x:Key="InputRadius">12</CornerRadius>
+
+        <!-- ═══════════════════════════════════════════════ -->
+        <!--  Icons: 24×24 stroke paths from the mockups.    -->
+        <!--  Use inside a Viewbox with Path.icon.            -->
+        <!-- ═══════════════════════════════════════════════ -->
+        <StreamGeometry x:Key="IconSail">M12 2v16M12 3c5 3 7 8 7 13h-7M12 6c-3 3-5 6-6 10h6M3 20c3 2 15 2 18 0</StreamGeometry>
+        <StreamGeometry x:Key="IconHome">M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z</StreamGeometry>
+        <StreamGeometry x:Key="IconPulse">M3 12h4l3-8 4 16 3-8h4</StreamGeometry>
+        <StreamGeometry x:Key="IconList">M8 6h13M8 12h13M8 18h13M3.5 6h0.01M3.5 12h0.01M3.5 18h0.01</StreamGeometry>
+        <StreamGeometry x:Key="IconWrench">M14.7 6.3a4 4 0 0 0 -5.4 5.4L3 18l3 3l6.3 -6.3a4 4 0 0 0 5.4 -5.4l-2.6 2.6l-2.4 -0.6l-0.6 -2.4z</StreamGeometry>
+        <StreamGeometry x:Key="IconSliders">M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M14 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M8 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M16 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0</StreamGeometry>
+        <StreamGeometry x:Key="IconCrown">M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z</StreamGeometry>
+        <StreamGeometry x:Key="IconCopy">M11 9h7a2 2 0 0 1 2 2v7a2 2 0 0 1 -2 2h-7a2 2 0 0 1 -2 -2v-7a2 2 0 0 1 2 -2zM5 15V5a2 2 0 0 1 2 -2h10</StreamGeometry>
+        <StreamGeometry x:Key="IconPencil">M4 20h4L19 9l-4 -4L4 16zM13.5 6.5l4 4</StreamGeometry>
+        <StreamGeometry x:Key="IconCheck">M5 12.5l4.5 4.5L19 7.5</StreamGeometry>
+        <StreamGeometry x:Key="IconLock">M7 11h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2H7a2 2 0 0 1 -2 -2v-6a2 2 0 0 1 2 -2zM8 11V8a4 4 0 0 1 8 0v3</StreamGeometry>
+        <StreamGeometry x:Key="IconRupee">M12 2l6 5v10l-6 5l-6 -5V7zM12 7v10</StreamGeometry>
+        <StreamGeometry x:Key="IconRupeeOutline">M12 2l6 5v10l-6 5l-6 -5V7z</StreamGeometry>
+        <StreamGeometry x:Key="IconGlobe">M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2 -3 14.8 0 18</StreamGeometry>
+        <StreamGeometry x:Key="IconChest">M5 9h14a2 2 0 0 1 2 2v7a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2v-7a2 2 0 0 1 2 -2zM5 9V7a3 3 0 0 1 3 -3h8a3 3 0 0 1 3 3v2M3 13h18M12 12v3</StreamGeometry>
+        <StreamGeometry x:Key="IconBook">M4 5a2 2 0 0 1 2 -2h13v16H6a2 2 0 0 0 -2 2zM4 19V5M8 7h7</StreamGeometry>
+        <StreamGeometry x:Key="IconWind">M3 8h11a3 3 0 1 0 -3 -3M3 12h15a3 3 0 1 1 -3 3M3 16h7</StreamGeometry>
+        <StreamGeometry x:Key="IconPeople">M5.5 8a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6</StreamGeometry>
+        <StreamGeometry x:Key="IconSwords">M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6 -6M16 16l4 4</StreamGeometry>
+        <StreamGeometry x:Key="IconArrowRight">M5 12h14M13 6l6 6l-6 6</StreamGeometry>
+        <StreamGeometry x:Key="IconArrowLeft">M19 12H5M11 6l-6 6l6 6</StreamGeometry>
+        <StreamGeometry x:Key="IconHeart">M12 21s-7.5 -4.6 -9.5 -9.2C1 8.2 3.2 5 6.5 5c2 0 3.5 1.1 5.5 3c2 -1.9 3.5 -3 5.5 -3C20.8 5 23 8.2 21.5 11.8C19.5 16.4 12 21 12 21z</StreamGeometry>
+        <StreamGeometry x:Key="IconInfo">M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M12 11v6M12 7.5h0.01</StreamGeometry>
+        <StreamGeometry x:Key="IconSearch">M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M20 20l-3.5 -3.5</StreamGeometry>
+        <StreamGeometry x:Key="IconMonitor">M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2V6a2 2 0 0 1 2 -2zM8 21h8M12 18v3</StreamGeometry>
+        <StreamGeometry x:Key="IconShard">M12 3l10 18H2z</StreamGeometry>
+        <StreamGeometry x:Key="IconDoor">M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-4M10 16l4 -4l-4 -4M14 12H4</StreamGeometry>
+        <StreamGeometry x:Key="IconShirt">M9 3.5L3.5 6.5l2 4.5l2.5 -1V20.5h8V10l2.5 1l2 -4.5L15 3.5c-0.5 1.6 -1.6 2.5 -3 2.5s-2.5 -0.9 -3 -2.5z</StreamGeometry>
+        <StreamGeometry x:Key="IconDownload">M12 4v11M7 10l5 5l5 -5M5 20h14</StreamGeometry>
+        <StreamGeometry x:Key="IconRefresh">M20 12a8 8 0 1 1 -2.4 -5.7M20 4v5h-5</StreamGeometry>
+        <StreamGeometry x:Key="IconWarning">M12 3.5l9.5 16.5H2.5zM12 10v4.5M12 17.5h0.01</StreamGeometry>
+        <!-- Filled tunic silhouette for the Appearance preview (100×100 box) -->
+        <StreamGeometry x:Key="ShapeTunic">M35 10L13 21l7 18l9 -4V92h42V35l9 4l7 -18L65 10C61 19 56 23 50 23S39 19 35 10z</StreamGeometry>
+    </Styles.Resources>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--  Icons                                              -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <Style Selector="Path.icon">
+        <Setter Property="Width" Value="24" />
+        <Setter Property="Height" Value="24" />
+        <Setter Property="StrokeThickness" Value="1.8" />
+        <Setter Property="StrokeLineCap" Value="Round" />
+        <Setter Property="StrokeJoin" Value="Round" />
+        <Setter Property="Stroke" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Path.icon.bold">
+        <Setter Property="StrokeThickness" Value="2.2" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--  Global Text                                        -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!-- Text colour, font and size are INHERITED from the Window (MainWindow sets them), not set
+         on every TextBlock: a global TextBlock setter would override the text colour buttons give
+         their content (dark text on the teal / light buttons). -->
+    <Style Selector="Window">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}" />
+        <Setter Property="FontSize" Value="14" />
+    </Style>
+
+    <!-- Page / card titles (Fredoka) -->
+    <Style Selector="TextBlock.ww-heading">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontHeading}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.ww-title">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontHeading}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="32" />
+        <Setter Property="LetterSpacing" Value="-0.3" />
+    </Style>
+    <Style Selector="TextBlock.ww-card-title">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontHeading}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="20" />
+    </Style>
+
+    <Style Selector="TextBlock.ww-subheading">
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        <Setter Property="FontSize" Value="14" />
+    </Style>
+
+    <!-- Secondary / tertiary body text -->
+    <Style Selector="TextBlock.ww-muted">
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="TextBlock.ww-faint">
+        <Setter Property="Foreground" Value="{StaticResource Text3Brush}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
+    <!-- Small mono caps label (text should be supplied uppercase) -->
+    <Style Selector="TextBlock.ww-label">
+        <Setter Property="Foreground" Value="{StaticResource Text3Brush}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}" />
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="LetterSpacing" Value="1.1" />
+    </Style>
+
+    <!-- Mono caps card header ("ROOM WALLET") -->
+    <Style Selector="TextBlock.ww-section-header">
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="LetterSpacing" Value="1.2" />
+    </Style>
+
+    <!-- Monospace data readout -->
+    <Style Selector="TextBlock.ww-mono">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}" />
+        <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+
+    <Style Selector="TextBlock.on-ink">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--  Surfaces                                           -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <Style Selector="Border.ww-card">
+        <Setter Property="Background" Value="{StaticResource CardBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardRadius}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CardLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="22" />
+    </Style>
+    <!-- Gold border while the owner is editing -->
+    <Style Selector="Border.ww-card.editing">
+        <Setter Property="BorderBrush" Value="{StaticResource GoldCBrush}" />
+    </Style>
+
+    <!-- Inset panel (memory, stat editors, sea chart, preset row) -->
+    <Style Selector="Border.ww-terminal">
+        <Setter Property="Background" Value="{StaticResource InputBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource SidebarBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="18" />
+    </Style>
+    <Style Selector="Border.ww-inset">
+        <Setter Property="Background" Value="{StaticResource InputBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource SidebarBorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="14" />
+    </Style>
+
+    <Style Selector="Border.ww-terminal-field">
+        <Setter Property="Background" Value="{StaticResource GroundBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource InputLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="9,8" />
+    </Style>
+
+    <!-- Mini stat tile -->
+    <Style Selector="Border.ww-tile">
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="12,10" />
+    </Style>
+
+    <!-- 42×42 rule icon tile -->
+    <Style Selector="Border.ww-icon-tile">
+        <Setter Property="Width" Value="42" />
+        <Setter Property="Height" Value="42" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+    </Style>
+
+    <Style Selector="Border.ww-error-banner">
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="Background" Value="{StaticResource DangerTintBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource DangerLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- Gold "you are editing" banner -->
+    <Style Selector="Border.ww-edit-banner">
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="18,12" />
+        <Setter Property="Background" Value="{StaticResource GoldTintBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GoldLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- Teal info banner -->
+    <Style Selector="Border.ww-info-banner">
+        <Setter Property="CornerRadius" Value="14" />
+        <Setter Property="Padding" Value="18,14" />
+        <Setter Property="Background" Value="{StaticResource AccentTintBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AccentLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <!-- Gold warning banner (e.g. "patch again") -->
+    <Style Selector="Border.ww-warn-banner">
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14,10" />
+        <Setter Property="Background" Value="{StaticResource GoldTintBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource GoldLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+
+    <Style Selector="Border.ww-divider">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Background" Value="{StaticResource CardLineBrush}" />
+    </Style>
+
+    <!-- Pill badge (status chips) -->
+    <Style Selector="Border.ww-chip">
+        <Setter Property="CornerRadius" Value="{StaticResource PillRadius}" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+    </Style>
+    <Style Selector="Border.ww-chip > StackPanel">
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- Small pill (ON/OFF, counts) -->
+    <Style Selector="Border.ww-pill">
+        <Setter Property="CornerRadius" Value="{StaticResource PillRadius}" />
+        <Setter Property="Padding" Value="12,5" />
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.ww-pill TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="LetterSpacing" Value="0.5" />
+        <Setter Property="Foreground" Value="{StaticResource Text3Brush}" />
+    </Style>
+    <Style Selector="Border.ww-pill.on">
+        <Setter Property="Background" Value="{StaticResource AccentTintBrush}" />
+    </Style>
+    <Style Selector="Border.ww-pill.on TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource AccentHoverBrush}" />
+    </Style>
+    <!-- Light "preset name" pill -->
+    <Style Selector="Border.ww-pill.light">
+        <Setter Property="Background" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Border.ww-pill.light TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource GroundBrush}" />
+    </Style>
+    <!-- Outlined "planned" pill -->
+    <Style Selector="Border.ww-pill.outline">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="10,3" />
+    </Style>
+    <Style Selector="Border.ww-pill.outline TextBlock">
+        <Setter Property="FontWeight" Value="Normal" />
+        <Setter Property="LetterSpacing" Value="0" />
+    </Style>
+    <!-- Teal item chip ("Telescope") -->
+    <Style Selector="Border.ww-item-chip">
+        <Setter Property="CornerRadius" Value="{StaticResource PillRadius}" />
+        <Setter Property="Padding" Value="10,6" />
+        <Setter Property="Background" Value="{StaticResource AccentTintBrush}" />
+        <Setter Property="Margin" Value="0,0,6,6" />
+    </Style>
+    <Style Selector="Border.ww-item-chip TextBlock">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource AccentHoverBrush}" />
+    </Style>
+
+    <Style Selector="Border.ww-item-chip.extra">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.ww-item-chip.extra TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+    </Style>
+
+    <!-- Round player avatar -->
+    <Style Selector="Border.ww-avatar">
+        <Setter Property="Width" Value="36" />
+        <Setter Property="Height" Value="36" />
+        <Setter Property="CornerRadius" Value="18" />
+    </Style>
+    <Style Selector="Border.ww-avatar TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource FontHeading}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Foreground" Value="#FFFFFF" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--  Buttons                                            -->
+    <!--  (Fluent paints the template's ContentPresenter, so -->
+    <!--   every state is set there)                          -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <Style Selector="Button">
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}" />
+    </Style>
+
+    <!-- Teal accent (Done, Warp, Host) -->
+    <Style Selector="Button.ww-accent">
+        <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="CornerRadius" Value="{StaticResource ButtonRadius}" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ww-accent /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}" />
+    </Style>
+    <Style Selector="Button.ww-accent:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource AccentHoverBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}" />
+    </Style>
+    <Style Selector="Button.ww-accent:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2BB3A2" />
+    </Style>
+
+    <!-- Light primary (Edit room / Edit items) -->
+    <Style Selector="Button.ww-primary">
+        <Setter Property="Foreground" Value="{StaticResource GroundBrush}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="CornerRadius" Value="{StaticResource ButtonRadius}" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ww-primary /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource TextBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource GroundBrush}" />
+    </Style>
+    <Style Selector="Button.ww-primary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#FFFFFF" />
+        <Setter Property="Foreground" Value="{StaticResource GroundBrush}" />
+    </Style>
+    <Style Selector="Button.ww-primary:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="#C9D6DD" />
+    </Style>
+
+    <!-- Dark outlined (Copy invite, Browse, Connect) -->
+    <Style Selector="Button.ww-secondary">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="CornerRadius" Value="{StaticResource ButtonRadius}" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ww-secondary /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CardBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-secondary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RaisedAltBrush}" />
+        <Setter Property="BorderBrush" Value="#3A4E5B" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-secondary:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+    </Style>
+
+    <!-- Ghost (transparent, outlined) -->
+    <Style Selector="Button.ww-ghost">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="CornerRadius" Value="{StaticResource ButtonRadius}" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ww-ghost /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-ghost:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RaisedAltBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+
+    <!-- Danger outlined (Leave room, Clear) -->
+    <Style Selector="Button.ww-danger">
+        <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="CornerRadius" Value="{StaticResource ButtonRadius}" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ww-danger /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource CardBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource DangerLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+    </Style>
+    <Style Selector="Button.ww-danger:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource DangerTintBrush}" />
+        <Setter Property="Foreground" Value="#FFB8B8" />
+    </Style>
+
+    <!-- Teal-tinted link button ("View items →") -->
+    <Style Selector="Button.ww-link">
+        <Setter Property="Foreground" Value="{StaticResource AccentHoverBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ww-link /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource AccentTint2Brush}" />
+        <Setter Property="Foreground" Value="{StaticResource AccentHoverBrush}" />
+    </Style>
+    <Style Selector="Button.ww-link:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#18404C" />
+        <Setter Property="Foreground" Value="#A6F0E6" />
+    </Style>
+
+    <!-- Bare text link ("← Room", "View all") -->
+    <Style Selector="Button.ww-textlink">
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.ww-textlink /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+    </Style>
+    <Style Selector="Button.ww-textlink:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource AccentHoverBrush}" />
+    </Style>
+
+    <!-- Sidebar nav item -->
+    <Style Selector="Button.ww-nav">
+        <Setter Property="Foreground" Value="{StaticResource TextNavBrush}" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.ww-nav /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextNavBrush}" />
+    </Style>
+    <Style Selector="Button.ww-nav:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#121E26" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-nav.active">
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.ww-nav.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RaisedAltBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-nav Path.icon">
+        <Setter Property="Stroke" Value="{StaticResource TextNavBrush}" />
+    </Style>
+    <Style Selector="Button.ww-nav.active Path.icon">
+        <Setter Property="Stroke" Value="{StaticResource AccentBrush}" />
+    </Style>
+
+    <!-- Segmented control option (presets, tool tabs, magic, capacity) -->
+    <Style Selector="Button.ww-seg">
+        <Setter Property="Foreground" Value="{StaticResource TextNavBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="18,0" />
+        <Setter Property="MinHeight" Value="40" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.ww-seg /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextNavBrush}" />
+    </Style>
+    <Style Selector="Button.ww-seg:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-seg.active">
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+    <Style Selector="Button.ww-seg.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource TextBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource GroundBrush}" />
+    </Style>
+    <Style Selector="Button.ww-seg.mono">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="Button.ww-seg.dev /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="{StaticResource Text3Brush}" />
+    </Style>
+    <Style Selector="Button.ww-seg.dev.active /template/ ContentPresenter">
+        <Setter Property="Foreground" Value="{StaticResource GroundBrush}" />
+    </Style>
+
+    <!-- Toggle chip / option (songs, pearls, swords): accent border when on -->
+    <Style Selector="Button.ww-option">
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CornerRadius" Value="12" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.ww-option.pill">
+        <Setter Property="CornerRadius" Value="{StaticResource PillRadius}" />
+        <Setter Property="MinHeight" Value="36" />
+    </Style>
+    <Style Selector="Button.ww-option /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+    </Style>
+    <Style Selector="Button.ww-option:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-option.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource AccentTintBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+
+    <!-- Plain hit-target around custom content (item tiles, shards, stage rows) -->
+    <Style Selector="Button.ww-bare">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-bare /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-bare:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-bare:pressed">
+        <Setter Property="RenderTransform" Value="none" />
+    </Style>
+
+    <!-- Stage row in the Warp list -->
+    <Style Selector="Button.ww-row">
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-row /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-row:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-row.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RaisedAltBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+    </Style>
+
+    <!-- Read-only controls look normal, not greyed: interactivity is shown by edit mode -->
+    <Style Selector="Button:disabled">
+        <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="Button.ww-option:disabled, Button.ww-seg:disabled, Button.ww-bare:disabled">
+        <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.ww-option:disabled /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+    </Style>
+    <Style Selector="Button.ww-option.active:disabled /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource AccentTintBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+    <Style Selector="Button.ww-seg:disabled /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextNavBrush}" />
+    </Style>
+    <Style Selector="Button.ww-seg.active:disabled /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource TextBrush}" />
+        <Setter Property="Foreground" Value="{StaticResource GroundBrush}" />
+    </Style>
+    <Style Selector="Button.ww-bare:disabled /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- On/off switch (50×28 track, white knob) -->
+    <Style Selector="ToggleButton.ww-switch">
+        <Setter Property="Background" Value="{StaticResource SwitchOffBrush}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Width" Value="56" />
+        <Setter Property="Height" Value="44" />
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel Background="Transparent">
+                    <Border x:Name="PART_Track" Width="50" Height="28" CornerRadius="14"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Background="{TemplateBinding Background}">
+                        <Border x:Name="PART_Knob" Width="22" Height="22" CornerRadius="11"
+                                Background="#FFFFFF" Margin="3,0" HorizontalAlignment="Left"
+                                VerticalAlignment="Center" />
+                    </Border>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="ToggleButton.ww-switch:checked">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.ww-switch:checked /template/ Border#PART_Knob">
+        <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="ToggleButton.ww-switch:disabled">
+        <Setter Property="Opacity" Value="0.5" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--  Inputs                                             -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="{StaticResource InputBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource InputLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}" />
+        <Setter Property="SelectionBrush" Value="#5537D3BF" />
+        <Setter Property="CornerRadius" Value="{StaticResource InputRadius}" />
+        <Setter Property="Padding" Value="12,11" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}" />
+    </Style>
+    <Style Selector="TextBox.mono">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}" />
+    </Style>
+    <Style Selector="TextBox.terminal">
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="10,8" />
+    </Style>
+    <!-- Borderless search field inside a styled border -->
+    <Style Selector="TextBox.bare">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0,10" />
+    </Style>
+    <Style Selector="TextBox.bare /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TextBox.bare:focus /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="TextBox.bare:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+
+    <Style Selector="ComboBox">
+        <Setter Property="Background" Value="{StaticResource InputBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource InputLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource InputRadius}" />
+        <Setter Property="Padding" Value="12,10" />
+        <Setter Property="MinHeight" Value="44" />
+        <Setter Property="FontFamily" Value="{StaticResource FontBody}" />
+    </Style>
+
+    <Style Selector="CheckBox">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--  ProgressBars                                       -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <Style Selector="ProgressBar.ww-health">
+        <Setter Property="Foreground" Value="{StaticResource HeartBrush}" />
+        <Setter Property="Background" Value="{StaticResource TrackBrush}" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="MinHeight" Value="8" />
+        <Setter Property="Height" Value="8" />
+    </Style>
+    <Style Selector="ProgressBar.ww-magic">
+        <Setter Property="Foreground" Value="{StaticResource StoryBrush}" />
+        <Setter Property="Background" Value="{StaticResource TrackBrush}" />
+        <Setter Property="CornerRadius" Value="7" />
+        <Setter Property="MinHeight" Value="12" />
+        <Setter Property="Height" Value="12" />
+    </Style>
+    <Style Selector="ProgressBar.ww-generic">
+        <Setter Property="Foreground" Value="{StaticResource RupeeBrush}" />
+        <Setter Property="Background" Value="{StaticResource TrackBrush}" />
+        <Setter Property="CornerRadius" Value="999" />
+        <Setter Property="MinHeight" Value="6" />
+        <Setter Property="Height" Value="6" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--  Expander / ScrollViewer                            -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <Style Selector="Expander">
+        <Setter Property="Background" Value="{StaticResource CardBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource CardLineBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource CardRadius}" />
+        <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        <Setter Property="Padding" Value="4" />
+    </Style>
+
+    <Style Selector="ScrollViewer">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <!--  Status dot + pulse animation                       -->
+    <!-- ═══════════════════════════════════════════════════ -->
+    <Style Selector="Ellipse.ww-status-dot">
+        <Setter Property="Width" Value="7" />
+        <Setter Property="Height" Value="7" />
+    </Style>
+
+    <Style Selector="Ellipse.ww-pulse">
+        <Style.Animations>
+            <Animation Duration="0:0:2.4" IterationCount="INFINITE">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+                <KeyFrame Cue="50%"><Setter Property="Opacity" Value="0.35" /></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1" /></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+
+</Styles>

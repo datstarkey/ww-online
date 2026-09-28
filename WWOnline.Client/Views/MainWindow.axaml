@@ -1,0 +1,174 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:WWOnline.ViewModels"
+        x:Class="WWOnline.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{Binding Title}"
+        Icon="avares://WWOnline.Client/Assets/Branding/app.ico"
+        Width="1280" Height="820"
+        MinWidth="1120" MinHeight="640"
+        FontFamily="{StaticResource FontBody}" FontSize="14"
+        Foreground="{StaticResource TextBrush}"
+        Background="{StaticResource GroundBrush}">
+
+    <DockPanel Background="{StaticResource GroundBrush}">
+        <!-- ═══ Sidebar: brand · nav · local player ═══ -->
+        <Border DockPanel.Dock="Left" Width="232"
+                Background="{StaticResource SidebarBrush}"
+                BorderBrush="{StaticResource SidebarBorderBrush}" BorderThickness="0,0,1,0"
+                Padding="14,22,14,18">
+            <DockPanel>
+                <!-- Brand -->
+                <Image DockPanel.Dock="Top" Source="avares://WWOnline.Client/Assets/Branding/logo.png"
+                       Width="148" Height="148" HorizontalAlignment="Center" Margin="0,-6,0,14"
+                       RenderOptions.BitmapInterpolationMode="HighQuality"
+                       AutomationProperties.Name="WW-Online" />
+
+                <!-- Local player card -->
+                <Border DockPanel.Dock="Bottom" Padding="12" CornerRadius="12"
+                        Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardLineBrush}" BorderThickness="1">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <!-- Avatar: gold ring when this player owns the room -->
+                        <Panel Width="42" Height="42" VerticalAlignment="Center">
+                            <Border Width="42" Height="42" CornerRadius="21" Background="{StaticResource GoldCBrush}"
+                                    IsVisible="{Binding Room.IsOwner}" />
+                            <Border Width="38" Height="38" CornerRadius="19" Background="{StaticResource SidebarBrush}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Border Width="34" Height="34" CornerRadius="17" Background="{Binding Server.LocalTunicBrush}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Server.LocalInitials}" FontFamily="{StaticResource FontHeading}"
+                                           FontWeight="SemiBold" FontSize="14" Foreground="{Binding Server.LocalAvatarForeground}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </Panel>
+                        <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" Spacing="2">
+                            <TextBlock Text="{Binding Server.PlayerName}" FontWeight="SemiBold" FontSize="14"
+                                       TextTrimming="CharacterEllipsis" />
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource RupeeBrush}"
+                                         IsVisible="{Binding Server.DolphinConnected}" />
+                                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="{StaticResource Text3Brush}"
+                                         IsVisible="{Binding !Server.DolphinConnected}" />
+                                <TextBlock Text="{Binding Server.DolphinLinkText}" FontSize="12"
+                                           Foreground="{StaticResource Text2Brush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Update banner (above the player card): installed builds only -->
+                <Border DockPanel.Dock="Bottom" Margin="0,0,0,10" Padding="12" CornerRadius="12"
+                        Background="{StaticResource AccentTintBrush}" BorderBrush="{StaticResource AccentLineBrush}" BorderThickness="1">
+                    <Border.IsVisible>
+                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                            <Binding Path="Updates.ShowBanner" />
+                            <Binding Path="Updates.IsEnabled" />
+                        </MultiBinding>
+                    </Border.IsVisible>
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                <Path Classes="icon bold" Data="{StaticResource IconDownload}" Stroke="{StaticResource AccentBrush}" />
+                            </Viewbox>
+                            <TextBlock Text="{Binding Updates.AvailableVersion, StringFormat='Update available · v{0}'}"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource AccentHoverBrush}"
+                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <Button Content="Download" Classes="ww-accent" MinHeight="34" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center" Command="{Binding Updates.DownloadCommand}"
+                                IsVisible="{Binding Updates.IsUpdateAvailable}" />
+                        <StackPanel Spacing="6" IsVisible="{Binding Updates.IsDownloading}">
+                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding Updates.DownloadProgress}"
+                                         Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+                            <TextBlock Text="{Binding Updates.DownloadProgress, StringFormat='Downloading… {0}%'}"
+                                       FontSize="12" Foreground="{StaticResource Text2Brush}" />
+                        </StackPanel>
+                        <Button Content="Restart to update" Classes="ww-accent" MinHeight="34" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center" Command="{Binding Updates.RestartToUpdateCommand}"
+                                IsVisible="{Binding Updates.IsReadyToRestart}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Patch banner (above the update banner): the patched game is out of date, e.g. after an
+                     update that shipped new game code. A prompt only: patching stays the player's call. -->
+                <Border DockPanel.Dock="Bottom" Margin="0,0,0,10" Classes="ww-warn-banner" IsVisible="{Binding ShowPatchBanner}">
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />
+                            </Viewbox>
+                            <TextBlock Text="Patch the game again" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource GoldTextBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="Your patched game isn't patched yet, or doesn't match this version of WW-Online."
+                                   FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource GoldTextSoftBrush}"
+                                   ToolTip.Tip="{Binding PatchOptions.BuildStatusText}" />
+                        <Button Content="Open Settings" Classes="ww-accent" MinHeight="34" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center" Command="{Binding ShowSettingsCommand}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Connection status (above the player card) -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="8,0,8,12" Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Server.IsConnected}">
+                        <Ellipse Classes="ww-status-dot ww-pulse" Fill="{StaticResource RupeeBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Hosting" IsVisible="{Binding Server.IsHosting}" FontSize="12" Foreground="{StaticResource RupeeLightBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="Online" IsVisible="{Binding !Server.IsHosting}" FontSize="12" Foreground="{StaticResource RupeeLightBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding Room.OnlineText, StringFormat='· {0}'}" FontSize="12" Foreground="{StaticResource Text2Brush}" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Server.IsConnecting}">
+                        <Ellipse Classes="ww-status-dot ww-pulse" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Connecting…" FontSize="12" Foreground="{StaticResource AccentHoverBrush}" FontWeight="SemiBold" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Server.IsDisconnected}">
+                        <Ellipse Classes="ww-status-dot" Fill="{StaticResource Text3Brush}" VerticalAlignment="Center" />
+                        <TextBlock Text="Not in a room" FontSize="12" Foreground="{StaticResource Text2Brush}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Nav -->
+                <StackPanel Spacing="4">
+                    <Button Classes="ww-nav" AutomationProperties.Name="Room" Classes.active="{Binding IsDashboardActive}" Command="{Binding ShowDashboardCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconHome}" /></Viewbox>
+                            <TextBlock Text="Room" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="ww-nav" AutomationProperties.Name="Appearance" Classes.active="{Binding IsAppearanceActive}" Command="{Binding ShowAppearanceCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconShirt}" /></Viewbox>
+                            <TextBlock Text="Appearance" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="ww-nav" AutomationProperties.Name="Dolphin" Classes.active="{Binding IsLiveStateActive}" Command="{Binding ShowLiveStateCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconMonitor}" /></Viewbox>
+                            <TextBlock Text="Dolphin" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="ww-nav" AutomationProperties.Name="Activity" Classes.active="{Binding IsActivityActive}" Command="{Binding ShowActivityCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconList}" /></Viewbox>
+                            <TextBlock Text="Activity" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="ww-nav" AutomationProperties.Name="Tools" Classes.active="{Binding IsToolsActive}" Command="{Binding ShowToolsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconWrench}" /></Viewbox>
+                            <TextBlock Text="Tools" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Classes="ww-nav" AutomationProperties.Name="Settings" Classes.active="{Binding IsSettingsActive}" Command="{Binding ShowSettingsCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconSliders}" /></Viewbox>
+                            <TextBlock Text="Settings" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══ Content ═══ -->
+        <ContentControl Content="{Binding CurrentView}" />
+    </DockPanel>
+</Window>

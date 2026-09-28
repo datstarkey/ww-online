@@ -1,0 +1,602 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             xmlns:svc="using:WWOnline.Services"
+             x:Class="WWOnline.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+
+    <UserControl.Resources>
+        <!-- ═══ Players card (shared by the owner and viewer layouts) ═══ -->
+        <DataTemplate x:Key="PlayersCard" x:DataType="vm:DashboardViewModel">
+            <Border Classes="ww-card" Padding="22,20">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="Players" Classes="ww-card-title" FontSize="18" VerticalAlignment="Center" />
+                        <Border Grid.Column="1" Classes="ww-pill" Background="{StaticResource RupeeTintBrush}" Padding="10,4">
+                            <TextBlock Text="{Binding OnlineText}" Foreground="{StaticResource RupeeBrush}" FontWeight="SemiBold" LetterSpacing="0" />
+                        </Border>
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Server.Players}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PlayerRowViewModel">
+                                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,12">
+                                    <Border Classes="ww-avatar" Background="{Binding TunicBrush}" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Initials}" Foreground="{Binding AvatarForeground}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" Spacing="2" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="{Binding PlayerName}" FontWeight="SemiBold" FontSize="14" />
+                                            <TextBlock Text="(you)" FontWeight="Medium" FontSize="14" Foreground="{StaticResource Text2Brush}"
+                                                       IsVisible="{Binding IsLocal}" />
+                                            <Viewbox Width="14" Height="14" VerticalAlignment="Center" IsVisible="{Binding IsOwner}"
+                                                     ToolTip.Tip="Room owner">
+                                                <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconCrown}" Stroke="{StaticResource GoldCBrush}" />
+                                            </Viewbox>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding StageText}" FontSize="12" Foreground="{StaticResource Text2Brush}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Panel IsVisible="{Binding IsWaitingForPlayers}">
+                        <Rectangle RadiusX="12" RadiusY="12" Stroke="{StaticResource OutlineBrush}" StrokeThickness="1"
+                                   StrokeDashArray="4,3" />
+                        <Grid ColumnDefinitions="*,Auto" Margin="12,10">
+                            <TextBlock Text="Waiting for more players" FontSize="13" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding RoomAddress}" Classes="ww-mono" FontSize="12"
+                                       Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center" />
+                        </Grid>
+                    </Panel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- ═══ Room wallet card ═══ -->
+        <DataTemplate x:Key="WalletCard" x:DataType="vm:DashboardViewModel">
+            <Border Classes="ww-card" Padding="22,20">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                            <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconRupeeOutline}" Stroke="{StaticResource RupeeBrush}" />
+                        </Viewbox>
+                        <TextBlock Grid.Column="1" Text="ROOM WALLET" Classes="ww-section-header" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="{Binding WalletStateText}" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource RupeeBrush}" IsVisible="{Binding SharedWalletOn}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="{Binding WalletStateText}" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedWalletOn}" VerticalAlignment="Center" />
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding WalletAmountText}" FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
+                                   FontSize="44" Foreground="{StaticResource RupeeLightBrush}" />
+                        <TextBlock Text="{Binding WalletMaxText}" FontSize="15" Foreground="{StaticResource Text2Brush}"
+                                   VerticalAlignment="Bottom" Margin="0,0,0,9" />
+                    </StackPanel>
+                    <ProgressBar Classes="ww-generic" Minimum="0" Maximum="100" Value="{Binding WalletPercent}" />
+                    <TextBlock Text="{Binding WalletNote}" FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- ═══ Room items summary card ═══ -->
+        <DataTemplate x:Key="ItemsCard" x:DataType="vm:DashboardViewModel">
+            <Border Classes="ww-card" Padding="22,20">
+                <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding ItemsCardTitle}" Classes="ww-card-title" FontSize="18" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="ww-link" Command="{Binding OpenItemsCommand}" AutomationProperties.Name="{Binding ItemsLinkText}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding ItemsLinkText}" VerticalAlignment="Center" />
+                                <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                                    <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconArrowRight}" Stroke="{StaticResource AccentHoverBrush}" />
+                                </Viewbox>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <TextBlock Text="{Binding Items.WaitingText}" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                               TextWrapping="Wrap" IsVisible="{Binding !Items.HasSnapshot}" />
+                    <StackPanel Spacing="12" IsVisible="{Binding Items.HasSnapshot}">
+                        <Grid ColumnDefinitions="*,8,*">
+                            <Border Classes="ww-tile">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="SWORD" FontSize="11" LetterSpacing="0.6" Foreground="{StaticResource Text2Brush}" />
+                                    <TextBlock Text="{Binding Items.SwordName}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Classes="ww-tile">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="SHIELD" FontSize="11" LetterSpacing="0.6" Foreground="{StaticResource Text2Brush}" />
+                                    <TextBlock Text="{Binding Items.ShieldName}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Items.HeartIcons}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Viewbox Width="18" Height="18" Margin="0,0,4,2">
+                                        <Path Width="24" Height="24" Data="{StaticResource IconHeart}" Fill="{StaticResource HeartBrush}" />
+                                    </Viewbox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Items.HeartsText}" FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                            <TextBlock Grid.Column="1" Text="{Binding Items.MagicText}" FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding Items.OwnedChips}" IsVisible="{Binding Items.HasOwnedChips}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ItemChip">
+                                    <Border Classes="ww-item-chip" Classes.extra="{Binding IsExtra}">
+                                        <TextBlock Text="{Binding Text}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+        <!-- ═══ Story flags summary card ═══ -->
+        <DataTemplate x:Key="FlagsCard" x:DataType="vm:DashboardViewModel">
+            <Border Classes="ww-card" Padding="22,20">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding FlagsCardTitle}" Classes="ww-card-title" FontSize="18" VerticalAlignment="Center" />
+                        <Button Grid.Column="1" Classes="ww-link" Command="{Binding OpenFlagsCommand}" AutomationProperties.Name="{Binding FlagsLinkText}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding FlagsLinkText}" VerticalAlignment="Center" />
+                                <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                                    <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconArrowRight}" Stroke="{StaticResource AccentHoverBrush}" />
+                                </Viewbox>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Viewbox Width="18" Height="18" VerticalAlignment="Center">
+                            <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconBook}" Stroke="{StaticResource StoryBrush}" />
+                        </Viewbox>
+                        <TextBlock Text="{Binding Flags.SetCountText}" FontWeight="SemiBold" FontSize="15" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <ProgressBar Classes="ww-magic" Height="6" MinHeight="6" Minimum="0" Maximum="100" Value="{Binding Flags.SetPercent}" />
+                    <TextBlock Text="{Binding Flags.CardNote}" FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Panel>
+        <!-- ════ Room items / Story flags sub-pages ════ -->
+        <ContentControl Content="{Binding Items}" IsVisible="{Binding ShowItemsPage}" />
+        <ContentControl Content="{Binding Flags}" IsVisible="{Binding ShowFlagsPage}" />
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                      IsVisible="{Binding ShowOverview}">
+            <Grid Margin="32,28,32,32">
+
+                <!-- ════ Not in a room: host or join ════ -->
+                <StackPanel IsVisible="{Binding !Server.IsConnected}" HorizontalAlignment="Center" Width="560"
+                            Margin="0,24,0,0" Spacing="16">
+                    <Border Classes="ww-card" Padding="28">
+                        <StackPanel Spacing="16">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Set sail" FontSize="26" Classes="ww-heading" />
+                                <TextBlock Text="Host a room or join your crew on the Great Sea." Classes="ww-subheading" />
+                            </StackPanel>
+
+                            <Border Classes="ww-error-banner" IsVisible="{Binding Server.ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding Server.ErrorMessage}" Foreground="{StaticResource DangerBrush}"
+                                           FontSize="13" TextWrapping="Wrap" />
+                            </Border>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="PLAYER NAME" Classes="ww-label" />
+                                <TextBox Text="{Binding Server.PlayerName}" Watermark="Link" />
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="*,12,120">
+                                <StackPanel Grid.Column="0" Spacing="6">
+                                    <TextBlock Text="SERVER HOST" Classes="ww-label" />
+                                    <TextBox Text="{Binding Server.ServerHost}" Classes="mono" Watermark="localhost" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="6">
+                                    <TextBlock Text="PORT" Classes="ww-label" />
+                                    <TextBox Text="{Binding Server.ServerPort}" Classes="mono" Watermark="6969" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
+                                <Button Grid.Column="0" Content="Host a room" Classes="ww-accent"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Command="{Binding Server.HostCommand}" IsEnabled="{Binding !Server.IsLoading}" />
+                                <Button Grid.Column="2" Content="Join" Classes="ww-secondary"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                        Command="{Binding Server.ConnectCommand}" IsEnabled="{Binding !Server.IsLoading}" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Server.IsConnecting}">
+                                <Ellipse Classes="ww-status-dot ww-pulse" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Server.ConnectionInfoText}" FontSize="13" Foreground="{StaticResource AccentHoverBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,0">
+                        <Button Classes="ww-textlink" Command="{Binding GoLiveStateCommand}" AutomationProperties.Name="Dolphin page">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding Server.DolphinLinkText}" VerticalAlignment="Center" />
+                                <TextBlock Text="· Dolphin page" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="18">
+                            <Button Classes="ww-textlink" Command="{Binding OpenItemsCommand}" AutomationProperties.Name="Your items">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="Your items" VerticalAlignment="Center" />
+                                    <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                                        <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconArrowRight}"
+                                              Stroke="{Binding $parent[Button].Foreground}" />
+                                    </Viewbox>
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="ww-textlink" Command="{Binding OpenFlagsCommand}" AutomationProperties.Name="Your story flags">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="Story flags" VerticalAlignment="Center" />
+                                    <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                                        <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconArrowRight}"
+                                              Stroke="{Binding $parent[Button].Foreground}" />
+                                    </Viewbox>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <!-- ════ In a room ════ -->
+                <StackPanel IsVisible="{Binding Server.IsConnected}" Spacing="22">
+
+                    <!-- Header -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="6" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding RoomLabel}" Classes="ww-section-header" LetterSpacing="1" />
+                            <TextBlock Text="{Binding RoomTitle}" Classes="ww-title" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="16,0,0,0">
+                            <!-- Owner badge / view-only badge -->
+                            <Border Classes="ww-chip" Background="{StaticResource GoldTintBrush}" IsVisible="{Binding IsOwner}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                        <Path Classes="icon" StrokeThickness="1.9" Data="{StaticResource IconCrown}" Stroke="{StaticResource GoldCBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Text="You own this room" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{StaticResource GoldCBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+                            <Border Classes="ww-chip" IsVisible="{Binding !IsOwner}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                                        <Path Classes="icon" StrokeThickness="1.9" Data="{StaticResource IconLock}" Stroke="{StaticResource TextNavBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Text="View only" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{StaticResource TextNavBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+
+                            <Button Classes="ww-secondary" Command="{Binding CopyInviteCommand}" AutomationProperties.Name="Copy invite"
+                                    ToolTip.Tip="{Binding RoomAddress, StringFormat='Copies {0} for a friend to join'}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                        <Path Classes="icon" Data="{StaticResource IconCopy}" Stroke="{StaticResource TextBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Text="{Binding CopyInviteText}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Classes="ww-primary" Command="{Binding StartEditCommand}" IsVisible="{Binding ShowEditButton}" AutomationProperties.Name="Edit room">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                        <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconPencil}" Stroke="{StaticResource GroundBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Text="Edit room" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="ww-accent" Command="{Binding StopEditCommand}" IsVisible="{Binding IsEditing}" AutomationProperties.Name="Done">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                        <Path Classes="icon" StrokeThickness="2.4" Data="{StaticResource IconCheck}" Stroke="{StaticResource OnAccentBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Text="Done" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+
+                            <Button Classes="ww-danger" Content="{Binding LeaveText}" Command="{Binding Server.DisconnectCommand}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Editing banner (owner) -->
+                    <Border Classes="ww-edit-banner" IsVisible="{Binding IsEditing}" Margin="0,-8,0,0">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <Viewbox Width="18" Height="18" VerticalAlignment="Center">
+                                <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconPencil}" Stroke="{StaticResource GoldCBrush}" />
+                            </Viewbox>
+                            <TextBlock Grid.Column="1" Margin="12,0" VerticalAlignment="Center" TextWrapping="Wrap"
+                                       FontSize="14" Foreground="{StaticResource GoldTextBrush}">
+                                <Run Text="Editing the room." FontWeight="Bold" Foreground="{StaticResource GoldTextStrongBrush}" /><Run Text=" Each change reaches every player as soon as you make it." />
+                            </TextBlock>
+                            <TextBlock Grid.Column="2" Text="Press Done to lock it again" FontSize="13"
+                                       Foreground="{StaticResource GoldTextSoftBrush}" VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <!-- Owner-name banner (players who don't own the room) -->
+                    <Border Classes="ww-info-banner" IsVisible="{Binding !IsOwner}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Viewbox Width="18" Height="18" VerticalAlignment="Center">
+                                <Path Classes="icon" StrokeThickness="1.9" Data="{StaticResource IconCrown}" Stroke="{StaticResource AccentBrush}" />
+                            </Viewbox>
+                            <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap"
+                                       FontSize="14" Foreground="#BDEFE8">
+                                <Run Text="{Binding OwnerBannerName}" FontWeight="Bold" Foreground="{StaticResource TextBrush}" /><Run Text=" owns this room" FontWeight="Bold" Foreground="{StaticResource TextBrush}" /><Run Text=" and sets the rules and room items. Anything you pick up still counts for everyone." />
+                            </TextBlock>
+                        </Grid>
+                    </Border>
+
+                    <!-- ════ Owner layout: rules | players · wallet · items ════ -->
+                    <Grid ColumnDefinitions="*,20,400" IsVisible="{Binding IsOwner}">
+                        <Border Classes="ww-card" Classes.editing="{Binding IsEditing}" Padding="24" VerticalAlignment="Top">
+                            <StackPanel Spacing="18">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="Room rules" Classes="ww-card-title" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsViewing}" VerticalAlignment="Center">
+                                        <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                                            <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconLock}" Stroke="{StaticResource Text2Brush}" />
+                                        </Viewbox>
+                                        <TextBlock Text="Locked. Press Edit room to change" FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="Editing" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource GoldCBrush}"
+                                               IsVisible="{Binding IsEditing}" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <!-- Read: preset pill + note -->
+                                <Border Classes="ww-inset" Padding="14,12" IsVisible="{Binding IsViewing}">
+                                    <Grid ColumnDefinitions="Auto,Auto,*">
+                                        <TextBlock Text="Preset" FontSize="13" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center" />
+                                        <Border Grid.Column="1" Classes="ww-pill light" Margin="12,0">
+                                            <TextBlock Text="{Binding PresetText}" FontSize="13" LetterSpacing="0" />
+                                        </Border>
+                                        <TextBlock Grid.Column="2" Text="{Binding PresetNote}" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                                                   VerticalAlignment="Center" TextWrapping="Wrap" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- Edit: preset segmented control -->
+                                <StackPanel Spacing="10" IsVisible="{Binding IsEditing}">
+                                    <Border Classes="ww-inset" Padding="4">
+                                        <Grid ColumnDefinitions="*,4,*,4,*">
+                                            <Button Grid.Column="0" Classes="ww-seg" Classes.active="{Binding IsFullSyncPreset}" Content="Full sync"
+                                                    MinHeight="44" HorizontalAlignment="Stretch" Command="{Binding ApplyFullSyncPresetCommand}"
+                                                    ToolTip.Tip="Share everything: wallet, world, items and story." />
+                                            <Button Grid.Column="2" Classes="ww-seg" Classes.active="{Binding IsCoopPreset}" Content="Co-op"
+                                                    MinHeight="44" HorizontalAlignment="Stretch" Command="{Binding ApplyCoopPresetCommand}"
+                                                    ToolTip.Tip="Share nothing: each player keeps their own game and you just see each other." />
+                                            <Button Grid.Column="4" Classes="ww-seg" Classes.active="{Binding IsCustomPreset}" Content="Custom"
+                                                    MinHeight="44" HorizontalAlignment="Stretch" IsEnabled="False"
+                                                    ToolTip.Tip="Lit when the switches below are a mix. Pick a preset to reset." />
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Text="{Binding PresetNote}" FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                                </StackPanel>
+
+                                <!-- Rule rows -->
+                                <StackPanel>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconRupee}" Stroke="{StaticResource RupeeBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Shared wallet" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="One rupee purse. Anyone's rupees count for everyone." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding SharedWalletOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding SharedWalletOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !SharedWalletOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding SharedWalletOn}" ToolTip.Tip="Shared wallet" AutomationProperties.Name="Shared wallet" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconGlobe}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Shared world" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="Chests, switches and pickups are gone for everyone once taken." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding SharedWorldOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding SharedWorldOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !SharedWorldOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding SharedWorldOn}" ToolTip.Tip="Shared world" AutomationProperties.Name="Shared world" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconChest}" Stroke="{StaticResource GoldCBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Shared items" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="One player's pickup unlocks it for the room. Heart and magic upgrades too." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding SharedItemsOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding SharedItemsOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !SharedItemsOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding SharedItemsOn}" ToolTip.Tip="Shared items" AutomationProperties.Name="Shared items" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconBook}" Stroke="{StaticResource StoryBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Shared story" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="Main story progress merges up. Players can split up and finish different parts." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding SharedStoryOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding SharedStoryOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !SharedStoryOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding SharedStoryOn}" ToolTip.Tip="Shared story" AutomationProperties.Name="Shared story" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Coming later (not interactive) -->
+                                <StackPanel Spacing="2" Margin="0,4,0,0">
+                                    <TextBlock Text="COMING LATER" Classes="ww-label" Margin="0,0,0,6" />
+                                    <Grid ColumnDefinitions="Auto,*,Auto" Height="44">
+                                        <Viewbox Width="18" Height="18" VerticalAlignment="Center"><Path Classes="icon" Data="{StaticResource IconWind}" Stroke="{StaticResource Text3Brush}" /></Viewbox>
+                                        <TextBlock Grid.Column="1" Text="Shared weather, wind and time of day" Margin="14,0" FontSize="14"
+                                                   Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" />
+                                        <Border Grid.Column="2" Classes="ww-pill outline"><TextBlock Text="Off by default" /></Border>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" Height="44">
+                                        <Viewbox Width="18" Height="18" VerticalAlignment="Center"><Path Classes="icon" Data="{StaticResource IconPeople}" Stroke="{StaticResource Text3Brush}" /></Viewbox>
+                                        <TextBlock Grid.Column="1" Text="No player collision (walk through each other)" Margin="14,0" FontSize="14"
+                                                   Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" />
+                                        <Border Grid.Column="2" Classes="ww-pill outline"><TextBlock Text="Off by default" /></Border>
+                                    </Grid>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" Height="44">
+                                        <Viewbox Width="18" Height="18" VerticalAlignment="Center"><Path Classes="icon" Data="{StaticResource IconSwords}" Stroke="{StaticResource Text3Brush}" /></Viewbox>
+                                        <TextBlock Grid.Column="1" Text="PVP" Margin="14,0" FontSize="14"
+                                                   Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" />
+                                        <Border Grid.Column="2" Classes="ww-pill outline"><TextBlock Text="Planned" /></Border>
+                                    </Grid>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Grid.Column="2" Spacing="20">
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PlayersCard}" />
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource WalletCard}" />
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ItemsCard}" />
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource FlagsCard}" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- ════ Player layout: rules + wallet | items | players + feed ════ -->
+                    <Grid ColumnDefinitions="*,20,*,20,340" IsVisible="{Binding !IsOwner}">
+                        <StackPanel Grid.Column="0" Spacing="20">
+                            <Border Classes="ww-card" Padding="22">
+                                <StackPanel Spacing="4">
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+                                        <TextBlock Text="Room rules" Classes="ww-card-title" FontSize="18" VerticalAlignment="Center" />
+                                        <Border Grid.Column="1" Classes="ww-pill light" Padding="10,4">
+                                            <TextBlock Text="{Binding PresetText}" LetterSpacing="0" />
+                                        </Border>
+                                    </Grid>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconRupeeOutline}" Stroke="{StaticResource RupeeBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="Shared wallet" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedWalletOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedWalletOn}" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconGlobe}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="Shared world" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedWorldOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedWorldOn}" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconChest}" Stroke="{StaticResource GoldCBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="Shared items" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedItemsOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedItemsOn}" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconBook}" Stroke="{StaticResource StoryBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="Shared story" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedStoryOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedStoryOn}" />
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource WalletCard}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Spacing="20" VerticalAlignment="Top">
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ItemsCard}" />
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource FlagsCard}" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="4" Spacing="20">
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource PlayersCard}" />
+                            <Border Classes="ww-card" Padding="22,20">
+                                <StackPanel Spacing="4">
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                                        <TextBlock Text="What's happening" Classes="ww-card-title" FontSize="18" VerticalAlignment="Center" />
+                                        <Button Grid.Column="1" Classes="ww-textlink" Content="View all" Command="{Binding GoActivityCommand}" />
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding Activity.RecentEntries}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="svc:GameLogEntry">
+                                                <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,10">
+                                                    <Grid ColumnDefinitions="58,*,Auto">
+                                                        <Border Width="58" Height="22" CornerRadius="6" Background="{Binding TagBackground}" VerticalAlignment="Top">
+                                                            <TextBlock Text="{Binding EventTypeText}" FontFamily="{StaticResource FontMono}" FontSize="10"
+                                                                       LetterSpacing="0.6" Foreground="{Binding TagForeground}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                        </Border>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Message}" Margin="12,0" FontSize="13" LineHeight="18"
+                                                                   Foreground="{StaticResource TextSoftBrush}" TextWrapping="Wrap" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding TimestampText}" FontSize="12"
+                                                                   Foreground="{StaticResource Text3Brush}" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="Nothing yet. Joins, leaves and zone changes show up here."
+                                               FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
+                                               IsVisible="{Binding !Activity.HasEntries}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Panel>
+</UserControl>

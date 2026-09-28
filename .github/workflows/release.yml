@@ -1,0 +1,278 @@
+name: Release
+
+# Push a tag v1.2.3 (or v1.3.0-beta.1 for a pre-release) and this:
+#   1. builds PatchData (our puppet REL, every patch diff, the optional patch catalogue) with
+#      devkitPPC in devkitPro's Linux container (the client's --build-patchdata mode),
+#   2. publishes the client (self-contained win-x64, server bundled for the Host button),
+#   3. packs it with Velopack and publishes a GitHub Release in THIS repo, which installed
+#      apps update from, and attaches the standalone server zips.
+# Run it by hand (workflow_dispatch) for a dry run: everything is built and packed, and the
+# packages are kept as a workflow artifact instead of being released.
+# See docs/releasing.md.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version for the dry run (nothing is released)'
+        required: true
+        default: '0.0.0-dryrun'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_VERSION: 9.0.x
+  SOLUTION: WW-Online.sln
+  CLIENT_PROJECT: WWOnline.Client/WWOnline.Client.csproj
+  SERVER_PROJECT: WWOnline.Server/WWOnline.Server.csproj
+  CLIENT_EXE: WWOnline.Client.exe
+  # Keep VPK_VERSION in step with the Velopack package in WWOnline.Client.csproj.
+  VPK_VERSION: 1.2.158
+  PACK_ID: WWOnline
+  PACK_TITLE: WW-Online
+  PACK_AUTHORS: datstarkey
+
+jobs:
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      publish: ${{ steps.v.outputs.publish }}
+    steps:
+      - id: v
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            version="${GITHUB_REF_NAME#v}"; publish=true
+          else
+            version="$INPUT_VERSION"; publish=false
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$version' is not a SemVer version (tag like v1.2.3 or v1.3.0-beta.1)"
+            exit 1
+          fi
+          prerelease=false
+          if [[ "$version" == *-* ]]; then prerelease=true; fi
+          {
+            echo "version=$version"
+            echo "prerelease=$prerelease"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          echo "WW-Online $version (pre-release: $prerelease, publish: $publish)"
+
+  patchdata:
+    name: Build PatchData (devkitPPC)
+    needs: version
+    runs-on: ubuntu-latest
+    # devkitPPC comes from devkitPro's image (Debian 12; it sets DEVKITPPC). The tag is pinned to the
+    # devkitPPC release the game code is developed and tested with (r47.1, gcc 15.1), so the REL a
+    # release ships is byte-identical to a local build. Bump it deliberately, together with the local
+    # toolchain, and re-test in game (REL size / ARAM budget, hook size). A job container can't read
+    # the workflow env, so the tag lives here.
+    container:
+      image: devkitpro/devkitppc:20250727
+    # Builds and runs repo code inside a third-party image: it needs no write access.
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      # No submodules: GameMod only includes GameMod/include; tww-decomp is reference only.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Toolchain
+        run: |
+          echo "DEVKITPPC=$DEVKITPPC"
+          "$DEVKITPPC/bin/powerpc-eabi-gcc" --version | head -n 1
+          dotnet --version
+
+      # The client's headless --build-patchdata mode compiles the puppet REL, generates the draw
+      # hook and assembles every required and optional patch from GameMod/, WITHOUT any game files,
+      # then adds the optional patch catalogue, assets and patchdata-stamp.json (docs/releasing.md).
+      # Paths are relative to the workspace: runner.temp is a host path in a container job.
+      - name: Build PatchData
+        run: |
+          dotnet run --project "$CLIENT_PROJECT" -c Release -p:Version="$VERSION" -- \
+            --build-patchdata out/PatchData --log-file out/patchdata.log
+
+      - name: PatchData build log
+        if: always()
+        run: cat out/patchdata.log 2> /dev/null || echo "(no log)"
+
+      - name: Check PatchData
+        run: |
+          out=out/PatchData
+          for f in d_a_puppet.rel patchdata-stamp.json free_space_start_offsets.txt patch_diffs/use_extra_memory_diff.yaml patch_diffs/link_draw_hook_diff.yaml; do
+            test -s "$out/$f" || { echo "::error::PatchData/$f is missing"; exit 1; }
+          done
+          ls "$out"/patch_diffs/optional/*_diff.yaml > /dev/null 2>&1 || { echo "::error::PatchData has no optional patch diffs"; exit 1; }
+          ls "$out"/optional/*.asm > /dev/null 2>&1 || { echo "::error::PatchData has no optional patch catalogue"; exit 1; }
+          find "$out" -type f -exec ls -l {} \;
+
+      # The container has no pwsh: the guard runs on PowerShell's .NET global tool.
+      - name: No Nintendo files in PatchData
+        run: |
+          dotnet tool install --global PowerShell --version 7.5.3
+          export PATH="$PATH:$HOME/.dotnet/tools"
+          pwsh -NoProfile -File ./scripts/check-no-nintendo-files.ps1 -Path out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: patchdata
+          path: out/PatchData
+          if-no-files-found: error
+
+  windows:
+    name: Publish, pack and release
+    needs: [version, patchdata]
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+      # The app updates from the repo it was released from (overrides Directory.Build.props).
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: No Nintendo files in the repo
+        shell: pwsh
+        run: ./scripts/check-no-nintendo-files.ps1
+
+      - name: Build and test
+        shell: pwsh
+        run: |
+          dotnet build "$env:SOLUTION" -c Release -warnaserror -p:Version=$env:VERSION
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test WWOnline.Tests/WWOnline.Tests.csproj -c Release --no-build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test WWOnline.Patcher.Tests/WWOnline.Patcher.Tests.csproj -c Release --no-build
+
+      - name: Publish client (self-contained win-x64)
+        shell: pwsh
+        run: dotnet publish $env:CLIENT_PROJECT -c Release -r win-x64 --self-contained true -p:Version=$env:VERSION -p:WwoRepositoryUrl=$env:REPO_URL -o publish/client
+
+      - name: Publish server into the client (the Host button runs server/WWOnline.Server.exe)
+        shell: pwsh
+        run: dotnet publish $env:SERVER_PROJECT -c Release -r win-x64 --self-contained true -p:Version=$env:VERSION -p:WwoRepositoryUrl=$env:REPO_URL -o publish/client/server
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: patchdata
+          path: ci-patchdata/PatchData
+
+      - name: Add PatchData
+        shell: pwsh
+        run: |
+          # The CI-built PatchData is the app's complete patch data (REL, every diff, the optional patch
+          # catalogue, assets, stamp): it REPLACES whatever the publish copied from the checkout.
+          ./scripts/check-no-nintendo-files.ps1 -Path ci-patchdata
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $target = 'publish/client/PatchData'
+          if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+          Copy-Item ci-patchdata/PatchData $target -Recurse
+          Remove-Item ci-patchdata -Recurse -Force
+          # Every file the stamp lists must be there, unchanged, and nothing else (the client checks this
+          # too before patching).
+          $stamp = Get-Content "$target/patchdata-stamp.json" -Raw | ConvertFrom-Json
+          foreach ($f in $stamp.Files) {
+            $path = Join-Path $target $f.Path
+            if (-not (Test-Path $path)) { throw "PatchData/$($f.Path) is missing" }
+            if ((Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $f.Sha256) { throw "PatchData/$($f.Path) differs from its stamp" }
+          }
+          $root = (Resolve-Path $target).Path
+          $listed = @($stamp.Files | ForEach-Object { $_.Path }) + 'patchdata-stamp.json'
+          foreach ($file in Get-ChildItem $target -Recurse -File) {
+            $rel = $file.FullName.Substring($root.Length + 1).Replace('\', '/')
+            if ($listed -cnotcontains $rel) { throw "PatchData/$rel is not in the stamp" }
+          }
+          "PatchData: $($stamp.Files.Count) files, default source hash $($stamp.DefaultSourceHash.Substring(0, 12))"
+          Get-ChildItem $target -Recurse -File | ForEach-Object { "{0,10}  {1}" -f $_.Length, $_.FullName }
+
+      - name: Server zips
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          # Windows, self-contained (no .NET needed): the same server the app bundles.
+          Compress-Archive -Path publish/client/server/* -DestinationPath "dist/WW-Online-Server-$env:VERSION-win-x64.zip"
+          # Any OS with the ASP.NET Core 9 runtime (Linux VPS etc.): dotnet WWOnline.Server.dll [port]
+          dotnet publish $env:SERVER_PROJECT -c Release --self-contained false -p:UseAppHost=false -p:Version=$env:VERSION -o publish/server-portable
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Compress-Archive -Path publish/server-portable/* -DestinationPath "dist/WW-Online-Server-$env:VERSION-portable.zip"
+
+      - name: No Nintendo files in the app or the server zips
+        shell: pwsh
+        run: ./scripts/check-no-nintendo-files.ps1 -Path publish/client, dist
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version ${{ env.VPK_VERSION }}
+
+      - name: Download the previous release (for delta updates)
+        if: needs.version.outputs.publish == 'true'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $extra = @(); if ($env:PRERELEASE -eq 'true') { $extra += '--pre' }
+          vpk download github --repoUrl $env:REPO_URL --token $env:GITHUB_TOKEN --outputDir Releases @extra
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'No previous release to diff against (first release?): full package only.'
+            $global:LASTEXITCODE = 0
+          }
+
+      - name: Pack (Velopack)
+        shell: pwsh
+        run: |
+          $icon = @(); if (Test-Path assets/branding/app.ico) { $icon = @('--icon', 'assets/branding/app.ico') }
+          vpk pack --packId $env:PACK_ID --packVersion $env:VERSION --packDir publish/client `
+            --mainExe $env:CLIENT_EXE --packTitle "$env:PACK_TITLE" --packAuthors "$env:PACK_AUTHORS" `
+            --outputDir Releases @icon
+
+      - name: No Nintendo files in the packages
+        shell: pwsh
+        run: ./scripts/check-no-nintendo-files.ps1 -Path Releases
+
+      - name: Publish the GitHub release
+        if: needs.version.outputs.publish == 'true'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $extra = @(); if ($env:PRERELEASE -eq 'true') { $extra += '--pre' }
+          vpk upload github --outputDir Releases --repoUrl $env:REPO_URL --token $env:GITHUB_TOKEN `
+            --tag $env:GITHUB_REF_NAME --releaseName "WW-Online $env:VERSION" --publish @extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          gh release upload $env:GITHUB_REF_NAME (Get-ChildItem dist/*.zip).FullName --clobber
+
+      - name: Keep the packages (dry run)
+        if: needs.version.outputs.publish != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run-${{ env.VERSION }}
+          path: |
+            Releases
+            dist
+          if-no-files-found: error

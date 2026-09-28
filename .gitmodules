@@ -1,0 +1,3 @@
+[submodule "tww-decomp"]
+	path = tww-decomp
+	url = https://github.com/zeldaret/tww.git
