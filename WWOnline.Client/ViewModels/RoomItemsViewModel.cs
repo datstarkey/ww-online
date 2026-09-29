@@ -109,6 +109,8 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
     private readonly IDolphinService _dolphinService;
     private readonly RoomInventorySyncService _roomInventory;
     private readonly RoomSettingsService _roomSettings;
+    private readonly IHeartsSource? _hearts;
+    private HeartsSnapshot _heartsSnapshot = HeartsSnapshot.None;
     private System.Timers.Timer? _localTimer;
     private bool? _lastRoomMode;
 
@@ -210,6 +212,11 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private int _maxHearts;
     [ObservableProperty] private string _maxHeartsText = "—";
     [ObservableProperty] private string _heartsText = "";
+    /// <summary>Max health is derived from the room's flags (Shared items + Shared world): no owner edit.</summary>
+    [ObservableProperty] private bool _heartsDerived;
+    /// <summary>"Hearts: 2 of 6 containers, 13 of 44 pieces" (empty without a game or heart table).</summary>
+    [ObservableProperty] private string _heartSourcesText = "";
+    [ObservableProperty] private string _heartSourcesNote = "";
     [ObservableProperty] private string _magicText = "";
     [ObservableProperty] private string _shardText = "0 of 8";
     [ObservableProperty] private bool _hasOwnedChips;
@@ -263,11 +270,13 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         RoomInventorySyncService roomInventory,
         RoomSettingsService roomSettings,
         ServerViewModel server,
-        ItemIcons icons)
+        ItemIcons icons,
+        IHeartsSource? hearts = null)
     {
         _dolphinService = dolphinService;
         _roomInventory = roomInventory;
         _roomSettings = roomSettings;
+        _hearts = hearts;
         Server = server;
         Icons = icons;
 
@@ -310,6 +319,7 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         _roomInventory.RoomChanged += OnRoomInventoryChanged;
         _dolphinService.ConnectionChanged += OnDolphinConnectionChanged;
         Icons.Refreshed += RefreshIcons;
+        if (_hearts != null) _hearts.SnapshotChanged += OnHeartsChanged;
         RefreshIcons();
         OnRoomItemsModeChanged();
 
@@ -402,7 +412,11 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
 
     private void OnEditPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(EditMode.IsEditing)) OnPropertyChanged(nameof(IsEditing));
+        if (e.PropertyName == nameof(EditMode.IsEditing))
+        {
+            OnPropertyChanged(nameof(IsEditing));
+            OnPropertyChanged(nameof(CanEditHearts));
+        }
         OnPropertyChanged(nameof(ShowEditButton));
     }
 
@@ -509,12 +523,7 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         SwordName = inv.EquippedSword == RoomInventory.NoItem ? "None" : ItemIDs.GetItemName(inv.EquippedSword);
         ShieldName = inv.EquippedShield == RoomInventory.NoItem ? "None" : ItemIDs.GetItemName(inv.EquippedShield);
 
-        MaxHearts = inv.MaxHealth / 4;
-        MaxHeartsText = known ? MaxHearts.ToString() : "—";
-        int pieces = inv.MaxHealth % 4;
-        HeartsText = !known ? "" : $"{MaxHearts} heart{(MaxHearts == 1 ? "" : "s")} max{(pieces > 0 ? $" + {pieces}/4" : "")}";
-        while (HeartIcons.Count > Math.Min(MaxHearts, 20)) HeartIcons.RemoveAt(HeartIcons.Count - 1);
-        while (HeartIcons.Count < Math.Min(MaxHearts, 20)) HeartIcons.Add(HeartIcons.Count);
+        RefreshHearts();
 
         var magic = MagicOptions.Last(o => inv.MaxMagic >= o.Value); // options[0] is 0, so one always matches
         foreach (var o in MagicOptions) o.IsSelected = known && o == magic;
@@ -535,6 +544,44 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         Upgrades[2].IsOn = (inv.HerosCharm & RoomInventory.CharmMask) != 0;
 
         RefreshIcons(); // also rebuilds the summary chips
+    }
+
+    /// <summary>The hearts row: the room's (or this game's) max health, or the derived one while hearts are derived.</summary>
+    private void RefreshHearts()
+    {
+        var h = _heartsSnapshot;
+        bool derived = h is { HasGame: true, Derived: true };
+        bool known = derived || _snapshot != null;
+        int maxHealth = derived ? h.MaxLife : _snapshot?.MaxHealth ?? 0;
+        HeartsDerived = derived;
+        MaxHearts = maxHealth / 4;
+        MaxHeartsText = known ? MaxHearts.ToString() : "—";
+        int quarters = maxHealth % 4;
+        HeartsText = !known ? "" : $"{MaxHearts} heart{(MaxHearts == 1 ? "" : "s")} max{(quarters > 0 ? $" + {quarters}/4" : "")}";
+        while (HeartIcons.Count > Math.Min(MaxHearts, 20)) HeartIcons.RemoveAt(HeartIcons.Count - 1);
+        while (HeartIcons.Count < Math.Min(MaxHearts, 20)) HeartIcons.Add(HeartIcons.Count);
+        HeartSourcesText = h.HasGame
+            ? $"Hearts: {h.Containers} of {h.ContainersTotal} containers, {h.Pieces} of {h.PiecesTotal} pieces"
+            : "";
+        HeartSourcesNote = !h.HasGame ? ""
+            : derived ? "Max hearts come from the shared world: a piece or container anyone finds counts once for everyone."
+            : "Found in your game (max hearts are only derived with Shared items and Shared world on).";
+        OnPropertyChanged(nameof(CanEditHearts));
+    }
+
+    /// <summary>The max-hearts buttons: in edit mode, and not while max health is derived from the flags.</summary>
+    public bool CanEditHearts => IsEditing && !HeartsDerived;
+
+    private void OnHeartsChanged()
+    {
+        if (_hearts == null) return;
+        var h = _hearts.Snapshot;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (_disposed) return;
+            _heartsSnapshot = h;
+            RefreshHearts();
+        });
     }
 
     /// <summary>Summary chips: owned items (bottles collapsed), then the song count.</summary>
@@ -878,6 +925,7 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         _roomInventory.RoomChanged -= OnRoomInventoryChanged;
         _dolphinService.ConnectionChanged -= OnDolphinConnectionChanged;
         Icons.Refreshed -= RefreshIcons;
+        if (_hearts != null) _hearts.SnapshotChanged -= OnHeartsChanged;
         _localTimer?.Stop();
         _localTimer?.Dispose();
         _localTimer = null;

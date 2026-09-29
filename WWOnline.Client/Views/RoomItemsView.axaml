@@ -377,12 +377,12 @@
                             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                                 <TextBlock Text="Max hearts" FontSize="13" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center" />
                                 <Button Grid.Column="1" Classes="ww-secondary" Width="44" Padding="0" HorizontalContentAlignment="Center"
-                                        Content="−" FontSize="20" Command="{Binding HeartDownCommand}" IsEnabled="{Binding IsEditing}"
+                                        Content="−" FontSize="20" Command="{Binding HeartDownCommand}" IsEnabled="{Binding CanEditHearts}"
                                         ToolTip.Tip="One heart fewer" />
                                 <TextBlock Grid.Column="2" Text="{Binding MaxHeartsText}" MinWidth="44" TextAlignment="Center"
                                            FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold" FontSize="24" VerticalAlignment="Center" />
                                 <Button Grid.Column="3" Classes="ww-secondary" Width="44" Padding="0" HorizontalContentAlignment="Center"
-                                        Content="+" FontSize="20" Command="{Binding HeartUpCommand}" IsEnabled="{Binding IsEditing}"
+                                        Content="+" FontSize="20" Command="{Binding HeartUpCommand}" IsEnabled="{Binding CanEditHearts}"
                                         ToolTip.Tip="One heart more" />
                             </Grid>
                             <ItemsControl ItemsSource="{Binding HeartIcons}">
@@ -403,6 +403,11 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                             <TextBlock Text="{Binding HeartsText}" FontSize="12" Foreground="{StaticResource Text3Brush}" Margin="0,-8,0,0" />
+                            <StackPanel Spacing="2" Margin="0,-6,0,0"
+                                        IsVisible="{Binding HeartSourcesText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding HeartSourcesText}" FontWeight="SemiBold" FontSize="13" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding HeartSourcesNote}" FontSize="12" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                            </StackPanel>
                             <Grid ColumnDefinitions="*,Auto">
                                 <TextBlock Text="Magic meter" FontSize="13" Foreground="{StaticResource Text2Brush}" VerticalAlignment="Center" />
                                 <Border Grid.Column="1" Classes="ww-inset" CornerRadius="12" Padding="4">

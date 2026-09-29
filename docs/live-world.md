@@ -282,7 +282,7 @@ A new hub method `SendRoomSwitches(RoomSwitchEdges { Stage, Room|Slot, OnBits, O
 ### 7.1 Double items from chests (a bug in the current code)
 If the other player opens a chest while you are in the same room, your chest stays closed: `checkOpen` runs only at create. Opening it gives you the item again, because `actionOpenWait` and `boxCheck` never look at `mTbox` (`d_a_tbox.cpp:553-563, 954-996`), and `OpenInit_com` just sets the bit again (`:850-871`). The duplicate then spreads:
 - **Shared wallet** is delta-based (`WWOnline.Server/Hubs/WalletStore.cs:5-17`), so a duplicated rupee chest pays everyone twice.
-- **Shared items** MAX-merges heart quarters (`RoomInventoryStore`), so a re-opened heart-piece chest gives *everyone* an extra quarter.
+- **Shared items** used to MAX-merge heart quarters (`RoomInventoryStore`), so a re-opened heart-piece chest gave *everyone* an extra quarter. With Shared world on, max health is now derived from the flags (`docs/hearts.md`): the chest's tbox bit is one flag, so the second piece is logged and taken back.
 - **Small keys** are handled in `docs/small-keys.md` §4.
 
 `puppet_worldsync.c:15` ("Chests ... need nothing here") is only true across a reload. Stage 1's chest re-create closes this. A residual race remains: both players open within about 0.4-0.9 s plus network latency (the REL's 4-frame cadence, the 4 Hz world-sync ticks, the read-back). Closing it needs **server-side chest-claim arbitration** (a future stage: a player's chest-open event asks the server first, and a second claim for the same chest gets an empty chest), not more client speed.

@@ -16,6 +16,10 @@ namespace WWOnline.Services;
 ///     remove / downgrade) is written into the game where it differs, then re-baselined.
 /// Only synced fields are written (see <see cref="RoomInventoryMemory"/>), and only while the
 /// scene is stable (Link present, no stage change pending).
+/// Max health leaves the max-merge while <see cref="IMaxHealthOwner.OwnsMaxHealth"/> (derived hearts, Shared world
+/// on too: docs/hearts.md), since a piece two players pick up would count twice: the room's value is never applied
+/// then, a rise is never sent as a gain, and a join sends the derived value (so the room's field, which protocol-5
+/// clients without derived hearts still use, stays a real max health).
 /// </summary>
 public class RoomInventorySyncService : IDisposable
 {
@@ -27,6 +31,7 @@ public class RoomInventorySyncService : IDisposable
     private readonly IDolphinService _dolphin;
     private readonly SignalRClientService _signalR;
     private readonly RoomSettingsService _room;
+    private readonly IMaxHealthOwner? _maxHealthOwner;
     private readonly SceneStabilityGate _scene = new(StableTicksRequired);
     private readonly object _tickLock = new();
     private readonly object _roomLock = new();
@@ -57,15 +62,34 @@ public class RoomInventorySyncService : IDisposable
     /// <summary>Raised (on a background thread) when <see cref="Room"/> changes.</summary>
     public event Action<RoomInventory?>? RoomChanged;
 
-    public RoomInventorySyncService(IDolphinService dolphin, SignalRClientService signalR, RoomSettingsService room)
+    public RoomInventorySyncService(IDolphinService dolphin, SignalRClientService signalR, RoomSettingsService room,
+        IMaxHealthOwner? maxHealthOwner = null)
     {
         _dolphin = dolphin;
         _signalR = signalR;
         _room = room;
+        _maxHealthOwner = maxHealthOwner;
         // Track the room even while no game is attached, so the owner's Items editor has it.
         _signalR.RoomInventoryReceived += OnRoomInventoryReceived;
         _signalR.ConnectionLost += OnConnectionReset;
         _signalR.Connected += OnConnectionReset;
+    }
+
+    /// <summary>Max health is derived from the room's flags (<see cref="SharedHeartService"/>), not max-merged here.</summary>
+    public bool MaxHealthDerived => _maxHealthOwner?.OwnsMaxHealth == true;
+
+    /// <summary>
+    /// <paramref name="inv"/> with its max health replaced by <paramref name="maxHealth"/> while max health is derived
+    /// (<paramref name="derived"/>), else <paramref name="inv"/> itself: a gain sends 0 (no gain; the server's MAX ignores
+    /// it), a join the derived value, and a room state to apply keeps the game's own (SharedHeartService sets it).
+    /// RoomInventory itself is unchanged (the protocol-5 DTO).
+    /// </summary>
+    public static RoomInventory WithMaxHealth(RoomInventory inv, bool derived, ushort maxHealth)
+    {
+        if (!derived || inv.MaxHealth == maxHealth) return inv;
+        var c = inv.Clone();
+        c.MaxHealth = maxHealth;
+        return c;
     }
 
     /// <summary>True when item edits should go to the room (connected and the SharedItems rule is on).</summary>
@@ -226,7 +250,7 @@ public class RoomInventorySyncService : IDisposable
         // 1. Local gains first, so a pickup racing a push isn't overwritten before it's sent.
         if (_baseline != null)
         {
-            var gains = local.GainsOver(_baseline);
+            var gains = WithMaxHealth(local.GainsOver(_baseline), MaxHealthDerived, 0);
             if (!gains.IsEmpty)
             {
                 var after = _baseline.Clone();
@@ -264,7 +288,7 @@ public class RoomInventorySyncService : IDisposable
         bool applyShield = _lastApplied == null || room.EquippedShield != _lastApplied.EquippedShield;
 
         var changes = new List<string>();
-        _baseline = RoomInventoryMemory.Apply(_dolphin, room, local, applySword, applyShield, changes);
+        _baseline = RoomInventoryMemory.Apply(_dolphin, WithMaxHealth(room, MaxHealthDerived, local.MaxHealth), local, applySword, applyShield, changes);
         _lastApplied = room;
         _verifySword = applySword ? room.EquippedSword : null;
         _verifyShield = applyShield ? room.EquippedShield : null;
@@ -307,11 +331,12 @@ public class RoomInventorySyncService : IDisposable
         _nextJoinAttempt = DateTime.UtcNow + JoinRetry;
 
         var snapshot = local.Clone();
+        var payload = WithMaxHealth(snapshot, MaxHealthDerived, (ushort)(_maxHealthOwner?.DerivedMaxHealth ?? snapshot.MaxHealth));
         _ = Task.Run(async () =>
         {
             try
             {
-                var room = await _signalR.JoinRoomInventoryAsync(snapshot);
+                var room = await _signalR.JoinRoomInventoryAsync(payload);
                 if (room == null || !room.IsValid())
                 {
                     bool waiting;

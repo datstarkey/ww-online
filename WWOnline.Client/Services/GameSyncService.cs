@@ -25,6 +25,7 @@ public class GameSyncService : IDisposable
     private readonly SharedSpoilsService _sharedSpoils;
     private readonly StorySyncService _storySync;
     private readonly SharedSmallKeyService _smallKeys;
+    private readonly SharedHeartService _hearts;
     private readonly RoomSwitchSyncService _roomSwitchSync;
     private readonly PlayerEventService _playerEvents;
 
@@ -49,6 +50,7 @@ public class GameSyncService : IDisposable
         SharedSpoilsService sharedSpoils,
         StorySyncService storySync,
         SharedSmallKeyService smallKeys,
+        SharedHeartService hearts,
         RoomSwitchSyncService roomSwitchSync,
         PlayerEventService playerEvents)
     {
@@ -62,6 +64,7 @@ public class GameSyncService : IDisposable
         _sharedSpoils = sharedSpoils;
         _storySync = storySync;
         _smallKeys = smallKeys;
+        _hearts = hearts;
         _roomSwitchSync = roomSwitchSync;
         _playerEvents = playerEvents;
     }
@@ -110,6 +113,8 @@ public class GameSyncService : IDisposable
         _storySync.Start();
         // Shared small keys: each dungeon's count derived from the shared world's flags
         _smallKeys.Start();
+        // Derived max health: containers + pieces whose flag the shared world / story holds
+        _hearts.Start();
         // Other players' projectiles: the REL's events block <-> the hub (bombs, cannon)
         _playerEvents.Start();
 
@@ -182,6 +187,7 @@ public class GameSyncService : IDisposable
         _roomInventorySync.Stop();
         _storySync.Stop();
         _smallKeys.Stop();
+        _hearts.Stop();
         _playerEvents.Stop();
 
         // Stop puppet sync (clears shared memory and slot assignments)
