@@ -21,7 +21,15 @@
  * puppet boat keeps an imitation daGrid_c in its heap and runs the game's own ho_move and packet
  * draw on it (see puppet_boat.c, "Sail"), recoloured with the peer's tunic colour.
  *
- * Not drawn yet: cannon / crane, wake effects, the talk mouth
+ * The cannon and the crane (salvage arm) sit on the mast joint like daShip_c's (bodyJointCallBack's
+ * J_FN_MAST, d_a_ship.cpp:119-125), aimed with the peer's cannon / arm angles (cannonJointCallBack,
+ * craneJointCallBack) and drawn while the peer's mPart is that part (daShip_c::draw, :304-317). The
+ * crane's rope is drawn hanging straight down at the peer's length (the game's rope sways: its
+ * physics isn't run here), with the grappling hook at its end. Nothing fires, salvages or plays a
+ * sound: they are just models.
+ *
+ * Not drawn yet: wake effects, the rope's sway and ripples, the hook while the rope is under 3
+ * segments (the arm rising / folding), the talk mouth
  * (headJointCallBack0's mAnmTransform swap) and the boat's shadow. The hull's water effect
  * texture matrix is shared material state that the local ship sets (d_a_ship.cpp:259-282), so
  * ours shows the local ship's projection. The boat has no collision.
@@ -79,6 +87,19 @@ typedef struct PuppetBoat
   u8 *sail;                             /* imitation daGrid_c + palettes (in `heap`), NULL = none */
   u32 sailKey;                          /* recoloured palette's colour | 0x01000000, 0 = none yet */
   f32 sailScale;                        /* daGrid_c scale.y: SAIL1's length (d_a_ship.cpp:4066) */
+  /* Cannon / crane (see puppet_boat.c, "Cannon and crane"); the models are in `heap`, NULL = none */
+  J3DModel *cannon;                     /* "Ship" vfncn.bdl, as daShip_c::mpCannonModel */
+  J3DModel *crane;                      /* "Ship" vfncr.bdl, as daShip_c::mpSalvageArmModel */
+  J3DModel *hook;                       /* "Link" ropeend.bdl, as daShip_c::mpLinkModel */
+  u8 *rope;                             /* mDoExt_3DlineMat1_c, as daShip_c::mRopeLine (2 points) */
+  f32 mastScale;                        /* J_FN_MAST's length before the hide scale (the hook's scale) */
+  s16 cannonYaw;                        /* m0394 */
+  s16 cannonPitch;                      /* m0396 */
+  s16 craneAngle;                       /* m0398 + m039C */
+  u8 part;                              /* SHIP_PART_CANNON / _CRANE posed this frame, else 0 */
+  u8 ropeCnt;                           /* mRopeCnt */
+  u8 hookShow;                          /* the hook is posed this frame */
+  u8 pad4[3];
 } PuppetBoat;
 
 /* PuppetBoat.clothState */

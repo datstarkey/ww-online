@@ -71,6 +71,10 @@ public class PuppetSyncService : IDisposable
     private readonly byte[] _boatBuf = new byte[GameMemoryAddresses.PuppetSync.BoatSize];
     private readonly byte[] _boatBodyBuf = new byte[GameMemoryAddresses.PuppetSync.BoatSize - PuppetBoatBodyOffset];
     private readonly byte[] _zeroBoat = new byte[GameMemoryAddresses.PuppetSync.BoatSize];
+    private readonly byte[] _boatCannonBuf = new byte[GameMemoryAddresses.PuppetSync.BoatCannonSize];
+    private readonly byte[] _boatCraneBuf = new byte[GameMemoryAddresses.PuppetSync.BoatCraneSize];
+    private readonly byte[] _zeroBoatCannon = new byte[GameMemoryAddresses.PuppetSync.BoatCannonSize];
+    private readonly byte[] _zeroBoatCrane = new byte[GameMemoryAddresses.PuppetSync.BoatCraneSize];
     private readonly byte[] _u32Buf = new byte[4];
 
     // Guards every emulator write + the shared buffers above: the 20Hz timer, WipeAll and
@@ -230,16 +234,19 @@ public class PuppetSyncService : IDisposable
         }
     }
 
-    /// <summary>Zero a slot body and its boat block (caller holds _writeLock).</summary>
+    /// <summary>Zero a slot body, its boat block and its cannon / crane words (caller holds _writeLock).</summary>
     private void ZeroSlotMemory(int slot)
     {
         _dolphin.WriteMemory(GameMemoryAddresses.PuppetSync.GetSlotBase(slot), _zeroSlot);
         _dolphin.WriteMemory(GameMemoryAddresses.PuppetSync.GetBoatBase(slot), _zeroBoat);
+        _dolphin.WriteMemory(GameMemoryAddresses.PuppetSync.GetBoatCannonBase(slot), _zeroBoatCannon);
+        _dolphin.WriteMemory(GameMemoryAddresses.PuppetSync.GetBoatCraneBase(slot), _zeroBoatCrane);
     }
 
     /// <summary>
     /// Write a slot's boat block: the peer's boat while they ride it, zeros otherwise
-    /// (PUPPET_BOAT_* in puppet_shared.h).
+    /// (PUPPET_BOAT_* in puppet_shared.h). With a boat, its cannon / crane words too
+    /// (PUPPET_BOAT_CANNON_* / PUPPET_BOAT_CRANE_*); without one the REL ignores them, so they're left as they are.
     /// </summary>
     private void WriteBoat(int slot, BoatState? boat)
     {
@@ -249,8 +256,14 @@ public class PuppetSyncService : IDisposable
             return;
         }
 
-        // Body first, FLAGS last: the REL snaps a new boat to the first position it sees with
-        // FLAGS set, so FLAGS must never be visible before the position.
+        // Parts and body first, FLAGS last: the REL snaps a new boat to the first position it sees
+        // with FLAGS set (and a part that has just come out to the angles it sees with FLAGS' PART),
+        // so FLAGS must never be visible before them.
+        EncodeBoatCannon(boat, _boatCannonBuf);
+        _dolphin.WriteMemory(GameMemoryAddresses.PuppetSync.GetBoatCannonBase(slot), _boatCannonBuf);
+        EncodeBoatCrane(boat, _boatCraneBuf);
+        _dolphin.WriteMemory(GameMemoryAddresses.PuppetSync.GetBoatCraneBase(slot), _boatCraneBuf);
+
         uint boatBase = GameMemoryAddresses.PuppetSync.GetBoatBase(slot);
         Array.Clear(_boatBuf, 0, _boatBuf.Length);
         WriteBigEndianFloat(_boatBuf, PuppetLayout.PUPPET_BOAT_OFF_POSX, boat.Position.X);
@@ -267,13 +280,33 @@ public class PuppetSyncService : IDisposable
         Buffer.BlockCopy(_boatBuf, PuppetBoatBodyOffset, _boatBodyBuf, 0, _boatBodyBuf.Length);
         _dolphin.WriteMemory(boatBase + PuppetBoatBodyOffset, _boatBodyBuf);
 
-        uint flags = PuppetLayout.PUPPET_BOAT_FLAG_ACTIVE
-                     | (boat.Flying ? PuppetLayout.PUPPET_BOAT_FLAG_FLY : 0u)
-                     | (boat.MastRaised ? PuppetLayout.PUPPET_BOAT_FLAG_MAST_ON : 0u)
-                     | (boat.MastHidden ? PuppetLayout.PUPPET_BOAT_FLAG_MAST_HIDE : 0u)
-                     | (uint)(boat.HeadBck & PuppetLayout.PUPPET_BOAT_HEAD_BCK_MASK) << PuppetLayout.PUPPET_BOAT_HEAD_BCK_SHIFT;
-        WriteBigEndianU32(_u32Buf, 0, flags);
+        WriteBigEndianU32(_u32Buf, 0, BoatFlags(boat));
         _dolphin.WriteMemory(boatBase + PuppetLayout.PUPPET_BOAT_OFF_FLAGS, _u32Buf);
+    }
+
+    /// <summary>A riding peer's boat FLAGS word (PUPPET_BOAT_OFF_FLAGS).</summary>
+    public static uint BoatFlags(BoatState boat) =>
+        PuppetLayout.PUPPET_BOAT_FLAG_ACTIVE
+        | (boat.Flying ? PuppetLayout.PUPPET_BOAT_FLAG_FLY : 0u)
+        | (boat.MastRaised ? PuppetLayout.PUPPET_BOAT_FLAG_MAST_ON : 0u)
+        | (boat.MastHidden ? PuppetLayout.PUPPET_BOAT_FLAG_MAST_HIDE : 0u)
+        | (uint)(boat.Part & PuppetLayout.PUPPET_BOAT_PART_MASK) << PuppetLayout.PUPPET_BOAT_PART_SHIFT
+        | (uint)(boat.HeadBck & PuppetLayout.PUPPET_BOAT_HEAD_BCK_MASK) << PuppetLayout.PUPPET_BOAT_HEAD_BCK_SHIFT;
+
+    /// <summary>A boat's cannon word (PUPPET_BOAT_CANNON_*, big-endian) into <paramref name="dest"/>.</summary>
+    public static void EncodeBoatCannon(BoatState boat, byte[] dest)
+    {
+        Array.Clear(dest, 0, PuppetLayout.PUPPET_BOAT_CANNON_SIZE);
+        WriteBigEndianS16(dest, PuppetLayout.PUPPET_BOAT_CANNON_OFF_YAW, boat.CannonYaw);
+        WriteBigEndianS16(dest, PuppetLayout.PUPPET_BOAT_CANNON_OFF_PITCH, boat.CannonPitch);
+    }
+
+    /// <summary>A boat's crane word (PUPPET_BOAT_CRANE_*, big-endian) into <paramref name="dest"/>.</summary>
+    public static void EncodeBoatCrane(BoatState boat, byte[] dest)
+    {
+        Array.Clear(dest, 0, PuppetLayout.PUPPET_BOAT_CRANE_SIZE);
+        WriteBigEndianS16(dest, PuppetLayout.PUPPET_BOAT_CRANE_OFF_ANGLE, boat.CraneAngle);
+        dest[PuppetLayout.PUPPET_BOAT_CRANE_OFF_ROPE] = boat.RopeLength;
     }
 
     /// <summary>Everything after the FLAGS word (PUPPET_BOAT_OFF_FLAGS is the first field).</summary>
@@ -1151,14 +1184,13 @@ public class PuppetSyncService : IDisposable
         return boat.IsValid() ? boat : null;
     }
 
-    /// <summary>First and one-past-last daShip_c pose field, read as one block.</summary>
-    private const uint ShipPoseStart = GameMemoryAddresses.Sea.ShipOffsetSailAngle;
-    private const int ShipPoseLength = (int)(GameMemoryAddresses.Sea.ShipOffsetMastScale + 4 - ShipPoseStart);
+    /// <summary>First and one-past-last daShip_c pose field (mPart .. m03E8), read as one block.</summary>
+    public const uint ShipPoseStart = GameMemoryAddresses.Sea.ShipOffsetPart;
+    public const int ShipPoseLength = (int)(GameMemoryAddresses.Sea.ShipOffsetMastScale + 4 - ShipPoseStart);
 
     /// <summary>
-    /// The sail, tiller, mast and head pose daShip_c draws with (d_a_ship.cpp:110-231). Angles are
-    /// clamped into the ranges the game keeps them in (BoatState limits) so a surprise value never
-    /// gets the whole puppet rejected; an unreadable block leaves the pose at rest.
+    /// The sail, tiller, mast, head, cannon and crane pose daShip_c draws with (d_a_ship.cpp:110-231,
+    /// 304-317); an unreadable block leaves the pose at rest.
     /// </summary>
     private void ReadLocalBoatPose(uint ship, BoatState boat)
     {
@@ -1166,6 +1198,20 @@ public class PuppetSyncService : IDisposable
         if (pose == null || pose.Length < ShipPoseLength)
             return;
 
+        ParseShipPose(pose, boat);
+        boat.MastFrame = ReadMorfFrame(ship + GameMemoryAddresses.Sea.ShipOffsetBodyAnm);
+        boat.HeadFrame = ReadMorfFrame(ship + GameMemoryAddresses.Sea.ShipOffsetHeadAnm);
+    }
+
+    /// <summary>
+    /// The pose fields of a daShip_c block read from <see cref="ShipPoseStart"/>. Angles are clamped
+    /// into the ranges the game keeps them in (BoatState limits) so a surprise value never gets the
+    /// whole puppet rejected.
+    /// </summary>
+    public static void ParseShipPose(byte[] pose, BoatState boat)
+    {
+        if (pose.Length < ShipPoseLength)
+            return;
         short S16(uint offset) => BinaryPrimitives.ReadInt16BigEndian(pose.AsSpan((int)(offset - ShipPoseStart)));
 
         boat.SailAngle = Math.Clamp(S16(GameMemoryAddresses.Sea.ShipOffsetSailAngle), (short)-BoatState.MaxSailAngle, BoatState.MaxSailAngle);
@@ -1180,8 +1226,21 @@ public class PuppetSyncService : IDisposable
             BinaryPrimitives.ReadInt32BigEndian(pose.AsSpan((int)(GameMemoryAddresses.Sea.ShipOffsetMastScale - ShipPoseStart))));
         boat.MastHidden = mastScale < 0.5f;
 
-        boat.MastFrame = ReadMorfFrame(ship + GameMemoryAddresses.Sea.ShipOffsetBodyAnm);
-        boat.HeadFrame = ReadMorfFrame(ship + GameMemoryAddresses.Sea.ShipOffsetHeadAnm);
+        // Only the part that's out uses its angles; the others stay 0.
+        byte part = pose[GameMemoryAddresses.Sea.ShipOffsetPart - ShipPoseStart];
+        boat.Part = part <= BoatState.PartCrane ? part : BoatState.PartWait;
+        if (boat.Part == BoatState.PartCannon)
+        {
+            boat.CannonYaw = S16(GameMemoryAddresses.Sea.ShipOffsetCannonYaw);
+            boat.CannonPitch = Math.Clamp(S16(GameMemoryAddresses.Sea.ShipOffsetCannonPitch), (short)0, BoatState.MaxCannonPitch);
+        }
+        else if (boat.Part == BoatState.PartCrane)
+        {
+            // s16 sum, as craneJointCallBack adds them (d_a_ship.cpp:175).
+            int crane = (short)(S16(GameMemoryAddresses.Sea.ShipOffsetCraneAngle) + S16(GameMemoryAddresses.Sea.ShipOffsetCraneSwing));
+            boat.CraneAngle = (short)Math.Clamp(crane, -BoatState.MaxCraneAngle, BoatState.MaxCraneAngle);
+            boat.RopeLength = (byte)Math.Clamp((int)S16(GameMemoryAddresses.Sea.ShipOffsetRopeCnt), 0, BoatState.MaxRopeLength);
+        }
     }
 
     /// <summary>A daShip_c morf's bck frame, rounded to whole frames (0 if the morf or frame is

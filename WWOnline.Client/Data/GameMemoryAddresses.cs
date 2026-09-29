@@ -297,6 +297,14 @@ public static class GameMemoryAddresses
         public const int BoatSize = PuppetLayout.PUPPET_BOAT_SIZE;
         public const uint Boat0Base = PuppetLayout.PUPPET_BOAT_0;
         public static uint GetBoatBase(int slotIndex) => Boat0Base + (uint)(slotIndex * BoatSize);
+
+        // Per-slot cannon / crane words (the peer's boat parts; two scratch gaps, see puppet_shared.h)
+        public const int BoatCannonSize = PuppetLayout.PUPPET_BOAT_CANNON_SIZE;
+        public const uint BoatCannon0Base = PuppetLayout.PUPPET_BOAT_CANNON_0;
+        public static uint GetBoatCannonBase(int slotIndex) => BoatCannon0Base + (uint)(slotIndex * BoatCannonSize);
+        public const int BoatCraneSize = PuppetLayout.PUPPET_BOAT_CRANE_SIZE;
+        public const uint BoatCrane0Base = PuppetLayout.PUPPET_BOAT_CRANE_0;
+        public static uint GetBoatCraneBase(int slotIndex) => BoatCrane0Base + (uint)(slotIndex * BoatCraneSize);
     }
 
     /// <summary>
@@ -363,6 +371,15 @@ public static class GameMemoryAddresses
         public const uint ShipOffsetHeadY = 0x3A2;     // s16 m03A2 head look yaw
         public const uint ShipOffsetHeadBck = 0x3B4;   // u16 m03B4 "file idx": the head's bck
         public const uint ShipOffsetMastScale = 0x3E8; // f32 m03E8: J_FN_MAST scale, 1.0 or 0.001
+
+        // The cannon / crane (d_a_ship.cpp:119-179, 304-317). Checked against the vanilla d_a_ship.rel:
+        // cannonJointCallBack reads 0x394 / 0x396, craneJointCallBack 0x398 + 0x39C, draw 0x34E / 0x39E.
+        public const uint ShipOffsetPart = 0x34E;        // u8 mPart (daShip_c::Part_e): what's on the mast joint
+        public const uint ShipOffsetCannonYaw = 0x394;   // s16 m0394: CANON1 X rotation
+        public const uint ShipOffsetCannonPitch = 0x396; // s16 m0396: CANON2 -Y rotation
+        public const uint ShipOffsetCraneAngle = 0x398;  // s16 m0398: the arm's angle
+        public const uint ShipOffsetCraneSwing = 0x39C;  // s16 m039C: the hook's swing, added to m0398
+        public const uint ShipOffsetRopeCnt = 0x39E;     // s16 mRopeCnt: rope segments (0..250)
         /// <summary>mDoExt_McaMorf mFrameCtrl (0x58, m_Do_ext.h) + J3DFrameCtrl mFrame (0x10, J3DAnimation.h):
         /// the morf's current bck frame (f32).</summary>
         public const uint McaMorfOffsetFrame = 0x58 + 0x10;
