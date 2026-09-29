@@ -111,6 +111,13 @@ public class PuppetSyncService : IDisposable
     // Names block last seen (0 = none yet), for logging changes only.
     private uint _namesBlock;
 
+    // Anim mirror (AnimMirror): each slot's entry for the REL, the sample it came from and its SEQ.
+    // SEQ changes only with a new sample: the REL snaps its frames to each new one.
+    private readonly byte[]?[] _anmEntries = new byte[]?[GameMemoryAddresses.PuppetSync.MaxSlots];
+    private readonly PuppetData?[] _anmSamples = new PuppetData?[GameMemoryAddresses.PuppetSync.MaxSlots];
+    private readonly uint[] _anmSeqs = new uint[GameMemoryAddresses.PuppetSync.MaxSlots];
+    private uint _anmBlock;
+
     private readonly GameSettingsService _settingsService;
     private readonly DespawnWorker _despawnWorker;
     private readonly LiveWorldPoke _liveWorld;
@@ -850,6 +857,7 @@ public class PuppetSyncService : IDisposable
                 var slotData = _slotBufs[i];
                 Array.Clear(slotData, 0, slotData.Length);
                 BoatState? slotBoat = null;
+                _anmEntries[i] = null;
 
                 string? playerId = GetPlayerInSlot(i);
                 if (i == 0 && playerId != null) slot0Diag |= 0x01;
@@ -940,12 +948,17 @@ public class PuppetSyncService : IDisposable
                             grabKind == PuppetLayout.PUPPET_GRAB_KIND_BOMB ? puppet.Equipment.GrabFuse : (byte)0;
 
                         slotBoat = puppet.Boat;
+                        _anmEntries[i] = AnimEntry(i, puppet, slotData[GameMemoryAddresses.PuppetSync.SlotOffset_CurProc]);
                     }
                 }
 
                 _dolphin.WriteMemory(slotBase, slotData);
                 WriteBoat(i, slotBoat);
             }
+
+            // Other players' anims for the procs their puppets have no init for (after the slots: the REL
+            // drops a sample whose proc isn't the slot's yet).
+            PublishAnimMirror();
 
             // The hook keeps slots 0..desiredCount-1 spawned, so ask for everything up to the
             // highest active slot; lower inactive slots are hidden by puppet_draw (active == 0).
@@ -977,6 +990,33 @@ public class PuppetSyncService : IDisposable
                ((uint)bytes[offset + 1] << 16) |
                ((uint)bytes[offset + 2] << 8) |
                bytes[offset + 3];
+    }
+
+    /// <summary>
+    /// A slot's anim mirror entry for <paramref name="puppet"/> (<see cref="AnimMirror.Encode"/>), with the
+    /// slot's proc. Its SEQ moves on only when a new sample arrived (a new PuppetData object).
+    /// </summary>
+    private byte[] AnimEntry(int slot, PuppetData puppet, byte proc)
+    {
+        if (!ReferenceEquals(_anmSamples[slot], puppet))
+        {
+            _anmSamples[slot] = puppet;
+            if (++_anmSeqs[slot] == 0)
+                _anmSeqs[slot] = 1;
+        }
+        return AnimMirror.Encode(puppet.Animation, proc, _anmSeqs[slot]);
+    }
+
+    /// <summary>Write the slots' anim mirror entries; a no-op until the REL has made the block.</summary>
+    private void PublishAnimMirror()
+    {
+        uint block = AnimMirror.Publish(_dolphin, _anmEntries) ?? 0;
+        if (block != _anmBlock)
+        {
+            Logger.Information(block != 0 ? "[puppet] anim mirror block at 0x{Block:X8}" : "[puppet] anim mirror block gone (was 0x{Old:X8})",
+                               block != 0 ? block : _anmBlock);
+            _anmBlock = block;
+        }
     }
 
     /// <summary>
@@ -1150,6 +1190,8 @@ public class PuppetSyncService : IDisposable
                 Timestamp = DateTime.UtcNow,
                 Boat = ReadLocalBoat(curProc),
             };
+            // Body / face anims for the procs other players' RELs have no init for (puppet_anmmirror.c).
+            AnimMirror.ReadLocal(_dolphin, actorBase, data.Animation);
 
             return data;
         }

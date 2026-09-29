@@ -14,6 +14,7 @@
 #include "puppet_boat.h"
 #include "puppet_held.h"
 #include "puppet_procs_extra.h"
+#include "puppet_anmmirror.h"
 
 // Forward declaration
 typedef struct PUPPET_class PUPPET_class;

@@ -99,6 +99,66 @@ public static class PuppetLayout
     public const uint PUPPET_SPAWN_STATE_ADDR = 0x803FD118;
     /// <summary>u32 — total spawn counter</summary>
     public const uint PUPPET_SPAWN_COUNTER = 0x803FD124;
+    /// <summary>u32 C: anim mirror block (game heap), 0 = none yet</summary>
+    public const uint PUPPET_ANM_PTR_ADDR = 0x803FD128;
+    /// <summary>"PANM"</summary>
+    public const int PUPPET_ANM_MAGIC = 0x50414E4D;
+    /// <summary>header + PUPPET_MAX_SLOTS entries (checked below)</summary>
+    public const int PUPPET_ANM_BLOCK_SIZE = 0x160;
+    /// <summary>u32 C: PUPPET_ANM_MAGIC once set up</summary>
+    public const int PUPPET_ANM_OFF_MAGIC = 0x00;
+    /// <summary>u32[2] C: __OSStartTime of the boot that allocated it (= PUPPET_NAMES_OFF_BOOT)</summary>
+    public const int PUPPET_ANM_OFF_BOOT = 0x08;
+    /// <summary>PUPPET_MAX_SLOTS x PUPPET_ANM_SLOT_SIZE</summary>
+    public const int PUPPET_ANM_OFF_SLOT0 = 0x10;
+    public const int PUPPET_ANM_SLOT_SIZE = 0x70;
+    /// <summary>u32 C#: changes with every new sample from the peer (the REL snaps frames only then), never 0; 0 = no data</summary>
+    public const int PUPPET_ANM_OFF_SEQ = 0x00;
+    /// <summary>u8  mCurProc the anims were sampled with</summary>
+    public const int PUPPET_ANM_OFF_PROC = 0x04;
+    /// <summary>u8  mLeftHandIdx (+0x34C0): hands.bdl joint of the left hand shape</summary>
+    public const int PUPPET_ANM_OFF_HAND_L = 0x05;
+    /// <summary>u8  mRightHandIdx (+0x34C1)</summary>
+    public const int PUPPET_ANM_OFF_HAND_R = 0x06;
+    /// <summary>u16 face btp (LkAnm index): m_tex_anm_heap field_0x2 if set, else mIdx; 0xFFFF none</summary>
+    public const int PUPPET_ANM_OFF_TEX_BTP = 0x08;
+    /// <summary>u16 eye btk, same from m_tex_scroll_heap</summary>
+    public const int PUPPET_ANM_OFF_TEX_BTK = 0x0A;
+    /// <summary>u16 m3530</summary>
+    public const int PUPPET_ANM_OFF_TEX_BTP_FRAME = 0x0C;
+    /// <summary>u16 m3532</summary>
+    public const int PUPPET_ANM_OFF_TEX_BTK_FRAME = 0x0E;
+    /// <summary>PUPPET_ANM_TRACKS x PUPPET_ANM_TRACK_SIZE</summary>
+    public const int PUPPET_ANM_OFF_TRACK0 = 0x10;
+    /// <summary>under[0], under[1], upper[0], upper[1] (upper[2] is puppet_held.c's)</summary>
+    public const int PUPPET_ANM_TRACKS = 4;
+    public const int PUPPET_ANM_TRACK_SIZE = 0x18;
+    /// <summary>u16 LkAnm bck index, or PUPPET_ANM_BCK_NONE / _SAME</summary>
+    public const int PUPPET_ANM_TR_OFF_BCK = 0x00;
+    /// <summary>s16 J3DFrameCtrl::mStart</summary>
+    public const int PUPPET_ANM_TR_OFF_START = 0x02;
+    /// <summary>s16 mEnd</summary>
+    public const int PUPPET_ANM_TR_OFF_END = 0x04;
+    /// <summary>s16 mLoop</summary>
+    public const int PUPPET_ANM_TR_OFF_LOOP = 0x06;
+    /// <summary>u8  mAttribute (J3DFrameCtrl::EMode_*)</summary>
+    public const int PUPPET_ANM_TR_OFF_ATTR = 0x08;
+    /// <summary>f32 mFrame</summary>
+    public const int PUPPET_ANM_TR_OFF_FRAME = 0x0C;
+    /// <summary>f32 mRate</summary>
+    public const int PUPPET_ANM_TR_OFF_RATE = 0x10;
+    /// <summary>f32 mRatio</summary>
+    public const int PUPPET_ANM_TR_OFF_RATIO = 0x14;
+    /// <summary>no anim on the track (or one the REL can't load: a demo bck)</summary>
+    public const int PUPPET_ANM_BCK_NONE = 0xFFFF;
+    /// <summary>upper track: plays the under track of the same index</summary>
+    public const int PUPPET_ANM_BCK_SAME = 0xFFFE;
+    public const int LKANM_BCK_FIRST = 0x008;
+    public const int LKANM_BCK_LAST = 0x149;
+    public const int LKANM_BTK_FIRST = 0x159;
+    public const int LKANM_BTK_LAST = 0x1DA;
+    public const int LKANM_BTP_FIRST = 0x1DD;
+    public const int LKANM_BTP_LAST = 0x277;
     public const int SPAWN_IDLE = 0;
     public const int SPAWN_SPAWNED = 2;
     public const int SPAWN_FOUND = 3;
@@ -412,6 +472,53 @@ public static class PuppetLayout
     public const int DAPY_OFF_MAX_NORMAL_SPEED = 0x2A8;
     /// <summary>mAnmRatioUnder[0].mRatio</summary>
     public const int DAPY_OFF_ANM_RATIO_UNDER0 = 0x2FB4;
+    /// <summary>mAnmRatioUpper[0]</summary>
+    public const int DAPY_OFF_ANM_RATIO_UPPER0 = 0x2FC4;
+    /// <summary>m_anm_heap_under[0]</summary>
+    public const int DAPY_OFF_ANM_HEAP_UNDER0 = 0x2FDC;
+    /// <summary>m_anm_heap_upper[0]</summary>
+    public const int DAPY_OFF_ANM_HEAP_UPPER0 = 0x2FFC;
+    /// <summary>mFrameCtrlUnder[0]</summary>
+    public const int DAPY_OFF_FRAME_CTRL_UNDER0 = 0x302C;
+    /// <summary>mFrameCtrlUpper[0]</summary>
+    public const int DAPY_OFF_FRAME_CTRL_UPPER0 = 0x3054;
+    public const int DAPY_ANM_RATIO_SIZE = 0x08;
+    public const int DAPY_ANM_HEAP_SIZE = 0x10;
+    public const int DAPY_FRAME_CTRL_SIZE = 0x14;
+    /// <summary>f32 mRatio</summary>
+    public const int ANM_RATIO_OFF_RATIO = 0x00;
+    /// <summary>J3DAnmTransform* mAnmTransform</summary>
+    public const int ANM_RATIO_OFF_ANM = 0x04;
+    /// <summary>u16 mIdx: the LkAnm index loaded, 0xFFFF none</summary>
+    public const int ANM_HEAP_OFF_IDX = 0x00;
+    /// <summary>u16 field_0x2: a texture heap's priority (setPriTextureAnime) index</summary>
+    public const int ANM_HEAP_OFF_PRI_IDX = 0x02;
+    /// <summary>u16 field_0x4: a demo (LkD00 archive) id</summary>
+    public const int ANM_HEAP_OFF_DEMO_IDX = 0x04;
+    /// <summary>void* m_buffer</summary>
+    public const int ANM_HEAP_OFF_BUFFER = 0x08;
+    /// <summary>JKRSolidHeap* mpAnimeHeap</summary>
+    public const int ANM_HEAP_OFF_HEAP = 0x0C;
+    /// <summary>u8</summary>
+    public const int FRAME_CTRL_OFF_ATTR = 0x04;
+    /// <summary>s16</summary>
+    public const int FRAME_CTRL_OFF_START = 0x06;
+    /// <summary>s16</summary>
+    public const int FRAME_CTRL_OFF_END = 0x08;
+    /// <summary>s16</summary>
+    public const int FRAME_CTRL_OFF_LOOP = 0x0A;
+    /// <summary>f32</summary>
+    public const int FRAME_CTRL_OFF_RATE = 0x0C;
+    /// <summary>f32</summary>
+    public const int FRAME_CTRL_OFF_FRAME = 0x10;
+    /// <summary>daPy_anmHeap_c m_tex_anm_heap (face btp)</summary>
+    public const int DAPY_OFF_TEX_ANM_HEAP = 0x31B8;
+    /// <summary>daPy_anmHeap_c m_tex_scroll_heap (eye btk)</summary>
+    public const int DAPY_OFF_TEX_SCROLL_HEAP = 0x31C8;
+    /// <summary>u8 mLeftHandIdx, then u8 mRightHandIdx</summary>
+    public const int DAPY_OFF_HAND_IDX = 0x34C0;
+    /// <summary>u16 m3530 (btp frame), then u16 m3532 (btk frame)</summary>
+    public const int DAPY_OFF_TEX_FRAMES = 0x3530;
     /// <summary>ResTIMG* mpCurrLinktex — the linktexS3TC header in the shared TEX1</summary>
     public const int DAPY_OFF_CURR_LINKTEX = 0x338;
     public const int DAPY_OFF_CUR_PROC = 0x31D8;

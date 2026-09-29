@@ -71,7 +71,7 @@ public class PuppetLayoutTests
             PuppetLayout.LOCAL_APPEARANCE_TAG_ADDR, PuppetLayout.LOCAL_APPEARANCE_WORD_ADDR,
             PuppetLayout.LOCAL_APPEARANCE_BLOCK_ADDR, PuppetLayout.LOCAL_APPEARANCE_IMAGE_ADDR,
             PuppetLayout.LOCAL_APPEARANCE_APPLIED_ADDR, PuppetLayout.LOCAL_APPEARANCE_STATUS_ADDR,
-            PuppetLayout.PUPPET_NAMES_PTR_ADDR, PuppetLayout.LIVEWORLD_PTR_ADDR,
+            PuppetLayout.PUPPET_NAMES_PTR_ADDR, PuppetLayout.LIVEWORLD_PTR_ADDR, PuppetLayout.PUPPET_ANM_PTR_ADDR,
         ];
         Assert.Equal(scratch.Length, scratch.Distinct().Count());
         Assert.All(scratch, a => Assert.Equal(0u, a % 4));
@@ -319,6 +319,64 @@ public class PuppetLayoutTests
     {
         Assert.Equal(PuppetLayout.PUPPET_SLOT_SIZE, GameMemoryAddresses.PuppetSync.SlotSize);
         Assert.Equal(PuppetLayout.PUPPET_SLOT_0 + 2u * PuppetLayout.PUPPET_SLOT_SIZE, GameMemoryAddresses.PuppetSync.GetSlotBase(2));
+    }
+
+    [Fact]
+    public void AnimMirrorPointer_SitsInTheFreeWordsAfterTheTrackingArrays()
+    {
+        // 0x803FD128..0x803FD12F were free (GameMod/CLAUDE.md); the block itself lives on the game heap.
+        Assert.True(PuppetLayout.PUPPET_ANM_PTR_ADDR >= PuppetLayout.PUPPET_SPAWN_COUNTER + 4);
+        Assert.True(PuppetLayout.PUPPET_ANM_PTR_ADDR + 4 <= PuppetLayout.FRAME_COUNTER_ADDR);
+        Assert.Equal(0u, PuppetLayout.PUPPET_ANM_PTR_ADDR % 4);
+    }
+
+    [Fact]
+    public void AnimMirrorBlock_FieldsFitAndAlign()
+    {
+        // Same boot-stamped block shape as the names block (puppet_bootBlock is shared).
+        Assert.Equal(PuppetLayout.PUPPET_NAMES_OFF_MAGIC, PuppetLayout.PUPPET_ANM_OFF_MAGIC);
+        Assert.Equal(PuppetLayout.PUPPET_NAMES_OFF_BOOT, PuppetLayout.PUPPET_ANM_OFF_BOOT);
+        Assert.True(PuppetLayout.PUPPET_ANM_OFF_BOOT + 8 <= PuppetLayout.PUPPET_ANM_OFF_SLOT0);
+        Assert.Equal(PuppetLayout.PUPPET_ANM_BLOCK_SIZE,
+                     PuppetLayout.PUPPET_ANM_OFF_SLOT0 + PuppetLayout.PUPPET_MAX_SLOTS * PuppetLayout.PUPPET_ANM_SLOT_SIZE);
+        Assert.Equal(PuppetLayout.PUPPET_ANM_SLOT_SIZE,
+                     PuppetLayout.PUPPET_ANM_OFF_TRACK0 + PuppetLayout.PUPPET_ANM_TRACKS * PuppetLayout.PUPPET_ANM_TRACK_SIZE);
+        Assert.True(PuppetLayout.PUPPET_ANM_OFF_TEX_BTK_FRAME + 2 <= PuppetLayout.PUPPET_ANM_OFF_TRACK0);
+        Assert.True(PuppetLayout.PUPPET_ANM_TR_OFF_ATTR < PuppetLayout.PUPPET_ANM_TR_OFF_FRAME);
+        Assert.True(PuppetLayout.PUPPET_ANM_TR_OFF_RATIO + 4 <= PuppetLayout.PUPPET_ANM_TRACK_SIZE);
+        foreach (var offset in new[] { PuppetLayout.PUPPET_ANM_OFF_SLOT0, PuppetLayout.PUPPET_ANM_SLOT_SIZE,
+                     PuppetLayout.PUPPET_ANM_OFF_TRACK0, PuppetLayout.PUPPET_ANM_TRACK_SIZE, PuppetLayout.PUPPET_ANM_TR_OFF_FRAME,
+                     PuppetLayout.PUPPET_ANM_TR_OFF_RATE, PuppetLayout.PUPPET_ANM_TR_OFF_RATIO })
+            Assert.Equal(0, offset % 4);
+        Assert.Equal(0x50414E4D, PuppetLayout.PUPPET_ANM_MAGIC); // "PANM"
+
+        // The wire DTO (WWOnline.Shared can't see PuppetLayout) uses the same markers and track count.
+        Assert.Equal(PuppetLayout.PUPPET_ANM_BCK_NONE, AnimTrack.None);
+        Assert.Equal(PuppetLayout.PUPPET_ANM_BCK_SAME, AnimTrack.Same);
+        Assert.Equal(PuppetLayout.PUPPET_ANM_TRACKS, AnimationState.TrackCount);
+        // No LkAnm bck index can be mistaken for a marker.
+        Assert.True(PuppetLayout.LKANM_BCK_LAST < AnimTrack.Same);
+    }
+
+    [Fact]
+    public void LinkAnimOffsets_MatchTheDecomp()
+    {
+        // d_a_player_main.h:2077-2082: mAnmRatioUnder[2], mAnmRatioUpper[3], m_anm_heap_under[2],
+        // m_anm_heap_upper[3], mFrameCtrlUnder[2], mFrameCtrlUpper[3], back to back.
+        Assert.Equal(PuppetLayout.DAPY_OFF_ANM_RATIO_UNDER0 + 2 * PuppetLayout.DAPY_ANM_RATIO_SIZE, PuppetLayout.DAPY_OFF_ANM_RATIO_UPPER0);
+        Assert.Equal(PuppetLayout.DAPY_OFF_ANM_RATIO_UPPER0 + 3 * PuppetLayout.DAPY_ANM_RATIO_SIZE, PuppetLayout.DAPY_OFF_ANM_HEAP_UNDER0);
+        Assert.Equal(PuppetLayout.DAPY_OFF_ANM_HEAP_UNDER0 + 2 * PuppetLayout.DAPY_ANM_HEAP_SIZE, PuppetLayout.DAPY_OFF_ANM_HEAP_UPPER0);
+        Assert.Equal(PuppetLayout.DAPY_OFF_ANM_HEAP_UPPER0 + 3 * PuppetLayout.DAPY_ANM_HEAP_SIZE, PuppetLayout.DAPY_OFF_FRAME_CTRL_UNDER0);
+        Assert.Equal(PuppetLayout.DAPY_OFF_FRAME_CTRL_UNDER0 + 2 * PuppetLayout.DAPY_FRAME_CTRL_SIZE, PuppetLayout.DAPY_OFF_FRAME_CTRL_UPPER0);
+        // The fields the rest of the client already reads sit inside them.
+        Assert.Equal(PuppetLayout.DAPY_OFF_ANM_HEAP_UPPER0 + 2 * PuppetLayout.DAPY_ANM_HEAP_SIZE, PuppetLayout.DAPY_OFF_UPPER_ANM_IDX);
+        Assert.Equal(PuppetLayout.DAPY_OFF_FRAME_CTRL_UNDER0 + PuppetLayout.FRAME_CTRL_OFF_FRAME, PuppetLayout.DAPY_OFF_UNDER_FRAME);
+        Assert.Equal(PuppetLayout.DAPY_OFF_TEX_ANM_HEAP + PuppetLayout.DAPY_ANM_HEAP_SIZE, PuppetLayout.DAPY_OFF_TEX_SCROLL_HEAP);
+        Assert.Equal(PuppetLayout.DAPY_OFF_TEX_SCROLL_HEAP + PuppetLayout.DAPY_ANM_HEAP_SIZE, PuppetLayout.DAPY_OFF_CUR_PROC);
+        // LkAnm types don't overlap (bck < btk < btp).
+        Assert.True(PuppetLayout.LKANM_BCK_FIRST <= PuppetLayout.LKANM_BCK_LAST);
+        Assert.True(PuppetLayout.LKANM_BCK_LAST < PuppetLayout.LKANM_BTK_FIRST);
+        Assert.True(PuppetLayout.LKANM_BTK_LAST < PuppetLayout.LKANM_BTP_FIRST);
     }
 
     [Fact]
