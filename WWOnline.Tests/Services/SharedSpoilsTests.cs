@@ -305,10 +305,16 @@ public class SharedSpoilsHubTests
         await owner.Connection!.InvokeAsync(HubConstants.SetRoomSettings, s);
     }
 
-    private static async Task<SpoilsCounts?> NextTotal(SignalRClientService client, Func<Task> send, int ms = 1500)
+    /// <summary>The next total <paramref name="client"/> receives after <paramref name="send"/> (the first one that
+    /// <paramref name="match"/>es, when given: a total pushed by an earlier step can still be on its way).</summary>
+    private static async Task<SpoilsCounts?> NextTotal(SignalRClientService client, Func<Task> send, int ms = 1500,
+        Func<SpoilsCounts, bool>? match = null)
     {
         var got = new TaskCompletionSource<SpoilsCounts>(TaskCreationOptions.RunContinuationsAsynchronously);
-        void Handler(SpoilsCounts t) => got.TrySetResult(t);
+        void Handler(SpoilsCounts t)
+        {
+            if (match == null || match(t)) got.TrySetResult(t);
+        }
         client.SpoilsTotalReceived += Handler;
         try
         {
@@ -353,7 +359,8 @@ public class SharedSpoilsHubTests
 
             // The Knight's Crest trade (-2) reaches everyone; a count can't go past 99.
             Assert.Equal(Spoils.C((Spoils.Pendant, 5)), await NextTotal(owner, () => player.SendSpoilsDeltaAsync(Spoils.C((Spoils.Crest, -2)))));
-            Assert.Equal(Spoils.C((Spoils.Pendant, 99)), await NextTotal(player, () => owner.SendSpoilsDeltaAsync(Spoils.C((Spoils.Pendant, 99)))));
+            var capped = Spoils.C((Spoils.Pendant, 99));
+            Assert.Equal(capped, await NextTotal(player, () => owner.SendSpoilsDeltaAsync(capped), match: t => t.Equals(capped)));
 
             await SetSpoilsRule(owner, false);
             Assert.Null(await owner.JoinSpoilsAsync(new SpoilsCounts()));

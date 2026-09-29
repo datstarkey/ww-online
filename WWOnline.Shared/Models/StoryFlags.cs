@@ -13,7 +13,8 @@ namespace WWOnline.Shared.Models;
 /// the game uses as one bitfield (docs/figurines.md);</item>
 /// <item>which dungeon warp jars are open (<see cref="WarpJars"/>): the 6 registers the three-way jars keep
 /// their "open" bits in (docs/live-world.md §0.2);</item>
-/// <item>Beedle's membership points (<see cref="BeedlePoints"/>): a counter, merged by MAX.</item>
+/// <item>Beedle's membership points (<see cref="BeedlePoints"/>): a counter, merged by MAX;</item>
+/// <item>the postbox letters (<see cref="Letters"/>): each letter's state register, merged by MAX.</item>
 /// </list>
 /// Grow-only: players' bits are OR-merged, and only syncable bits are ever stored, sent or applied.
 /// Every other event register (0x79-0xFF) and mTmp are never part of this.
@@ -55,6 +56,23 @@ public class StoryFlags
     /// </summary>
     public const int BeedlePointsRegisterByte = 0x86;
 
+    /// <summary>
+    /// The event byte of each postbox letter's state (dLetter_*, d_letter.cpp: 0 not sent, 1 sent, 2 in the
+    /// postbox, 3 read; value mask 0x03, the rest of the byte is other flags), in daObjTpost_c::m_letter order
+    /// (d_a_obj_toripost.cpp:39-52): Baito's mother, Komali's father, the bomb ad, Orca, Grandma, Rock Spire shop
+    /// ad, Tingle, Aryll, silver membership, Hoskit's girlfriend, Baito, gold membership. Reading one at a
+    /// postbox gives its reward; a letter one player has read reads as read for everyone, so the reward is
+    /// given once, and reaches the others through the other rules (the chart through the sea map, a heart piece
+    /// through the derived hearts, the ID / coupon through the delivery bag, rupees through the wallet).
+    /// </summary>
+    public static ReadOnlySpan<byte> LetterRegisterBytes =>
+        [0xAC, 0xB5, 0x7D, 0x7B, 0x9D, 0x7A, 0xB2, 0x8B, 0xB0, 0xAE, 0x7C, 0xAF];
+
+    public const int LetterByteCount = 12;
+
+    /// <summary>The bits of each letter register (dLetterStts_e 0..3).</summary>
+    public const byte LetterMask = 0x03;
+
     private static readonly byte[] Mask = EventFlagCatalog.GetFullSyncMask()[..ByteCount];
 
     private static readonly byte[] FigMask = BuildFigurineMask();
@@ -84,6 +102,9 @@ public class StoryFlags
     /// raised to it (two players buying in the same moment can lose a point between them).</summary>
     public byte BeedlePoints { get; set; }
 
+    /// <summary>Each postbox letter's state (0-3), in <see cref="LetterRegisterBytes"/> order. Merged by MAX.</summary>
+    public byte[] Letters { get; set; } = new byte[LetterByteCount];
+
     private static byte[] BuildFigurineMask()
     {
         var m = new byte[FigurineByteCount];
@@ -101,12 +122,14 @@ public class StoryFlags
         for (int i = 0; i < FigurineByteCount; i++) f.Figurines[i] = (byte)(eventBytes[FigurineRegisterBytes[i]] & FigMask[i]);
         for (int i = 0; i < WarpJarByteCount; i++) f.WarpJars[i] = (byte)(eventBytes[WarpJarRegisterBytes[i]] & WarpJarMask);
         f.BeedlePoints = eventBytes[BeedlePointsRegisterByte];
+        for (int i = 0; i < LetterByteCount; i++) f.Letters[i] = (byte)(eventBytes[LetterRegisterBytes[i]] & LetterMask);
         return f;
     }
 
     /// <summary>Structure check for anything from the network (call <see cref="Normalize"/> after).</summary>
     public bool IsValid() =>
-        Bits is { Length: ByteCount } && Figurines is { Length: FigurineByteCount } && WarpJars is { Length: WarpJarByteCount };
+        Bits is { Length: ByteCount } && Figurines is { Length: FigurineByteCount } && WarpJars is { Length: WarpJarByteCount } &&
+        Letters is { Length: LetterByteCount };
 
     /// <summary>Drop every bit outside <see cref="SyncMask"/> / <see cref="FigurineMask"/>. Returns this.</summary>
     public StoryFlags Normalize()
@@ -114,11 +137,13 @@ public class StoryFlags
         for (int i = 0; i < ByteCount; i++) Bits[i] &= Mask[i];
         for (int i = 0; i < FigurineByteCount; i++) Figurines[i] &= FigMask[i];
         for (int i = 0; i < WarpJarByteCount; i++) WarpJars[i] &= WarpJarMask;
+        for (int i = 0; i < LetterByteCount; i++) Letters[i] &= LetterMask;
         return this;
     }
 
     [JsonIgnore]
-    public bool IsEmpty => Bits.All(b => b == 0) && Figurines.All(b => b == 0) && WarpJars.All(b => b == 0) && BeedlePoints == 0;
+    public bool IsEmpty => Bits.All(b => b == 0) && Figurines.All(b => b == 0) && WarpJars.All(b => b == 0) && BeedlePoints == 0 &&
+                           Letters.All(b => b == 0);
 
     /// <summary>Set event flags (figurines not included).</summary>
     [JsonIgnore]
@@ -132,6 +157,10 @@ public class StoryFlags
     [JsonIgnore]
     public int WarpJarCount => WarpJars.Sum(b => BitOperations.PopCount(b));
 
+    /// <summary>Letters with any state (sent, in the postbox or read).</summary>
+    [JsonIgnore]
+    public int LetterCount => Letters.Count(b => b != 0);
+
     /// <summary>OR the syncable bits of <paramref name="other"/> into this. Returns true if any bit was added.</summary>
     public bool MergeFrom(StoryFlags other)
     {
@@ -143,6 +172,11 @@ public class StoryFlags
         for (int i = 0; i < WarpJarByteCount; i++)
             WarpJars[i] = Or(WarpJars[i], (byte)(other.WarpJars[i] & WarpJarMask), ref changed);
         if (other.BeedlePoints > BeedlePoints) { BeedlePoints = other.BeedlePoints; changed = true; }
+        for (int i = 0; i < LetterByteCount; i++)
+        {
+            byte theirs = (byte)(other.Letters[i] & LetterMask);
+            if (theirs > Letters[i]) { Letters[i] = theirs; changed = true; }
+        }
         return changed;
     }
 
@@ -161,10 +195,12 @@ public class StoryFlags
         for (int i = 0; i < FigurineByteCount; i++) d.Figurines[i] = (byte)(Figurines[i] & ~other.Figurines[i]);
         for (int i = 0; i < WarpJarByteCount; i++) d.WarpJars[i] = (byte)(WarpJars[i] & ~other.WarpJars[i]);
         d.BeedlePoints = BeedlePoints > other.BeedlePoints ? BeedlePoints : (byte)0; // a MAX field: only a higher count is "missing"
+        for (int i = 0; i < LetterByteCount; i++) d.Letters[i] = Letters[i] > other.Letters[i] ? Letters[i] : (byte)0; // MAX too
         return d;
     }
 
-    /// <summary>A copy holding the event flags and warp jars, without the figurines (which wait for an idle game).</summary>
+    /// <summary>A copy holding the event flags, warp jars and Beedle's points, without the figurines and letters
+    /// (which wait for an idle game).</summary>
     public StoryFlags FlagsOnly() =>
         new() { Bits = (byte[])Bits.Clone(), WarpJars = (byte[])WarpJars.Clone(), BeedlePoints = BeedlePoints };
 
@@ -172,7 +208,11 @@ public class StoryFlags
     public StoryFlags FigurinesOnly() => new() { Figurines = (byte[])Figurines.Clone() };
 
     public StoryFlags Clone() =>
-        new() { Bits = (byte[])Bits.Clone(), Figurines = (byte[])Figurines.Clone(), WarpJars = (byte[])WarpJars.Clone(), BeedlePoints = BeedlePoints };
+        new()
+        {
+            Bits = (byte[])Bits.Clone(), Figurines = (byte[])Figurines.Clone(), WarpJars = (byte[])WarpJars.Clone(),
+            BeedlePoints = BeedlePoints, Letters = (byte[])Letters.Clone(),
+        };
 
     public bool Has(ushort id) => (id >> 8) < ByteCount && (Bits[id >> 8] & (id & 0xFF)) != 0;
 
@@ -201,7 +241,8 @@ public class StoryFlags
     public string CountText() =>
         $"{BitCount} flag(s)" + (FigurineCount == 0 ? "" : $" + {FigurineCount} figurine(s)") +
         (WarpJarCount == 0 ? "" : $" + {WarpJarCount} warp jar(s)") +
-        (BeedlePoints == 0 ? "" : $" + Beedle {BeedlePoints} pt(s)");
+        (BeedlePoints == 0 ? "" : $" + Beedle {BeedlePoints} pt(s)") +
+        (LetterCount == 0 ? "" : $" + {LetterCount} letter(s)");
 
     /// <summary>
     /// Names of the set flags for log lines, e.g. "MET_KORL, UNK_0F40", then the figurines made as
@@ -219,6 +260,9 @@ public class StoryFlags
             .Select(i => $"0x{WarpJarRegisterBytes[i]:X2}={WarpJars[i]}").ToList();
         if (jars.Count > 0) parts.Add("warp jars " + string.Join(", ", jars));
         if (BeedlePoints != 0) parts.Add($"Beedle points {BeedlePoints}");
+        var letters = Enumerable.Range(0, LetterByteCount).Where(i => Letters[i] != 0)
+            .Select(i => $"0x{LetterRegisterBytes[i]:X2}={Letters[i]}").ToList();
+        if (letters.Count > 0) parts.Add("letters " + string.Join(", ", letters));
         return parts.Count == 0 ? "(none)" : string.Join(", ", parts);
     }
 

@@ -243,7 +243,7 @@ public class StorySyncService : IDisposable
     public static StoryFlags ToApply(StoryFlags room, StoryFlags local, StoryFlags applied, Func<bool> isIdle)
     {
         var missing = room.Except(local).Except(applied);
-        return missing.FigurineCount > 0 && !isIdle() ? missing.FlagsOnly() : missing;
+        return (missing.FigurineCount > 0 || missing.LetterCount > 0) && !isIdle() ? missing.FlagsOnly() : missing;
     }
 
     /// <summary>
@@ -267,6 +267,16 @@ public class StorySyncService : IDisposable
             uint addr = EventFlagCatalog.EventBitfieldAddress + StoryFlags.BeedlePointsRegisterByte;
             if (dolphin.ReadMemory(addr, 1) is [byte have] && have < bits.BeedlePoints)
                 dolphin.WriteMemory(addr, [bits.BeedlePoints]);
+        }
+        // Letters: each state raised to the room's (dLetter_send / stock / read only move it up), leaving the
+        // byte's other bits alone.
+        for (int i = 0; i < StoryFlags.LetterByteCount; i++)
+        {
+            byte want = (byte)(bits.Letters[i] & StoryFlags.LetterMask);
+            if (want == 0) continue;
+            uint addr = EventFlagCatalog.EventBitfieldAddress + StoryFlags.LetterRegisterBytes[i];
+            if (dolphin.ReadMemory(addr, 1) is [byte have] && (have & StoryFlags.LetterMask) < want)
+                dolphin.WriteMemory(addr, [(byte)(have & ~StoryFlags.LetterMask | want)]);
         }
     }
 
@@ -314,7 +324,8 @@ public class StorySyncService : IDisposable
                     _joined = true;
                     _loggedWaiting = false;
                     var fresh = room.Except(snapshot).Except(_applied);
-                    toApply = fresh.BitCount + fresh.FigurineCount + fresh.WarpJarCount + (fresh.BeedlePoints != 0 ? 1 : 0);
+                    toApply = fresh.BitCount + fresh.FigurineCount + fresh.WarpJarCount + (fresh.BeedlePoints != 0 ? 1 : 0) +
+                              fresh.LetterCount;
                 }
                 Logger.Information("[story] joined room story ({Room} in room, this game brought {Mine}); {N} to apply",
                     room.CountText(), snapshot.CountText(), toApply);
