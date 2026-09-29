@@ -4,7 +4,8 @@ namespace WWOnline.Server.Hubs;
 
 /// <summary>
 /// The room's shared story flags for this server's lifetime: the OR of every player's syncable
-/// event bits (<see cref="StoryFlags.SyncMask"/>). The room owner's game seeds it (see
+/// event bits (<see cref="StoryFlags.SyncMask"/>) and Nintendo Gallery figurines
+/// (<see cref="StoryFlags.Figurines"/>). The room owner's game seeds it (see
 /// GameHub.JoinRoomStory); after that anyone's flags only ever merge up. Thread-safe (hub methods
 /// run concurrently).
 /// </summary>

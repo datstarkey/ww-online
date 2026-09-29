@@ -346,12 +346,12 @@
                         <Expander.Header>
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Advanced: event registers" FontWeight="SemiBold" FontSize="14" />
-                                <TextBlock Text="This game only. Never synced." FontSize="12" Foreground="{StaticResource Text2Brush}" />
+                                <TextBlock Text="This game only. Never synced, except the figurines." FontSize="12" Foreground="{StaticResource Text2Brush}" />
                             </StackPanel>
                         </Expander.Header>
                         <StackPanel Spacing="10" Margin="10,6,4,8">
                             <TextBlock FontSize="12" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
-                                       Text="Multi-bit values in bytes 0x79-0xFF: letters, counters, figurines, warp pots. Edit mode sets them in your own game." />
+                                       Text="Multi-bit values in bytes 0x79-0xFF: letters, counters, figurines, warp pots. Edit mode sets them in your own game. With Shared story on, the Nintendo Gallery figurine bitfields merge into the room." />
                             <ItemsControl ItemsSource="{Binding Registers}" MaxHeight="440">
                                 <ItemsControl.Template>
                                     <ControlTemplate>

@@ -56,7 +56,7 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 | **Shared wallet** | One rupee purse. Anyone's rupees count for everyone. |
 | **Shared world** | Chests, switches and pickups are gone for everyone once someone takes them, and it happens live if you're in the same room: a chest opens empty, a bombed wall vanishes, a locked door comes back unlocked, and a ladder drops or a torch lights when another player clears the room. Small keys too: a key anyone finds is everyone's, and a door anyone unlocks uses it up for everyone. |
 | **Shared items** | One player finding an item unlocks it for the whole room, including heart containers and the magic meter. |
-| **Shared story** | Main story progress is shared, so you can split up and finish different parts of the game. |
+| **Shared story** | Main story progress is shared, so you can split up and finish different parts of the game. So is the Nintendo Gallery: a figurine Carlov makes for anyone is made for everyone, so you can split the Picto Box photos between you. |
 | **Shared bait bag** | One stock of All-Purpose Bait and Hyoi Pears. Anyone's purchase, pickup or use counts for everyone. |
 | **Shared spoils bag** | One stock of Joy Pendants, Skull Necklaces, Chu Jellies, Knight's Crests and the other spoils. Anyone's pickup, sale or trade counts for everyone. |
 | **Other players' projectiles** | Other players' bombs, boat-cannon shots and arrows are real in your game: they fly, explode and hit your enemies and walls. Off: you still see them carry a bomb or aim, but nothing flies. |
@@ -64,7 +64,7 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 
 - **Full sync** turns everything on. **Co-op** turns the six shared-progress rules and warping off, so you see each other (and each other's projectiles) but keep your own progress.
 - Joining a room never throws away progress: if you're further ahead than the room, your progress is added to it.
-- Never shared: health, magic, bomb and arrow counts, and bottle and delivery bag contents (the bait and spoils bags only with their Shared rules).
+- Never shared: health, magic, bomb and arrow counts, bottle and delivery bag contents (the bait and spoils bags only with their Shared rules), and Picto Box photos (each player gives Carlov their own).
 - The Room page's **Dungeons** card shows each dungeon's small keys, map, compass, big key and boss.
 - The app's item icons are read from your own game files and stay on your PC.
 

@@ -104,9 +104,11 @@ These are synced by design, but the host should know what happens.
 
 Doing nothing is a safe default: the Full-sync mask is 0 for every register byte.
 
+The one register group that does sync is the 17 figurine bitfields, under Shared story, as their own field (`StoryFlags.Figurines`, OR within the figurine mask, written only while idle). See [figurines.md](figurines.md). Carlov's in-progress figurine (register A9 and flags 2F01/3080/3F01/4080/4040) stays LocalOnly.
+
 ## The old heuristic (`ProgressionSyncService`: skip bytes 0x00-0x3F, OR-merge 0x40-0xFF)
 
-Removed: story sync is now `StorySyncService` + the server's `StoryFlagStore`, masked by `StoryFlags.SyncMask` (this catalogue's Full-sync mask, bytes 0x00-0x41), and registers are never synced. Kept for the record: the old heuristic was close to inverted.
+Removed: story sync is now `StorySyncService` + the server's `StoryFlagStore`, masked by `StoryFlags.SyncMask` (this catalogue's Full-sync mask, bytes 0x00-0x41), and no register is synced except the figurine bitfields ([figurines.md](figurines.md)). Kept for the record: the old heuristic was close to inverted.
 
 - **It excludes almost everything sharable.** Bytes 0x00-0x3F hold 479 of the 487 named bits, and 444 of those are OR-safe (including all Story and CutsceneSeen bits). Nothing in the story is shared.
 - **It OR-merges what must not be merged:**
