@@ -133,6 +133,9 @@ public partial class EventRegisterRow : ObservableObject
     /// <summary>Beedle's point card (<see cref="StoryFlags.BeedlePointsRegisterByte"/>): shared (MAX) with Shared story on.</summary>
     public bool IsSharedBeedlePoints { get; }
 
+    /// <summary>A postbox letter's state (<see cref="StoryFlags.LetterRegisterBytes"/>): shared (MAX) with Shared story on.</summary>
+    public bool IsSharedLetter { get; }
+
     /// <summary>Current value (byte &amp; mask), null while no game is loaded.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ValueText))]
@@ -150,8 +153,9 @@ public partial class EventRegisterRow : ObservableObject
         IsSharedFigurines = StoryFlags.FigurineRegisterBytes.Contains((byte)info.ByteIndex);
         IsSharedWarpJars = StoryFlags.WarpJarRegisterBytes.Contains((byte)info.ByteIndex) && info.Mask == StoryFlags.WarpJarMask;
         IsSharedBeedlePoints = info.ByteIndex == StoryFlags.BeedlePointsRegisterByte;
+        IsSharedLetter = StoryFlags.LetterRegisterBytes.Contains((byte)info.ByteIndex) && info.Mask == StoryFlags.LetterMask;
         PolicyText = IsSharedFigurines ? "Figurines (Shared story)" : IsSharedWarpJars ? "Warp jars (Shared story)"
-            : IsSharedBeedlePoints ? "Beedle points (Shared story)" : info.Policy switch
+            : IsSharedBeedlePoints ? "Beedle points (Shared story)" : IsSharedLetter ? "Letters (Shared story)" : info.Policy switch
         {
             EventRegisterPolicy.BitwiseOr => "Bitfield",
             EventRegisterPolicy.Max => "Progress state",
@@ -165,7 +169,9 @@ public partial class EventRegisterRow : ObservableObject
                           ? "A dungeon's warp jars that are open, one bit each. With Shared story on, a jar opened here opens for every player."
                           : IsSharedBeedlePoints
                               ? "Beedle's membership points. With Shared story on, the room keeps the highest card and every player's is raised to it."
-                              : "Registers are never synced: this changes your game only.");
+                              : IsSharedLetter
+                                  ? "A postbox letter: 0 not sent, 1 sent, 2 in the postbox, 3 read. With Shared story on, the room keeps the furthest state: a letter anyone has read is read for everyone (its reward reaches them through the other rules)."
+                                  : "Registers are never synced: this changes your game only.");
     }
 }
 

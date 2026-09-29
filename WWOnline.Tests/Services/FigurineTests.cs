@@ -304,7 +304,7 @@ public class FigurineApplyTests
         Assert.False(warpPot.IsSharedFigurines);
         Assert.True(warpPot.IsSharedWarpJars);
 
-        var unshared = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0x9D03));
+        var unshared = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0xFE07)); // the Battlesquid prize count
         Assert.Contains("never synced", unshared.Tooltip);
 
         var making = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0xA9FF));
