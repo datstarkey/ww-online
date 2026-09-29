@@ -592,10 +592,10 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
             _dolphinService.Write(GameMemoryAddresses.Inventory.PowerBraceletsBitfield, RoomInventory.BraceletMask);
 
             // Max out ammo
-            _dolphinService.WriteMemory(GameMemoryAddresses.Player.CurrentArrowCount.Address, new byte[] { 99 });
-            _dolphinService.WriteMemory(GameMemoryAddresses.Player.CurrentBombCount.Address, new byte[] { 99 });
             _dolphinService.WriteMemory(GameMemoryAddresses.Inventory.MaxArrows.Address, new byte[] { 99 });
             _dolphinService.WriteMemory(GameMemoryAddresses.Inventory.MaxBombs.Address, new byte[] { 99 });
+            GameActions.SetArrows(_dolphinService, 99); // HUD path, after the max
+            GameActions.SetBombs(_dolphinService, 99);
 
             StatusMessage = "Gave all items + equipment";
             PollLocal();
