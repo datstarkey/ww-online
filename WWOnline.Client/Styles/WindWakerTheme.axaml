@@ -234,6 +234,7 @@
         <StreamGeometry x:Key="IconDownload">M12 4v11M7 10l5 5l5 -5M5 20h14</StreamGeometry>
         <StreamGeometry x:Key="IconRefresh">M20 12a8 8 0 1 1 -2.4 -5.7M20 4v5h-5</StreamGeometry>
         <StreamGeometry x:Key="IconWarning">M12 3.5l9.5 16.5H2.5zM12 10v4.5M12 17.5h0.01</StreamGeometry>
+        <StreamGeometry x:Key="IconKey">M3 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M11 12h10M17 12v3.5M20.5 12v2.5</StreamGeometry>
         <!-- Filled tunic silhouette for the Appearance preview (100×100 box) -->
         <StreamGeometry x:Key="ShapeTunic">M35 10L13 21l7 18l9 -4V92h42V35l9 4l7 -18L65 10C61 19 56 23 50 23S39 19 35 10z</StreamGeometry>
     </Styles.Resources>

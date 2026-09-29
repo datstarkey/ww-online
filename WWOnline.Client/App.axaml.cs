@@ -44,6 +44,8 @@ public partial class App : Application
         services.AddSingleton<WorldFlagSyncService>();
         services.AddSingleton<SharedWalletService>();
         services.AddSingleton<StorySyncService>();
+        services.AddSingleton<SmallKeyTableProvider>();
+        services.AddSingleton<SharedSmallKeyService>();
         services.AddSingleton<RoomSettingsService>();
         services.AddSingleton<GameSyncService>();
         services.AddSingleton<GameLogService>();
