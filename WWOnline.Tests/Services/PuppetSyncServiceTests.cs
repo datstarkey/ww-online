@@ -289,6 +289,44 @@ public class PuppetSyncServiceTests : IDisposable
             sub.Verify(s => s.Dispose(), Times.Once);
     }
 
+    // ── Player names (name tags) ───────────────────────────────────────────────
+
+    [Fact]
+    public void GetSlotNames_FollowsSlots_WithSanitisedJoinNames()
+    {
+        _sut.SetPlayerName("player-A", "Jösé");
+        _sut.SetPlayerName("player-B", "ゼルダ");
+        _sut.AssignSlot("player-A");
+        _sut.AssignSlot("player-B");
+
+        Assert.Equal(new[] { "Jose", "Player 2", "" }, _sut.GetSlotNames());
+
+        _sut.ReleaseSlot("player-A");
+        Assert.Equal(new[] { "", "Player 2", "" }, _sut.GetSlotNames());
+
+        // The name goes with the player: a rejoin under the same id has to announce it again.
+        _sut.AssignSlot("player-A");
+        Assert.Equal(new[] { "Player 1", "Player 2", "" }, _sut.GetSlotNames());
+    }
+
+    [Fact]
+    public void GetSlotNames_FallsBackToThePuppetDataName()
+    {
+        var puppet = MakePuppet();
+        puppet.PlayerName = "Tetra";
+        _sut.UpdateRemotePuppet("player-A", puppet);
+        Assert.Equal("Tetra", _sut.GetSlotNames()[0]);
+
+        _sut.SetPlayerName("player-A", "Link");
+        Assert.Equal("Link", _sut.GetSlotNames()[0]);
+    }
+
+    [Fact]
+    public void ShowPlayerNames_DefaultsFromSettings()
+    {
+        Assert.Equal(_settings.Load().ShowPlayerNames, _sut.ShowPlayerNames);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private static PuppetData MakePuppet(float x = 0, float y = 0, float z = 0) => new()

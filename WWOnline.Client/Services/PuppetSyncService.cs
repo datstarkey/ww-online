@@ -92,6 +92,18 @@ public class PuppetSyncService : IDisposable
     // Last LocalAppearance.NeedsRel verdict, for logging transitions only.
     private bool _localLookNeedsRel;
 
+    /// <summary>
+    /// "Show player names": whether the REL draws each peer's name above their puppet
+    /// (<see cref="PuppetNameTags"/>). Live: published to the game on the next tick.
+    /// </summary>
+    public bool ShowPlayerNames { get; set; } = true;
+
+    // Player names by connection id, from PlayerJoined, already sanitised for the game font.
+    private readonly ConcurrentDictionary<string, string> _playerNames = new();
+
+    // Names block last seen (0 = none yet), for logging changes only.
+    private uint _namesBlock;
+
     private readonly GameSettingsService _settingsService;
     private readonly DespawnWorker _despawnWorker;
 
@@ -116,6 +128,7 @@ public class PuppetSyncService : IDisposable
             ColorG = saved.TunicColorG,
             ColorB = saved.TunicColorB,
         };
+        ShowPlayerNames = saved.ShowPlayerNames;
     }
 
     /// <summary>
@@ -432,6 +445,7 @@ public class PuppetSyncService : IDisposable
         _remotePuppets.TryRemove(playerId, out _);
         _lastPuppetReceive.TryRemove(playerId, out _);
         _lastSlotVisibility.TryRemove(playerId, out _);
+        _playerNames.TryRemove(playerId, out _);
 
         if (_dolphin.IsConnected)
         {
@@ -440,6 +454,68 @@ public class PuppetSyncService : IDisposable
         }
 
         Logger.Information("Released puppet slot {Slot} for player {PlayerId}", slot, playerId);
+    }
+
+    /// <summary>
+    /// Remember a remote player's name (from PlayerJoined) for the name above their puppet.
+    /// </summary>
+    public void SetPlayerName(string playerId, string? playerName)
+    {
+        if (string.IsNullOrEmpty(playerId))
+            return;
+        string sanitized = PuppetNameTags.Sanitize(playerName);
+        if (sanitized.Length == 0)
+            _playerNames.TryRemove(playerId, out _);
+        else
+            _playerNames[playerId] = sanitized;
+    }
+
+    /// <summary>
+    /// The name drawn above each slot's puppet ("" for an empty slot): the player's join name,
+    /// else the name in their puppet data, sanitised for the game font (<see cref="PuppetNameTags"/>).
+    /// </summary>
+    public IReadOnlyList<string> GetSlotNames()
+    {
+        var names = new string[GameMemoryAddresses.PuppetSync.MaxSlots];
+        for (int i = 0; i < names.Length; i++)
+        {
+            string? playerId = GetPlayerInSlot(i);
+            if (playerId == null)
+            {
+                names[i] = "";
+                continue;
+            }
+            string? name = _playerNames.TryGetValue(playerId, out var joined) ? joined
+                : _remotePuppets.TryGetValue(playerId, out var puppet) ? puppet.PlayerName : null;
+            names[i] = PuppetNameTags.DisplayName(name, i);
+        }
+        return names;
+    }
+
+    /// <summary>
+    /// Keep the REL's names block in line with the slots and the "Show player names" choice. Writes
+    /// only what changed; a no-op until the REL has created the block (first puppet since boot).
+    /// </summary>
+    private void PublishPlayerNames()
+    {
+        var names = GetSlotNames();
+        var result = PuppetNameTags.Publish(_dolphin, ShowPlayerNames, names);
+        uint block = result?.Block ?? 0;
+        if (block != _namesBlock)
+        {
+            Logger.Information(block != 0 ? "[names] names block at 0x{Block:X8}" : "[names] names block gone (was 0x{Old:X8})",
+                               block != 0 ? block : _namesBlock);
+            _namesBlock = block;
+        }
+        if (result is not { } r)
+            return;
+        if (r.FlagsWritten)
+            Logger.Information("[names] show player names: {Show}", ShowPlayerNames);
+        for (int i = 0; i < names.Count; i++)
+        {
+            if ((r.SlotsWritten & (1 << i)) != 0)
+                Logger.Information("[names] slot {Slot} name '{Name}'", i, names[i]);
+        }
     }
 
     /// <summary>
@@ -607,6 +683,9 @@ public class PuppetSyncService : IDisposable
             // The local player's outfit/colour for the puppet REL (it applies it to the local Link).
             var localLook = LocalAppearance;
             Services.LocalAppearance.Publish(_dolphin, localLook);
+
+            // The peers' names (and whether to show them) for the REL's name tags.
+            PublishPlayerNames();
 
             // Read local player's current stage/room for visibility filtering + transition detection.
             string localStage = "";

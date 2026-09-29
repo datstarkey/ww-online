@@ -17,6 +17,9 @@ public class GameSettings
     public byte TunicColorG { get; set; } = PuppetLayout.TUNIC_COLOR_DEFAULT_G;
     public byte TunicColorB { get; set; } = PuppetLayout.TUNIC_COLOR_DEFAULT_B;
 
+    /// <summary>Draw the other players' names above their Links (Appearance page, live).</summary>
+    public bool ShowPlayerNames { get; set; } = true;
+
     /// <summary>
     /// Optional game patches to apply when patching (ids from GameMod/src/patches/optional/).
     /// Null = never chosen: use each patch's default. See OptionalPatchCatalogService.

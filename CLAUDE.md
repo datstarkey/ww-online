@@ -96,6 +96,7 @@ Optional patches (`GameMod/src/patches/optional/*.asm`, betterww QoL + vanilla b
 - **World and story merge in one direction only.** World is per-stage save flags OR-merged. Story is event flags 0x00-0x41, masked by `StoryFlags.SyncMask`. **Items** only grow (OR / MAX), and only the owner can remove an item.
 - **These never sync:** health, magic, arrow and bomb counts, bottle and bag contents, small keys, LocalOnly or risky event flags, event registers, mTmp.
 - Every sync service resets and rejoins on `SignalRClientService.Connected`. Nothing is marked "sent" until the send succeeds. Puppets are position/animation/equipment (plus the boat while riding it) only, and never include yourself.
+- **Name tags:** each peer's name (from `PlayerJoined`, sanitised to printable ASCII by `PuppetNameTags`) is drawn above their puppet by the REL. `PuppetSyncService` writes the REL's names block (pointer at `PUPPET_NAMES_PTR_ADDR`) only where it differs; "Show player names" (Appearance page, `GameSettings.ShowPlayerNames`) is the block's SHOW flag, local only. Log lines: `[names]`.
 - **Visibility:** a puppet shows when the other player is in the same stage and room. On the Great Sea (`sea`, whose grid squares and islands are rooms) it's by distance instead, and crossing a square doesn't despawn puppets (`PuppetVisibility`).
 
 ## C# conventions

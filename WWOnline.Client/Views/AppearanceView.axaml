@@ -179,6 +179,22 @@
                             </Border>
                         </StackPanel>
                     </Border>
+
+                    <!-- Player names -->
+                    <Border Classes="ww-card" Padding="24,22">
+                        <StackPanel Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Viewbox Width="20" Height="20" VerticalAlignment="Center">
+                                    <Path Classes="icon" Data="{StaticResource IconPeople}" Stroke="{StaticResource AccentBrush}" />
+                                </Viewbox>
+                                <TextBlock Text="Player names" Classes="ww-card-title" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <ToggleSwitch IsChecked="{Binding ShowPlayerNames}" Content="Show player names"
+                                          AutomationProperties.Name="Show player names" />
+                            <TextBlock Text="Each crewmate's name floats above their Link on your screen. It shrinks with distance and hides during cutscenes and menus. Only you see this choice."
+                                       FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource Text2Brush}" />
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
             </Grid>
         </StackPanel>

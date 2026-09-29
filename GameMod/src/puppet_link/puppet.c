@@ -16,6 +16,8 @@
 #include "puppet_worldsync.c"
 // The peer's King of Red Lions
 #include "puppet_boat.c"
+// The peer's name above the puppet
+#include "puppet_nametag.c"
 
 /* Process condition flags */
 #define PROC_CONDITION_INIT 0x08
@@ -65,6 +67,9 @@ typedef struct PUPPET_class
 
   // The peer's boat, drawn by this puppet while they ride it (puppet_boat.c).
   PuppetBoat boat;
+
+  // The peer's name, entered in the 2D list by each draw (puppet_nametag.c).
+  PuppetNameTag nameTag;
 } PUPPET_class;
 
 // ww_structs.h's daPy_lk_c must be at least as large as the real class (0x4C28) or
@@ -201,6 +206,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   puppet_appearance_onCreate();
   this->appearanceCounted = 1;
   puppet_boatInit(&this->boat);
+  puppet_nametag_onCreate();
 
   // Setup actor in stage layer system
   fopAcM_setStageLayer(base);
@@ -487,6 +493,7 @@ int daPuppet_Draw(PUPPET_class *this)
   }
   puppet_draw(&this->parent, this->slotIndex, &this->packets, &this->lookBlock);
   puppet_boatDraw((fopAc_ac_c *)&this->parent, &this->boat);
+  puppet_nametag_queue((fopAc_ac_c *)&this->parent, DAPY_LK_MPCLMODEL(&this->parent), this->slotIndex, &this->nameTag);
   return 1;
 }
 
