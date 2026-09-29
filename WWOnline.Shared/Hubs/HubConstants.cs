@@ -16,9 +16,10 @@ public static class HubConstants
     /// anim mirror (AnimationState.Tracks and face / hand fields), the shared bait bag (JoinBait,
     /// SendBaitDelta, ReceiveBaitTotal, BaitCounts, RoomSettings.SharedBait), the shared spoils bag
     /// (JoinSpoils, SendSpoilsDelta, ReceiveSpoilsTotal, SpoilsCounts, RoomSettings.SharedSpoils) and warp
-    /// to player (PuppetData.Warp, RoomSettings.AllowWarping).
+    /// to player (PuppetData.Warp, RoomSettings.AllowWarping). 6: Nintendo Gallery figurines in the room
+    /// story (StoryFlags.Figurines).
     /// </summary>
-    public const int ProtocolVersion = 5; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait + spoils bags (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait; JoinSpoils / SendSpoilsDelta / ReceiveSpoilsTotal, SharedSpoils), warp to player (PuppetData.Warp, AllowWarping)
+    public const int ProtocolVersion = 6; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait + spoils bags (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait; JoinSpoils / SendSpoilsDelta / ReceiveSpoilsTotal, SharedSpoils), warp to player (PuppetData.Warp, AllowWarping). 6: figurines in the room story (StoryFlags.Figurines)
 
     // Hub method names (server-side methods invoked by clients)
 

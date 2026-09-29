@@ -37,7 +37,7 @@ Everything is set through environment variables (`-e NAME=value`, or `environmen
 | `WWO_SHARED_WALLET` | `true` | The room's starting rules. `true`/`false` (also `1`/`0`, `yes`/`no`, `on`/`off`). The room owner can change them any time from the Room page, so these only set how a fresh room starts. `false` for the six shared-progress rules and `WWO_ALLOW_WARPING` (with projectiles left `true`) is the Co-op preset. |
 | `WWO_SHARED_WORLD` | `true` | |
 | `WWO_SHARED_ITEMS` | `true` | |
-| `WWO_SHARED_STORY` | `true` | |
+| `WWO_SHARED_STORY` | `true` | Shared story: story, cutscene and side-quest event flags, and the Nintendo Gallery figurines Carlov has made. |
 | `WWO_SHARED_BAIT` | `true` | Shared bait bag: the bait bag's All-Purpose Bait and Hyoi Pears are one room total. |
 | `WWO_SHARED_SPOILS` | `true` | Shared spoils bag: the spoils bag's counts (Joy Pendants, Skull Necklaces, Chu Jellies...) are one room total. |
 | `WWO_SHARED_PROJECTILES` | `true` | Other players' projectiles: their bombs, boat-cannon shots and arrows are real in your world (they fly, explode and hit your enemies and walls). `false` drops them; their carried bomb and aim poses still show. On in both presets. |
