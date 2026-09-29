@@ -20,7 +20,7 @@ namespace WWOnline.Services;
 public static class PuppetNameTags
 {
     /// <summary>MEM1 ends here with use_extra_memory.asm (48MB); the block must lie below it.</summary>
-    public const uint Mem1End = 0x83000000;
+    public const uint Mem1End = BootStampedBlock.Mem1End;
 
     /// <summary>
     /// A name as the game can draw it: accents dropped (é -> e), whitespace runs as one space,
@@ -91,7 +91,7 @@ public static class PuppetNameTags
 
     /// <summary>Is <paramref name="address"/> a plausible names block (whole block in MEM1, word aligned)?</summary>
     public static bool IsValidBlockAddress(uint address) =>
-        address >= 0x80000000 && address <= Mem1End - PuppetLayout.PUPPET_NAMES_BLOCK_SIZE && address % 4 == 0;
+        BootStampedBlock.IsValidAddress(address, PuppetLayout.PUPPET_NAMES_BLOCK_SIZE);
 
     /// <summary>What one <see cref="Publish"/> found and wrote.</summary>
     /// <param name="Block">The names block's address.</param>
@@ -107,26 +107,12 @@ public static class PuppetNameTags
     /// </summary>
     public static PublishResult? Publish(IDolphinService dolphin, bool show, IReadOnlyList<string> names)
     {
-        var ptr = dolphin.ReadMemory(PuppetLayout.PUPPET_NAMES_PTR_ADDR, 4);
-        if (ptr is not { Length: 4 })
+        // Only a block made in this boot (BootStampedBlock): after a soft reset the old one is someone
+        // else's memory, and writing it would corrupt the game.
+        if (BootStampedBlock.Read(dolphin, PuppetLayout.PUPPET_NAMES_PTR_ADDR, PuppetLayout.PUPPET_NAMES_MAGIC,
+                PuppetLayout.PUPPET_NAMES_BLOCK_SIZE) is not { } found)
             return null;
-        uint block = ReadU32(ptr, 0);
-        if (!IsValidBlockAddress(block))
-            return null;
-
-        var current = dolphin.ReadMemory(block, PuppetLayout.PUPPET_NAMES_BLOCK_SIZE);
-        if (current is not { Length: PuppetLayout.PUPPET_NAMES_BLOCK_SIZE } ||
-            ReadU32(current, PuppetLayout.PUPPET_NAMES_OFF_MAGIC) != PuppetLayout.PUPPET_NAMES_MAGIC)
-            return null;
-
-        // Only a block made in this boot. The pointer word (and the old block's bytes, magic
-        // included) survive a soft reset, but the game heap is recreated, so a stale block is
-        // someone else's memory now: writing it would corrupt the game.
-        var bootTime = GameMemoryAddresses.System.OSStartTime;
-        var boot = dolphin.ReadMemory(bootTime.Address, bootTime.Length);
-        if (boot is not { Length: 8 } || boot.All(b => b == 0) ||
-            !current.AsSpan(PuppetLayout.PUPPET_NAMES_OFF_BOOT, 8).SequenceEqual(boot))
-            return null;
+        var (block, current) = found;
 
         uint wantFlags = show ? PuppetLayout.PUPPET_NAMES_FLAG_SHOW : 0u;
         bool flagsWritten = false;

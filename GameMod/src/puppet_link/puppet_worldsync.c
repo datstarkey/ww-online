@@ -12,7 +12,8 @@
  * in the live mMemory.mItem, provided it is idle on the ground (not being collected by the
  * local player, not held by the boomerang/hookshot/another actor).
  *
- * Chests (daTbox_c::checkOpen at create) and switch-polling actors need nothing here.
+ * Chests and other actors that read a flag only at create: puppet_liveworld.c (run from the draw).
+ * Switch-polling actors need nothing.
  *
  * Everything is offset-macro based (ww_inlines.h, WORLD SYNC block). REL: literals OK.
  */

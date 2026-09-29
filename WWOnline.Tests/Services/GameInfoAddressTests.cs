@@ -39,6 +39,7 @@ public class GameInfoAddressTests
         Assert.Equal(0x803C5380u, GameMemoryAddresses.WorldFlags.LiveMemory);
         Assert.Equal(0x803C9DA0u, GameMemoryAddresses.WorldFlags.StagInfoPtr);
         Assert.Equal(0x803C9D54u, GameMemoryAddresses.WorldFlags.NextStageEnable);
+        Assert.Equal(0x803C9EA2u, GameMemoryAddresses.Events.EventMode); // the REL's GAMEINFO_EVT_MODE (gameInfo + 0x529A)
     }
 
     [Fact]

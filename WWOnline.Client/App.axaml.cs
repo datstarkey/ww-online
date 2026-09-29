@@ -38,6 +38,7 @@ public partial class App : Application
         services.AddSingleton<IDolphinService, DolphinService>();
         services.AddSingleton<GameMemoryMonitorService>();
         services.AddSingleton<DespawnWorker>();
+        services.AddSingleton<LiveWorldPoke>();
         services.AddSingleton<PuppetSyncService>();
         services.AddSingleton<RoomInventorySyncService>();
         services.AddSingleton<WorldFlagSyncService>();

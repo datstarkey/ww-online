@@ -113,15 +113,18 @@ public class PuppetSyncService : IDisposable
 
     private readonly GameSettingsService _settingsService;
     private readonly DespawnWorker _despawnWorker;
+    private readonly LiveWorldPoke _liveWorld;
 
     // Last equip ids read outside a REL equip swap (see EquipSwapGuard).
     private byte _lastSword, _lastShield;
 
-    public PuppetSyncService(IDolphinService dolphinService, GameSettingsService settingsService, DespawnWorker despawnWorker)
+    public PuppetSyncService(IDolphinService dolphinService, GameSettingsService settingsService, DespawnWorker despawnWorker,
+        LiveWorldPoke liveWorld)
     {
         _dolphin = dolphinService;
         _settingsService = settingsService;
         _despawnWorker = despawnWorker;
+        _liveWorld = liveWorld;
 
         for (int i = 0; i < _slotBufs.Length; i++)
             _slotBufs[i] = new byte[GameMemoryAddresses.PuppetSync.SlotSize];
@@ -946,10 +949,11 @@ public class PuppetSyncService : IDisposable
             // The shared world's live despawn runs in a puppet's tick: with no peer puppet here
             // and placed items still to despawn, ask for slot 0 anyway — left inactive, the hook
             // spawns it PARKED (invisible, no collision) just to run the scan. Same for the local
-            // Link's outfit/colour (applied by the REL), until it shows the local player's choice.
-            // (Non-short-circuit | : both checks update their own state every tick.)
+            // Link's outfit/colour (applied by the REL), until it shows the local player's choice, and
+            // for the live world (LiveWorldPoke) while the REL has a batch of other players' bits to handle.
+            // (Non-short-circuit | : every check updates its own state every tick.)
             int desiredCount = highestActiveSlot + 1;
-            if (_despawnWorker.IsNeeded(_dolphin) | LocalLookNeedsRel(linkPtr!.Value, localLook))
+            if (_despawnWorker.IsNeeded(_dolphin) | _liveWorld.IsNeeded(_dolphin) | LocalLookNeedsRel(linkPtr!.Value, localLook))
                 desiredCount = Math.Max(desiredCount, 1);
             WriteSyncHeader(GameMemoryAddresses.PuppetSync.Magic, desiredCount);
 

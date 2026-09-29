@@ -153,6 +153,41 @@
 #define PUPPET_EQUIP_SWAP_SEQ_ADDR    0x803FD148  /* u32 C: ++ at swap start and end (odd = in progress) */
 
 /* ============================================================================
+ * Live world (puppet_liveworld.c, docs/live-world.md). Chests, bombable walls, ice blocks,
+ * barricades, crystal switches and small-key locks read their flag only when they are created,
+ * so a bit another player set doesn't reach them while you are in the room. C# publishes the
+ * bits it applied FROM other players (current stage only) in one game-heap block; the REL brings
+ * the matching actors to the new state: re-create from their own params (create reads the flag:
+ * chest opens empty, wall/floor/ice/barricade never appear, crystal shows on) or clear a stale
+ * small-key lock byte. The block is allocated and published by the REL exactly like the names
+ * block (same magic/boot-stamp rules, see PUPPET_NAMES_*): never freed, adopted by the next REL,
+ * used by C# only while its boot stamp matches __OSStartTime.
+ * One publish = one batch of NEW bits. C# writes it with a seqlock (SEQ++ to odd, TAG, ZONE_ROOM,
+ * BITS, SEQ++ to even) and only when the REL has acknowledged the previous batch (DONE_SEQ == SEQ),
+ * so each bit is handled once. The REL handles an even SEQ != DONE_SEQ once TAG is the current
+ * stage's (a batch for another stage waits for C# to publish one for this stage; a batch may be
+ * empty), then sets DONE_SEQ = SEQ.
+ * BITS: word 0 = chests (dSv_memBit_c::mTbox bit n), words 1..8 = switch n in word 1 + (n >> 5),
+ * bit (n & 31): memory 0x00-0x7F, dan 0x80-0xBF (whole stage), zone 0xC0-0xEF (ZONE_ROOM only).
+ * ============================================================================ */
+#define LIVEWORLD_PTR_ADDR            0x803FD14C  /* u32 C: live-world block (game heap), 0 = none yet */
+#define LIVEWORLD_MAGIC               0x4C495645  /* "LIVE" */
+#define LIVEWORLD_TAG_MAGIC           0x4C570000  /* "LW" | saveTbl */
+#define LIVEWORLD_BLOCK_SIZE          0x4C
+#define LIVEWORLD_BIT_WORDS           9           /* tbox + 8 switch words */
+#define LIVEWORLD_ZONE_ROOM_NONE      0xFF
+#define LIVEWORLD_OFF_MAGIC           0x00        /* u32 C: LIVEWORLD_MAGIC once set up */
+#define LIVEWORLD_OFF_SEQ             0x04        /* u32 C#: seqlock, odd while C# writes */
+#define LIVEWORLD_OFF_BOOT            0x08        /* u32[2] C: __OSStartTime of the boot that allocated it */
+#define LIVEWORLD_OFF_TAG             0x10        /* u32 C#: LIVEWORLD_TAG_MAGIC | saveTbl the batch belongs to */
+#define LIVEWORLD_OFF_ZONE_ROOM       0x14        /* u32 C#: room of the zone bits (words 7, 8), else LIVEWORLD_ZONE_ROOM_NONE */
+#define LIVEWORLD_OFF_BITS            0x18        /* u32[9] C#: the batch of new bits (see above) */
+#define LIVEWORLD_OFF_DONE_SEQ        0x3C        /* u32 C: SEQ of the last batch handled */
+#define LIVEWORLD_OFF_POKE_COUNT      0x40        /* u32 C: ++ per actor re-created or unlocked */
+#define LIVEWORLD_OFF_WAIT            0x44        /* u32 C: passes held back for an actor still being created */
+#define LIVEWORLD_OFF_RETRY           0x48        /* u32 C: with DONE_SEQ: actors left undone (not ready in ~2 s, hits full, delete refused): publish again */
+
+/* ============================================================================
  * Per-Link appearance (puppet_appearance.c). Every Link on screen shares one J3DModelData, so
  * the outfit (linktexS3TC ResTIMG header in TEX1) and the tunic colour (a recoloured copy of
  * that texture) are applied per Link at draw time. The REL owns the LOCAL Link's header while
@@ -387,6 +422,13 @@ typedef char puppet_check_scratch_above_sbss2[
 typedef char puppet_check_equip_swap_words[
     (PUPPET_EQUIP_SWAP_ACTIVE_ADDR >= RESULT_PTR_ADDR + 4 &&
      PUPPET_EQUIP_SWAP_SEQ_ADDR + 4 <= LOCAL_APPEARANCE_TAG_ADDR) ? 1 : -1];
+typedef char puppet_check_liveworld_word[
+    (LIVEWORLD_PTR_ADDR >= PUPPET_EQUIP_SWAP_SEQ_ADDR + 4 && LIVEWORLD_PTR_ADDR + 4 <= LOCAL_APPEARANCE_TAG_ADDR &&
+     (LIVEWORLD_PTR_ADDR % 4) == 0) ? 1 : -1];
+typedef char puppet_check_liveworld_block[
+    (LIVEWORLD_OFF_BITS + (LIVEWORLD_BIT_WORDS * 4) <= LIVEWORLD_OFF_DONE_SEQ &&
+     LIVEWORLD_OFF_RETRY + 4 <= LIVEWORLD_BLOCK_SIZE && (LIVEWORLD_BLOCK_SIZE % 4) == 0 &&
+     LIVEWORLD_OFF_MAGIC == PUPPET_NAMES_OFF_MAGIC && LIVEWORLD_OFF_BOOT == PUPPET_NAMES_OFF_BOOT) ? 1 : -1];
 typedef char puppet_check_appearance_words[
     (LOCAL_APPEARANCE_STATUS_ADDR + 4 <= WORLDSYNC_ITEM_MASK_ADDR) ? 1 : -1];
 typedef char puppet_check_worldsync_in_region[

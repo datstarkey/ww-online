@@ -20,6 +20,8 @@
 #include "puppet_boat.c"
 // The peer's name above the puppet
 #include "puppet_nametag.c"
+// Create-only actors follow bits other players set (chests, walls, crystals, key locks)
+#include "puppet_liveworld.c"
 
 /* Process condition flags */
 #define PROC_CONDITION_INIT 0x08
@@ -213,6 +215,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   puppet_boatInit(&this->boat);
   puppet_nametag_onCreate();
   puppet_heldInit(&this->held);
+  puppet_liveworld_onCreate();
 
   // Setup actor in stage layer system
   fopAcM_setStageLayer(base);
@@ -491,6 +494,7 @@ int daPuppet_Delete(PUPPET_class *this)
  */
 int daPuppet_Draw(PUPPET_class *this)
 {
+  puppet_liveworld_draw(); // create-only actors catch up; after all executes (see puppet_liveworld.h)
   // Parked this frame (execute skipped the model calc): never draw, even if C# flipped the
   // slot ACTIVE between our execute and this draw.
   if (this->parked)
