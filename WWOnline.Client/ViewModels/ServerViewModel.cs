@@ -45,6 +45,15 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _serverPort = "6969";
 
+    /// <summary>
+    /// Optional, for joining a dedicated server that has an owner key (WWO_OWNER_KEY): entering it
+    /// makes this player the room owner. Not saved to disk, and cleared when the address changes or
+    /// the player leaves, so one server's key is never sent to another. (An automatic reconnect to
+    /// the same server re-sends it: SignalRClientService keeps its own copy for that.)
+    /// </summary>
+    [ObservableProperty]
+    private string _ownerKey = "";
+
     [ObservableProperty]
     private ConnectionState _connectionState = ConnectionState.Disconnected;
 
@@ -65,10 +74,13 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     public string ConnectionInfoText => ConnectionState switch
     {
         ConnectionState.Hosting => $"Hosting on port {ServerPort}",
-        ConnectionState.Connected => $"Connected to {ServerHost}:{ServerPort}",
-        ConnectionState.Connecting => $"Connecting to {ServerHost}:{ServerPort}...",
+        ConnectionState.Connected => $"Connected to {ServerAddress}",
+        ConnectionState.Connecting => $"Connecting to {ServerAddress}...",
         _ => "Not connected"
     };
+
+    /// <summary>"host:port", or the URL as typed when the host field holds a full URL (reverse proxy).</summary>
+    public string ServerAddress => ServerHost.Contains("://", StringComparison.Ordinal) ? ServerHost.Trim() : $"{ServerHost}:{ServerPort}";
 
     public string DolphinStatusText => DolphinConnected ? "Connected" : "Not connected";
 
@@ -85,6 +97,9 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     public string LocalInitials => TunicColors.InitialsOf(PlayerName);
 
     partial void OnPlayerNameChanged(string value) => OnPropertyChanged(nameof(LocalInitials));
+
+    partial void OnServerHostChanged(string value) => OwnerKey = "";
+    partial void OnServerPortChanged(string value) => OwnerKey = "";
 
     /// <summary>Called when the tunic colour is picked on the Appearance page; recolours the local avatar and row.</summary>
     public void SetLocalTunicColor(string hex)
@@ -496,7 +511,9 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
 
         try
         {
-            if (!int.TryParse(ServerPort, out var port))
+            // A URL in the host field (reverse proxy) carries its own port: the Port field is ignored.
+            int port = 0;
+            if (!SignalRClientService.IsUrl(ServerHost) && !int.TryParse(ServerPort, out port))
             {
                 ErrorMessage = "Invalid port number";
                 return;
@@ -505,7 +522,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
             SavePlayerName();
             ConnectionState = ConnectionState.Connecting;
 
-            var (success, message) = await _signalRClient.ConnectAsync(ServerHost, port, PlayerName);
+            var (success, message) = await _signalRClient.ConnectAsync(ServerHost, port, PlayerName, OwnerKey);
             if (success)
             {
                 ConnectionState = ConnectionState.Connected;
@@ -536,6 +553,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         {
             await _signalRClient.DisconnectAsync();
             StopServerProcess();
+            OwnerKey = ""; // the next server gets no key unless the player enters one
 
             ConnectionState = ConnectionState.Disconnected;
             ClearPlayers();

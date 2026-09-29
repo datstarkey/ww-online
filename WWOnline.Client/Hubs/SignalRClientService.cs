@@ -59,13 +59,63 @@ public class SignalRClientService : IAsyncDisposable
     private string _playerName = "";
     private string? _hostToken;
 
-    /// <param name="hostToken">The token passed to a server this client launched; claims room ownership.</param>
+    /// <summary>True when the host field holds a URL ("https://...") rather than a host name or IP.</summary>
+    public static bool IsUrl(string? host) => host?.Contains("://", StringComparison.Ordinal) == true;
+
+    /// <summary>
+    /// The hub URL for what the player typed. A plain host ("192.168.1.20", "wwo.example.com")
+    /// means http://host:port. An http:// or https:// URL ("https://wwo.example.com", for a server
+    /// behind a TLS reverse proxy; docs/self-hosting.md) is used as it is and <paramref name="port"/>
+    /// is ignored: without a port in the URL that's 443 for https and 80 for http. The hub path is
+    /// added when the URL has no path. Any other scheme (ws://...) is refused with a reason.
+    /// </summary>
+    public static bool TryBuildHubUrl(string host, int port, out string url, out string error)
+    {
+        host = host.Trim();
+        url = "";
+        error = "";
+        if (host.Length == 0)
+        {
+            error = "Enter the server's address.";
+            return false;
+        }
+        if (IsUrl(host))
+        {
+            if (!Uri.TryCreate(host, UriKind.Absolute, out var uri) ||
+                (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
+                string.IsNullOrEmpty(uri.Host))
+            {
+                error = $"'{host}' isn't a server address WW-Online can use. Enter a host name or IP (and the port), " +
+                        "or a URL starting with http:// or https://.";
+                return false;
+            }
+            var path = uri.AbsolutePath.TrimEnd('/');
+            url = uri.GetLeftPart(UriPartial.Authority) + (path.Length == 0 ? HubConstants.HubPath : path);
+            return true;
+        }
+        if (port is < 1 or > 65535)
+        {
+            error = "Invalid port number";
+            return false;
+        }
+        url = $"http://{host}:{port}{HubConstants.HubPath}";
+        return true;
+    }
+
+    /// <param name="hostToken">Claims room ownership: the token passed to a server this client
+    /// launched, or a dedicated server's owner key.</param>
     public async Task<(bool success, string message)> ConnectAsync(string host, int port, string playerName = "", string? hostToken = null)
     {
+        if (!TryBuildHubUrl(host, port, out var hubUrl, out var addressError))
+        {
+            Logger.Warning("Not connecting to '{Host}' (port {Port}): {Error}", host, port, addressError);
+            return (false, addressError);
+        }
+
         await _connectionSemaphore.WaitAsync();
         try
         {
-            Logger.Information("Attempting to connect to SignalR server at {Host}:{Port} as player: {PlayerName}", host, port, playerName);
+            Logger.Information("Attempting to connect to SignalR server at {Url} as player: {PlayerName}", hubUrl, playerName);
 
             if (_hubConnection != null)
             {
@@ -74,9 +124,9 @@ public class SignalRClientService : IAsyncDisposable
             }
 
             _playerName = playerName;
-            _hostToken = hostToken;
+            _hostToken = string.IsNullOrWhiteSpace(hostToken) ? null : hostToken.Trim();
             var connection = new HubConnectionBuilder()
-                .WithUrl($"http://{host}:{port}{HubConstants.HubPath}")
+                .WithUrl(hubUrl)
                 .WithAutomaticReconnect()
                 .Build();
             _hubConnection = connection;
@@ -90,12 +140,12 @@ public class SignalRClientService : IAsyncDisposable
                 return (false, rejection);
             }
 
-            Logger.Information("Successfully connected to SignalR server at {Host}:{Port}", host, port);
-            return (true, $"Connected to server at {host}:{port}");
+            Logger.Information("Successfully connected to SignalR server at {Url}", hubUrl);
+            return (true, $"Connected to server at {hubUrl}");
         }
         catch (Exception ex)
         {
-            Logger.Error(ex, "Failed to connect to SignalR server at {Host}:{Port}", host, port);
+            Logger.Error(ex, "Failed to connect to SignalR server at {Url}", hubUrl);
             return (false, $"Failed to connect: {ex.Message}");
         }
         finally

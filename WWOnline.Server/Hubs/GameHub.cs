@@ -16,6 +16,9 @@ public class GameHub : Hub<IGameHubClient>
     private static readonly Serilog.ILogger Logger = Log.ForContext<GameHub>();
     private static readonly ConcurrentDictionary<string, PlayerInfo> ConnectedPlayers = new();
 
+    /// <summary>Named players in the room (the /health endpoint and the shutdown log).</summary>
+    public static int PlayerCount => ConnectedPlayers.Values.Count(p => !string.IsNullOrEmpty(p.PlayerName));
+
     private static string GetPlayerName(string connectionId)
     {
         return ConnectedPlayers.TryGetValue(connectionId, out var p) && !string.IsNullOrEmpty(p.PlayerName)
@@ -53,6 +56,7 @@ public class GameHub : Hub<IGameHubClient>
         var name = GetPlayerName(connectionId);
 
         ConnectedPlayers.TryRemove(connectionId, out _);
+        OwnerKeyGate.Forget(connectionId);
         ItemsSeedGate.Forget(connectionId);
         StorySeedGate.Forget(connectionId);
         WalletSeedGate.Forget(connectionId);
@@ -163,27 +167,38 @@ public class GameHub : Hub<IGameHubClient>
 
     // A client that launches this server (its "Host" button) passes a secret token on the
     // command line and claims room ownership with it — otherwise another client racing to
-    // connect first would become the owner. Ownership is keyed by connection id, so the host
+    // connect first would become the owner. A dedicated server's admin sets the same secret as
+    // its owner key (WWO_OWNER_KEY), and a player who enters it in the client's Owner key field
+    // claims the room the same way. Ownership is keyed by connection id, so the owner
     // re-claims with the same token after every reconnect (new id), which moves it over.
-    // Without a claimed owner (dedicated server, or the owner left) the earliest-joined named
-    // player is the room owner.
-    private static string? _hostToken;
+    // Without a claimed owner (no key set, or the owner left) the earliest-joined named
+    // player is the room owner. OwnerKeyCheck compares in constant time and stops listening to a
+    // connection after a few wrong keys.
+    private static readonly OwnerKeyCheck OwnerKeyGate = new();
     private static volatile string? _claimedOwnerId;
 
-    public static void ConfigureHostToken(string? token) => _hostToken = token;
+    public static void ConfigureHostToken(string? token) => OwnerKeyGate.Configure(token);
 
     public async Task ClaimRoomOwner(string token)
     {
         var player = GetPlayerName(Context.ConnectionId);
-        if (string.IsNullOrEmpty(_hostToken) || token != _hostToken)
+        switch (OwnerKeyGate.Check(Context.ConnectionId, token))
         {
-            Logger.Warning("ClaimRoomOwner rejected for {Player}: wrong token", player);
-            return;
+            case OwnerKeyCheck.Outcome.Ignored:
+                return;
+            case OwnerKeyCheck.Outcome.Rejected:
+                Logger.Warning("ClaimRoomOwner rejected for {Player}: {Reason}", player,
+                    OwnerKeyGate.IsConfigured ? "wrong owner key" : "this server has no owner key");
+                return;
+            case OwnerKeyCheck.Outcome.RejectedLastAttempt:
+                Logger.Warning("ClaimRoomOwner rejected for {Player}: {Reason} — {Max} failed attempts, ignoring further claims from this connection",
+                    player, OwnerKeyGate.IsConfigured ? "wrong owner key" : "this server has no owner key", OwnerKeyCheck.MaxFailedAttempts);
+                return;
         }
         var previous = _claimedOwnerId;
         _claimedOwnerId = Context.ConnectionId;
         if (previous == null)
-            Logger.Information("[room] {Player} claimed room ownership (started this server)", player);
+            Logger.Information("[room] {Player} claimed room ownership (host token / owner key)", player);
         else if (previous != Context.ConnectionId)
             Logger.Information("[room] {Player} re-claimed room ownership on a new connection", player);
         await Clients.All.ReceiveRoomSettings(CurrentRoomSettings());

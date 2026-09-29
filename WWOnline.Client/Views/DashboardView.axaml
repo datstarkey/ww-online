@@ -211,6 +211,13 @@
                                 </StackPanel>
                             </Grid>
 
+                            <!-- Only for a dedicated server with an owner key (docs/self-hosting.md) -->
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="OWNER KEY (OPTIONAL)" Classes="ww-label" />
+                                <TextBox Text="{Binding Server.OwnerKey}" Classes="mono" PasswordChar="•"
+                                         Watermark="Only if the server's admin gave you one" />
+                            </StackPanel>
+
                             <Grid ColumnDefinitions="*,12,*" Margin="0,4,0,0">
                                 <Button Grid.Column="0" Content="Host a room" Classes="ww-accent"
                                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"

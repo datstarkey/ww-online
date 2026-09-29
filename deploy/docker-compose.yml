@@ -1,0 +1,31 @@
+# WW-Online dedicated server. Copy this file to your server, then:
+#   docker compose up -d        # start (and restart on reboot)
+#   docker compose logs -f      # watch who joins
+#   docker compose pull && docker compose up -d   # update to the newest release
+# Everything is explained in docs/self-hosting.md.
+
+services:
+  ww-online:
+    image: ghcr.io/datstarkey/ww-online-server:latest   # or pin a release, e.g. :0.2.0 / :0.2
+    container_name: ww-online
+    restart: unless-stopped
+    ports:
+      - "6969:6969"          # TCP. Players connect to <this machine's address>:6969
+    environment:
+      WWO_PORT: "6969"       # the port inside the container (change the mapping above to match)
+      # The room's starting rules. The room owner can change them from the client at any time.
+      WWO_SHARED_WALLET: "true"
+      WWO_SHARED_WORLD: "true"
+      WWO_SHARED_ITEMS: "true"
+      WWO_SHARED_STORY: "true"
+      # A player who enters this in the client's "Owner key" field becomes the room owner.
+      # Without it the first player to join owns the room. Pick your own long random string.
+      # WWO_OWNER_KEY: "change-me-to-something-long-and-random"
+      # Logs go to `docker compose logs`. Uncomment (and the volume below) to keep a file too.
+      # WWO_LOG_FILE: "/data/server.log"
+    # volumes:
+    #   - ww-online-data:/data
+    stop_grace_period: 10s   # SIGTERM, then the server closes every connection and exits
+
+# volumes:
+#   ww-online-data:

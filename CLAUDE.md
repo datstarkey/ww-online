@@ -19,14 +19,16 @@ dotnet build "WW-Online.sln"                          # everything (should be 0 
 dotnet test "WWOnline.Tests/WWOnline.Tests.csproj"    # client + server
 dotnet test "WWOnline.Patcher.Tests/WWOnline.Patcher.Tests.csproj"
 dotnet run --project WWOnline.Client/WWOnline.Client.csproj
-dotnet run --project WWOnline.Server/WWOnline.Server.csproj -- [port]   # default 6969
+dotnet run --project WWOnline.Server/WWOnline.Server.csproj -- [port]   # default 6969; --help for flags/WWO_* env vars
+docker build -f WWOnline.Server/Dockerfile -t ww-online-server .          # server image (context = repo root)
 dotnet run --project WWOnline.Client/WWOnline.Client.csproj -- --build-patchdata out/PatchData   # release PatchData
 ```
 - If a build fails with "file is locked", a running client or server (e.g. from dev-test) holds `bin/`. Run `.\scripts\dev-test.ps1 -Stop`, or build with `--artifacts-path <tmp>`.
 - HotAvalonia reloads `.axaml` in Debug builds. `dotnet watch` handles C# changes.
 - **Version:** the release version comes from the git tag (`v1.2.3` means `-p:Version=1.2.3`). `Directory.Build.props` holds the dev version and `WwoRepositoryUrl`, the one place the GitHub owner/repo lives. Read them at runtime through `AppInfo` (Shared), never from a hardcoded string.
 - **Protocol:** bump `HubConstants.ProtocolVersion` whenever a hub method, callback or wire DTO changes. `GameHub.Join` refuses a client on a different protocol, and `SignalRClientService` surfaces the reason (`JoinRejected`, and the `ConnectAsync` failure message).
-- **Releases:** push a `v*` tag. `.github/workflows/release.yml` builds PatchData (`--build-patchdata` in devkitPro's Linux container, tag pinned to the local devkitPPC r47.1), packs the client with Velopack and publishes a GitHub Release. Installed apps update from it through `UpdateService`, which is a no-op in dev builds. CI (`ci.yml`) runs the Nintendo-files guard, a `-warnaserror` build and both test projects. See `docs/releasing.md`.
+- **Releases:** push a `v*` tag. `.github/workflows/release.yml` builds PatchData (`--build-patchdata` in devkitPro's Linux container, tag pinned to the local devkitPPC r47.1), packs the client with Velopack and publishes a GitHub Release. Installed apps update from it through `UpdateService`, which is a no-op in dev builds. It then pushes the server's Docker image (amd64 + arm64) to `ghcr.io/<owner>/ww-online-server`. CI (`ci.yml`) runs the Nintendo-files guard, a `-warnaserror` build, both test projects and an amd64 image build + smoke test. See `docs/releasing.md`.
+- **Server config:** `ServerOptions` (CLI flags over `WWO_*` env vars over defaults), endpoints in `ServerApp` (hub + `GET /health`). Self-hosting, Docker and the owner key: `docs/self-hosting.md`.
 - **Nintendo-files guard:** run `./scripts/check-no-nintendo-files.ps1` before any commit that adds binaries. With `-Path <dirs>` it checks build output and packages.
 
 ## Multiplayer test cycle: `scripts\dev-test.ps1`
@@ -64,6 +66,7 @@ tww-decomp/                Wind Waker decompilation (submodule), the reference f
 scripts/dev-test.ps1       local multiplayer test harness
 Directory.Build.props      app version + GitHub repo URL (all projects)
 .github/workflows/         ci.yml (every push/PR), release.yml (v* tags; docs/releasing.md)
+deploy/docker-compose.yml  dedicated server example (image built from WWOnline.Server/Dockerfile)
 scripts/                   check-no-nintendo-files.ps1 (CI + release guard)
 ```
 

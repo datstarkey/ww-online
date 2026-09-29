@@ -115,7 +115,11 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 The host's PC must be reachable on port `6969`. The easiest options:
 - **[Tailscale](https://tailscale.com/)** (recommended): everyone installs it and joins the host's tailnet, then connects to the host's Tailscale IP. No router changes needed.
 - **Port forwarding:** forward TCP `6969` on the host's router to the host's PC, and friends connect to the host's public IP.
-- **Dedicated server:** run `WWOnline.Server` on any always-on machine or VPS, and everyone connects to it.
+- **Dedicated server:** run the server on any always-on machine or VPS, and everyone connects to it. There's a Docker image (amd64 and arm64):
+  ```
+  docker run -d --name ww-online --restart unless-stopped -p 6969:6969 ghcr.io/datstarkey/ww-online-server:latest
+  ```
+  [Self-hosting](docs/self-hosting.md) covers Docker Compose, the settings, the optional owner key (so the right player owns the room), firewalls, Tailscale and TLS. The release zips run without Docker too.
 
 ## Troubleshooting
 
