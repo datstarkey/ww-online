@@ -12,6 +12,8 @@
 
 // Include draw implementation (self-contained with all its helpers)
 #include "puppet_draw.c"
+// The item the peer holds / uses (called from execute and draw)
+#include "puppet_held.c"
 // Shared-world layer 2: live despawn of placed items other players collected
 #include "puppet_worldsync.c"
 // The peer's King of Red Lions
@@ -70,6 +72,9 @@ typedef struct PUPPET_class
 
   // The peer's name, entered in the 2D list by each draw (puppet_nametag.c).
   PuppetNameTag nameTag;
+
+  // REL-drawn held boomerang / carried bomb (puppet_held.c).
+  PuppetHeld held;
 } PUPPET_class;
 
 // ww_structs.h's daPy_lk_c must be at least as large as the real class (0x4C28) or
@@ -207,6 +212,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   this->appearanceCounted = 1;
   puppet_boatInit(&this->boat);
   puppet_nametag_onCreate();
+  puppet_heldInit(&this->held);
 
   // Setup actor in stage layer system
   fopAcM_setStageLayer(base);
@@ -472,6 +478,7 @@ int daPuppet_Delete(PUPPET_class *this)
   this->appearanceCounted = 0;
 
   puppet_boatDelete(&this->boat);
+  puppet_heldDelete(&this->held);
 
   return 1;
 }
@@ -492,6 +499,7 @@ int daPuppet_Draw(PUPPET_class *this)
     return 1;
   }
   puppet_draw(&this->parent, this->slotIndex, &this->packets, &this->lookBlock);
+  puppet_heldDraw(&this->parent, &this->held);
   puppet_boatDraw((fopAc_ac_c *)&this->parent, &this->boat);
   puppet_nametag_queue((fopAc_ac_c *)&this->parent, DAPY_LK_MPCLMODEL(&this->parent), this->slotIndex, &this->nameTag);
   return 1;
@@ -554,6 +562,7 @@ int daPuppet_Execute(PUPPET_class *this)
   l_puppetBoat = &this->boat;
 
   puppet_execute(link);
+  puppet_heldExecute(link, &this->held);
 
   l_puppetBoat = NULL;
   this->followState = (u32)l_puppetFollowState;

@@ -20,7 +20,7 @@ public static class PuppetLayout
     public const int PUPPET_HDR_OFF_NUM_ACTIVE = 0x04;
     /// <summary>u32</summary>
     public const int PUPPET_HDR_OFF_WRITE_COUNTER = 0x08;
-    public const int PUPPET_SLOT_SIZE = 0x48;
+    public const int PUPPET_SLOT_SIZE = 0x50;
     public const uint PUPPET_SLOT_0 = 0x803FD010;
     /// <summary>u32 — set to 1 when slot is live</summary>
     public const int PUPPET_SLOT_OFF_ACTIVE = 0x00;
@@ -76,8 +76,19 @@ public static class PuppetLayout
     public const int PUPPET_SLOT_OFF_MODE_FLG = 0x3C;
     /// <summary>u32  (Link +0x29C)</summary>
     public const int PUPPET_SLOT_OFF_NO_RESET_FLG0 = 0x40;
-    /// <summary>u32  (Link +0x2A0) — last field</summary>
+    /// <summary>u32  (Link +0x2A0)</summary>
     public const int PUPPET_SLOT_OFF_NO_RESET_FLG1 = 0x44;
+    /// <summary>s16  mBodyAngle.x (Link +0x2B4): aim pitch</summary>
+    public const int PUPPET_SLOT_OFF_BODY_ANGLE_X = 0x48;
+    /// <summary>s16  mBodyAngle.y (Link +0x2B6): aim yaw, relative to shape_angle.y</summary>
+    public const int PUPPET_SLOT_OFF_BODY_ANGLE_Y = 0x4A;
+    /// <summary>u8   PUPPET_GRAB_KIND_*: what the peer carries (mActorKeepGrab) — last field</summary>
+    public const int PUPPET_SLOT_OFF_GRAB_KIND = 0x4C;
+    /// <summary>nothing carried, or something the puppet doesn't draw (pot, barrel...)</summary>
+    public const int PUPPET_GRAB_KIND_NONE = 0;
+    /// <summary>a bomb (fpcNm_BOMB_e): the REL draws one between the puppet's hands</summary>
+    public const int PUPPET_GRAB_KIND_BOMB = 1;
+    public const int PUPPET_GRAB_KIND_MAX = 1;
     /// <summary>u32[3] — fopAcM process IDs</summary>
     public const uint PUPPET_PROC_IDS_ADDR = 0x803FD100;
     /// <summary>u32[3] — actor pointers</summary>
@@ -277,6 +288,20 @@ public static class PuppetLayout
     public const int DAPY_OFF_NEXT_EQUIP_ITEM = 0x3562;
     /// <summary>draw/sheathe upper anim</summary>
     public const int DAPY_UPPER_ANM_REST = 0xD7;
+    public const int DAPY_UPPER_ANM_TAKE = 0x103;
+    public const int DAPY_UPPER_ANM_TAKEBOTH = 0x104;
+    public const int DAPY_UPPER_ANM_TAKEL = 0x105;
+    public const int DAPY_UPPER_ANM_TAKER = 0x106;
+    /// <summary>s16 — daPy_py_c::mBodyAngle.x (d_a_player.h:491)</summary>
+    public const int DAPY_OFF_BODY_ANGLE_X = 0x2B4;
+    /// <summary>s16 — mBodyAngle.y</summary>
+    public const int DAPY_OFF_BODY_ANGLE_Y = 0x2B6;
+    /// <summary>fopAc_ac_c* — mActorKeepGrab (0x318C, d_a_player_main.h:2088) .mActor (+0x4, :86)</summary>
+    public const int DAPY_OFF_GRAB_ACTOR = 0x3190;
+    /// <summary>s16 — base_process_class::mProcName (f_pc_base.h:16)</summary>
+    public const int FPC_OFF_PROC_NAME = 0x08;
+    /// <summary>fpcNm_BOMB_e (f_pc_name.h:308)</summary>
+    public const int FPC_NAME_BOMB = 0x128;
     public const int DAPY_PROC_GUARD_0 = 0x0C;
     public const int DAPY_PROC_GUARD_1 = 0x0D;
     public const int DAPY_PROC_GUARD_2 = 0x6D;

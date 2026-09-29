@@ -347,6 +347,7 @@ public class GameHub : Hub<IGameHubClient>
             return;
         }
 
+        puppetData.ClampUnknownValues();
         puppetData.PlayerId = Context.ConnectionId;
         PuppetRelayCounts.AddOrUpdate(Context.ConnectionId, 1, (_, n) => n + 1);
         await Clients.Others.ReceivePuppetData(puppetData);

@@ -193,6 +193,45 @@ public class PuppetLayoutTests
     }
 
     [Fact]
+    public void HeldItemFields_FitAfterTheV2Fields_WithoutOverlap()
+    {
+        // s16 aim angles: 2-aligned, after the last u32 of the v2 block; the u8 grab kind last.
+        Assert.True(PuppetLayout.PUPPET_SLOT_OFF_NO_RESET_FLG1 + 4 <= PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_X);
+        Assert.Equal(0, PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_X % 2);
+        Assert.Equal(0, PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_Y % 2);
+        Assert.True(PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_X + 2 <= PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_Y);
+        Assert.True(PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_Y + 2 <= PuppetLayout.PUPPET_SLOT_OFF_GRAB_KIND);
+        Assert.True(PuppetLayout.PUPPET_SLOT_OFF_GRAB_KIND + 1 <= PuppetLayout.PUPPET_SLOT_SIZE);
+        Assert.Equal(0, PuppetLayout.PUPPET_SLOT_SIZE % 4);
+
+        Assert.Equal(PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_X, GameMemoryAddresses.PuppetSync.SlotOffset_BodyAngleX);
+        Assert.Equal(PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_Y, GameMemoryAddresses.PuppetSync.SlotOffset_BodyAngleY);
+        Assert.Equal(PuppetLayout.PUPPET_SLOT_OFF_GRAB_KIND, GameMemoryAddresses.PuppetSync.SlotOffset_GrabKind);
+    }
+
+    [Fact]
+    public void GrabKinds_MatchTheSharedModel()
+    {
+        // The server clamps PuppetData grab kinds above EquipmentState.MaxGrabKind to 0 (WWOnline.Shared can't see PuppetLayout).
+        Assert.Equal(PuppetLayout.PUPPET_GRAB_KIND_MAX, (int)EquipmentState.MaxGrabKind);
+        Assert.Equal(0, PuppetLayout.PUPPET_GRAB_KIND_NONE);
+        Assert.InRange(PuppetLayout.PUPPET_GRAB_KIND_BOMB, 1, PuppetLayout.PUPPET_GRAB_KIND_MAX);
+    }
+
+    [Fact]
+    public void LinkFieldOffsets_MatchTheDecomp()
+    {
+        // tww-decomp d_a_player.h:491 mBodyAngle (csXyz), d_a_player_main.h:2088 mActorKeepGrab (+4 = mActor),
+        // f_pc_base.h:16 mProcName, f_pc_name.h:308 fpcNm_BOMB_e, LkAnm.h TAKE..TAKER.
+        Assert.Equal(0x2B4, PuppetLayout.DAPY_OFF_BODY_ANGLE_X);
+        Assert.Equal(PuppetLayout.DAPY_OFF_BODY_ANGLE_X + 2, PuppetLayout.DAPY_OFF_BODY_ANGLE_Y);
+        Assert.Equal(0x318C + 4, PuppetLayout.DAPY_OFF_GRAB_ACTOR);
+        Assert.Equal(0x08, PuppetLayout.FPC_OFF_PROC_NAME);
+        Assert.Equal(0x128, PuppetLayout.FPC_NAME_BOMB);
+        Assert.Equal(PuppetLayout.DAPY_UPPER_ANM_TAKE + 3, PuppetLayout.DAPY_UPPER_ANM_TAKER);
+    }
+
+    [Fact]
     public void SlotBuffer_MatchesLayoutSize()
     {
         Assert.Equal(PuppetLayout.PUPPET_SLOT_SIZE, GameMemoryAddresses.PuppetSync.SlotSize);

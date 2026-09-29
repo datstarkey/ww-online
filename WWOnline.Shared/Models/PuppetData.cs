@@ -51,6 +51,16 @@ public class PuppetData
         if (Boat != null && !Boat.IsValid()) return false;
         return Position.IsFinite() && float.IsFinite(Rotation);
     }
+
+    /// <summary>
+    /// Drop values this build doesn't know rather than the whole update: a grab kind from a newer
+    /// client (say a pot) becomes "nothing drawn", so its puppet keeps moving.
+    /// </summary>
+    public void ClampUnknownValues()
+    {
+        if (Equipment != null && Equipment.GrabKind > EquipmentState.MaxGrabKind)
+            Equipment.GrabKind = 0;
+    }
 }
 
 /// <summary>
@@ -214,6 +224,16 @@ public class EquipmentState
 
     [JsonPropertyName("bottleContents")]
     public uint BottleContents { get; set; }
+
+    /// <summary>
+    /// What the player carries (mActorKeepGrab): 0 = nothing the puppet draws, 1 = a bomb
+    /// (puppet_shared.h PUPPET_GRAB_KIND_*). Receivers draw a bomb between the puppet's hands.
+    /// </summary>
+    [JsonPropertyName("grabKind")]
+    public byte GrabKind { get; set; }
+
+    /// <summary>Highest <see cref="GrabKind"/> (puppet_shared.h PUPPET_GRAB_KIND_MAX; a test keeps them equal).</summary>
+    public const byte MaxGrabKind = 1;
 }
 
 /// <summary>
@@ -296,6 +316,14 @@ public class ActionState
     /// that re-inits the same proc id.</summary>
     [JsonPropertyName("procSeq")]
     public byte ProcSeq { get; set; }
+
+    /// <summary>mBodyAngle.x (+0x2B4): aim pitch while aiming (bow, boomerang, hookshot, telescope).</summary>
+    [JsonPropertyName("bodyAngleX")]
+    public short BodyAngleX { get; set; }
+
+    /// <summary>mBodyAngle.y (+0x2B6): aim yaw, relative to the facing.</summary>
+    [JsonPropertyName("bodyAngleY")]
+    public short BodyAngleY { get; set; }
 
     [JsonPropertyName("pressedButtons")]
     public byte PressedButtons { get; set; }

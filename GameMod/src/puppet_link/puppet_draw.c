@@ -807,8 +807,14 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
     daPy_lk_c__drawMirrorLightModel(link);
     dComIfGd_setListP1();
 
-    // Bottle contents model
+    // The held item's / bottle contents' btk and brk are registered on SHARED model data: use this
+    // puppet's for its entries below, the local Link's again after (puppet_held.c).
     J3DModel *mpBottleContentsModel = DAPY_LK_MPBOTTLECONTENTSMODEL(link);
+    J3DModelData *heldItemData = DAPY_LK_MPHELDITEMMODEL(link) ? J3DMODEL_MPMODELDATA(DAPY_LK_MPHELDITEMMODEL(link)) : NULL;
+    J3DModelData *contentsData = mpBottleContentsModel ? J3DMODEL_MPMODELDATA(mpBottleContentsModel) : NULL;
+    puppet_heldEntryItemAnms(link, heldItemData, contentsData);
+
+    // Bottle contents model
     if (mpBottleContentsModel)
     {
       daPy_lk_c__updateDLSetLight(link, mpBottleContentsModel, 0);
@@ -854,9 +860,14 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
               J3DShape__hide(bladeShape);
           }
         }
+        // Picto Box flash shape: this puppet's regular / Deluxe choice, entry only (puppet_held.c).
+        u32 savedFlashFlags = 0;
+        J3DShape *flashShape = puppet_heldFlashBegin(link, &savedFlashFlags);
         daPy_lk_c__entryDLSetLight(link, mpHeldItemModel, frozenFlag);
         if (bladeShape != NULL)
           J3DSHAPE_MVISFLAGS(bladeShape) = savedBladeFlags;
+        if (flashShape != NULL)
+          J3DSHAPE_MVISFLAGS(flashShape) = savedFlashFlags;
 
         // Sword glow (vanilla :1987-1989: chance mode || soup || checkFinalMasterSwordEquip;
         // the puppet uses the peer's sword byte). updateDLSetLight calcs the glow model, whose
@@ -891,6 +902,7 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
     {
       daPy_lk_c__updateDLSetLight(link, mpBottleCapModel, 0);
     }
+    puppet_heldEntryItemAnms(realPlayer, heldItemData, contentsData);
 
     // Magic armor aura (6 models, daPy_aura_c = {J3DModel*, f32 frame})
     void *auraBrkAnm = DAPY_LK_MYAURA00RBRK_ANM(link);

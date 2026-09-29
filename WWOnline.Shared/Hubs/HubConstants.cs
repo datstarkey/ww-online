@@ -12,7 +12,7 @@ public static class HubConstants
     /// crosses the wire changes shape or meaning (PuppetData layout, RoomInventory fields, flag
     /// masks...). Pure app changes that don't touch the wire keep it.
     /// </summary>
-    public const int ProtocolVersion = 1;
+    public const int ProtocolVersion = 2;
 
     // Hub method names (server-side methods invoked by clients)
 

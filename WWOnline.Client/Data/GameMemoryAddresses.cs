@@ -264,6 +264,9 @@ public static class GameMemoryAddresses
         public const int SlotOffset_ModeFlg = PuppetLayout.PUPPET_SLOT_OFF_MODE_FLG;
         public const int SlotOffset_NoResetFlg0 = PuppetLayout.PUPPET_SLOT_OFF_NO_RESET_FLG0;
         public const int SlotOffset_NoResetFlg1 = PuppetLayout.PUPPET_SLOT_OFF_NO_RESET_FLG1;
+        public const int SlotOffset_BodyAngleX = PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_X;   // daPy_py_c::mBodyAngle.x (+0x2B4, d_a_player.h:491)
+        public const int SlotOffset_BodyAngleY = PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_Y;   // mBodyAngle.y (+0x2B6)
+        public const int SlotOffset_GrabKind = PuppetLayout.PUPPET_SLOT_OFF_GRAB_KIND;        // mActorKeepGrab (+0x318C, d_a_player_main.h:2088) -> PUPPET_GRAB_KIND_*
 
         // Hook tracking arrays
         public const uint ProcIdsAddr = PuppetLayout.PUPPET_PROC_IDS_ADDR;
