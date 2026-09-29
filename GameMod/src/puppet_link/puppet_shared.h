@@ -82,8 +82,9 @@
  * so the slot can't grow again without moving the tracking arrays (checked below). */
 #define PUPPET_SLOT_OFF_BODY_ANGLE_X      0x48  /* s16  mBodyAngle.x (Link +0x2B4): aim pitch */
 #define PUPPET_SLOT_OFF_BODY_ANGLE_Y      0x4A  /* s16  mBodyAngle.y (Link +0x2B6): aim yaw, relative to shape_angle.y */
-#define PUPPET_SLOT_OFF_GRAB_KIND         0x4C  /* u8   PUPPET_GRAB_KIND_*: what the peer carries (mActorKeepGrab) — last field */
-/* 0x4D..0x4F: padding, written as 0 */
+#define PUPPET_SLOT_OFF_GRAB_KIND         0x4C  /* u8   PUPPET_GRAB_KIND_*: what the peer carries (mActorKeepGrab) */
+#define PUPPET_SLOT_OFF_GRAB_FUSE         0x4D  /* u8   a carried bomb's fuse: frames left (daBomb_c::mRestTime, capped at 255); 0 = none / unknown — last field */
+/* 0x4E..0x4F: padding, written as 0 */
 
 /* PUPPET_SLOT_OFF_GRAB_KIND values */
 #define PUPPET_GRAB_KIND_NONE             0     /* nothing carried, or something the puppet doesn't draw (pot, barrel...) */
@@ -222,7 +223,7 @@
  * C# compares the block with what it wants and writes FLAGS / a name only when they differ.
  * Names are printable ASCII (C# sanitises: no Shift-JIS lead bytes), NUL-terminated within
  * PUPPET_NAME_BYTES; the REL copies at most PUPPET_NAME_BYTES - 1 of them.
- * 0x803FD16C..0x803FD16F stays free.
+ * 0x803FD16C holds the projectile events block's pointer (PUPPET_FX_PTR_ADDR, below).
  * ============================================================================ */
 #define PUPPET_NAMES_PTR_ADDR         0x803FD168  /* u32 C: names block (game heap), 0 = none yet */
 #define PUPPET_NAMES_MAGIC            0x4E414D45  /* "NAME" */
@@ -235,6 +236,70 @@
 #define PUPPET_NAME_MAX_CHARS         16          /* C# truncates names to this many characters */
 #define PUPPET_NAMES_FLAG_SHOW        0x01        /* the local player wants names shown ("Show player names") */
 #define PUPPET_NAMES_NAME(block, i)   ((char *)(block) + PUPPET_NAMES_OFF_NAME0 + ((i) * PUPPET_NAME_BYTES))
+
+/* ============================================================================
+ * Projectile events (puppet_fx.c, docs/held-items.md stages 2-4): other players' bombs, boat-cannon
+ * shots and arrows are real actors in this world. One-shot events can't ride the 20Hz slot (C# would miss a
+ * one-frame throw), so they go through two rings in ONE game-heap block, made and adopted exactly
+ * like the names block (above): the REL allocates it the first time a puppet is created, never frees
+ * it, stamps it with __OSStartTime and publishes it here; C# uses it only while pointer, magic and
+ * stamp match (a soft reset leaves a stale pointer).
+ *   OUTBOX (REL -> C#): the REL watches the LOCAL Link's projectiles every frame and writes an event
+ *     at entry (OUT_WRITE + 1) % PUPPET_FX_OUT_COUNT, then bumps OUT_WRITE. C# reads the events after
+ *     its OUT_READ, sends them to the hub and sets OUT_READ (the ack). A full ring drops the event
+ *     (OUT_DROPPED++). C# skips an outbox's history when it first adopts a block.
+ *   INBOX (C# -> REL): C# writes a peer's event at entry (IN_WRITE + 1) % PUPPET_FX_IN_COUNT, then bumps
+ *     IN_WRITE, but only while IN_WRITE - IN_READ < PUPPET_FX_IN_COUNT. The REL consumes up to IN_WRITE
+ *     every frame and sets IN_READ. A REL that adopts a block discards the backlog (IN_READ = IN_WRITE).
+ * Sequence numbers are u32 and wrap; entry i of a ring holds the event with seq % COUNT == i.
+ * ============================================================================ */
+#define PUPPET_FX_PTR_ADDR            0x803FD16C  /* u32 C: events block (game heap), 0 = none yet */
+#define PUPPET_FX_MAGIC               0x50465830  /* "PFX0" */
+#define PUPPET_FX_BLOCK_SIZE          0x3F0       /* header + inbox + outbox (checked below) */
+#define PUPPET_FX_OFF_MAGIC           0x00  /* u32 C: PUPPET_FX_MAGIC once the block is set up */
+#define PUPPET_FX_OFF_FLAGS           0x04  /* u32 C#: PUPPET_FX_FLAG_* (0 in a new block) */
+#define PUPPET_FX_OFF_BOOT            0x08  /* u32[2] C: __OSStartTime (u64) of the boot that allocated the block (= PUPPET_NAMES_OFF_BOOT: puppet_bootBlock) */
+#define PUPPET_FX_OFF_IN_WRITE        0x10  /* u32 C#: seq of the last inbox event written */
+#define PUPPET_FX_OFF_IN_READ         0x14  /* u32 C: seq of the last inbox event consumed */
+#define PUPPET_FX_OFF_OUT_WRITE       0x18  /* u32 C: seq of the last outbox event written */
+#define PUPPET_FX_OFF_OUT_READ        0x1C  /* u32 C#: seq of the last outbox event read (the ack) */
+#define PUPPET_FX_OFF_OUT_DROPPED     0x20  /* u32 C: outbox events dropped (ring full), diagnostics */
+#define PUPPET_FX_OFF_IN_REJECTED     0x24  /* u32 C: inbox events refused (bad values, slot not shown, table full) */
+#define PUPPET_FX_OFF_SPAWNED         0x28  /* u32 C: projectiles spawned for peers, diagnostics */
+#define PUPPET_FX_OFF_IN_RING         0x30  /* PUPPET_FX_IN_COUNT events */
+#define PUPPET_FX_IN_COUNT            16
+#define PUPPET_FX_OFF_OUT_RING        0x2B0 /* PUPPET_FX_OUT_COUNT events */
+#define PUPPET_FX_OUT_COUNT           8
+#define PUPPET_FX_EVENT_SIZE          0x28
+/* PUPPET_FX_OFF_FLAGS bits (C#) */
+#define PUPPET_FX_FLAG_SEND           0x01  /* the room's SharedProjectiles rule is on: report the local Link's projectiles */
+/* One event (both rings). Fields mirror the projectile actor (fopAc_ac_c / daBomb_c). */
+#define PUPPET_FX_EV_OFF_KIND         0x00  /* u8  PUPPET_FX_KIND_* */
+#define PUPPET_FX_EV_OFF_SLOT         0x01  /* u8  inbox: the sender's puppet slot; outbox: 0 */
+#define PUPPET_FX_EV_OFF_VARIANT      0x02  /* u8  ARROW: the arrow type (daArrow_c::mArrowType, 0..3); 0 for bombs and cannonballs */
+#define PUPPET_FX_EV_OFF_ROOM         0x03  /* s8  outbox: the projectile's room (current.roomNo) when it happened, -1 unknown; inbox: 0 */
+#define PUPPET_FX_EV_OFF_ID           0x04  /* u32 the sender's projectile: its actor's process id there */
+#define PUPPET_FX_EV_OFF_POSX         0x08  /* f32 current.pos */
+#define PUPPET_FX_EV_OFF_POSY         0x0C  /* f32 */
+#define PUPPET_FX_EV_OFF_POSZ         0x10  /* f32 */
+#define PUPPET_FX_EV_OFF_SPEED_F      0x14  /* f32 speedF */
+#define PUPPET_FX_EV_OFF_SPEED_Y      0x18  /* f32 speed.y */
+#define PUPPET_FX_EV_OFF_GRAVITY      0x1C  /* f32 gravity */
+#define PUPPET_FX_EV_OFF_ANGLE_X      0x20  /* s16 current.angle.x */
+#define PUPPET_FX_EV_OFF_ANGLE_Y      0x22  /* s16 current.angle.y */
+#define PUPPET_FX_EV_OFF_ANGLE_Z      0x24  /* s16 shape_angle.z */
+#define PUPPET_FX_EV_OFF_TIMER        0x26  /* s16 bomb: fuse frames left (mRestTime); cannonball: frames without gravity */
+/* Event kinds (PlayerEventKind in C#; a test keeps them equal) */
+#define PUPPET_FX_KIND_BOMB_THROW     1     /* a bomb left the sender's hands (thrown / put down): spawn or snap a lit bomb in flight */
+#define PUPPET_FX_KIND_BOMB_PICKUP    2     /* the sender picked their bomb up again: delete the copy (the puppet shows it carried) */
+#define PUPPET_FX_KIND_EXPLODE        3     /* the sender's bomb / cannonball exploded at POS: explode the copy there, or an explosion */
+#define PUPPET_FX_KIND_REMOVE         4     /* the sender's bomb / cannonball is gone without exploding (sank): the copy goes */
+#define PUPPET_FX_KIND_CANNON         5     /* the sender's boat cannon fired: spawn the cannonball in flight */
+#define PUPPET_FX_KIND_ARROW          6     /* the sender shot an arrow (VARIANT = type) from POS along ANGLE_X/Y: spawn it in flight */
+#define PUPPET_FX_KIND_MAX            6
+#define PUPPET_FX_ARROW_TYPE_MAX      3     /* light */
+#define PUPPET_FX_EVENT(block, ring, count, seq) \
+    ((u8 *)(block) + (ring) + (((seq) % (count)) * PUPPET_FX_EVENT_SIZE))
 
 #define APPEARANCE_CLOTHES_HERO       0
 #define APPEARANCE_CLOTHES_CASUAL     1
@@ -386,6 +451,7 @@
 #define DAPY_OFF_GRAB_ACTOR       0x3190  /* fopAc_ac_c* — mActorKeepGrab (0x318C, d_a_player_main.h:2088) .mActor (+0x4, :86) */
 #define FPC_OFF_PROC_NAME         0x08    /* s16 — base_process_class::mProcName (f_pc_base.h:16) */
 #define FPC_NAME_BOMB             0x128   /* fpcNm_BOMB_e (f_pc_name.h:308) */
+#define DABOMB_OFF_REST_TIME      0x6FC   /* s16 — daBomb_c::mRestTime, the fuse (d_a_bomb.h:233; setBombRestTime DOL 0x800681EC: sth r31,0x6FC) */
 
 /* Guard detection (C# sets PUPPET_ACTION_FLAG_GUARD from the local Link's state) */
 #define DAPY_PROC_GUARD_0         0x0C
@@ -401,7 +467,8 @@ typedef char puppet_check_slot_fits[
     (PUPPET_SLOT_OFF_NO_RESET_FLG1 + 4 <= PUPPET_SLOT_OFF_BODY_ANGLE_X &&
      PUPPET_SLOT_OFF_BODY_ANGLE_X + 2 <= PUPPET_SLOT_OFF_BODY_ANGLE_Y &&
      PUPPET_SLOT_OFF_BODY_ANGLE_Y + 2 <= PUPPET_SLOT_OFF_GRAB_KIND &&
-     PUPPET_SLOT_OFF_GRAB_KIND + 1 <= PUPPET_SLOT_SIZE && (PUPPET_SLOT_SIZE % 4) == 0) ? 1 : -1];
+     PUPPET_SLOT_OFF_GRAB_KIND + 1 <= PUPPET_SLOT_OFF_GRAB_FUSE &&
+     PUPPET_SLOT_OFF_GRAB_FUSE + 1 <= PUPPET_SLOT_SIZE && (PUPPET_SLOT_SIZE % 4) == 0) ? 1 : -1];
 typedef char puppet_check_slots_before_tracking[
     (PUPPET_SLOT_REGION_END <= PUPPET_PROC_IDS_ADDR) ? 1 : -1];
 typedef char puppet_check_boat_cannon_words[
@@ -450,5 +517,16 @@ typedef char puppet_check_names_block[
      PUPPET_NAMES_OFF_FLAGS + 4 <= PUPPET_NAMES_OFF_BOOT && PUPPET_NAMES_OFF_BOOT + 8 <= PUPPET_NAMES_OFF_NAME0 &&
      (PUPPET_NAMES_OFF_BOOT % 4) == 0 && PUPPET_NAME_MAX_CHARS < PUPPET_NAME_BYTES &&
      (PUPPET_NAMES_BLOCK_SIZE % 4) == 0) ? 1 : -1];
+typedef char puppet_check_fx_word[
+    (PUPPET_FX_PTR_ADDR >= PUPPET_NAMES_PTR_ADDR + 4 && PUPPET_FX_PTR_ADDR + 4 <= PUPPET_BOAT_0 &&
+     (PUPPET_FX_PTR_ADDR % 4) == 0) ? 1 : -1];
+typedef char puppet_check_fx_block[
+    (PUPPET_FX_OFF_SPAWNED + 4 <= PUPPET_FX_OFF_IN_RING &&
+     PUPPET_FX_OFF_IN_RING + (PUPPET_FX_IN_COUNT * PUPPET_FX_EVENT_SIZE) == PUPPET_FX_OFF_OUT_RING &&
+     PUPPET_FX_OFF_OUT_RING + (PUPPET_FX_OUT_COUNT * PUPPET_FX_EVENT_SIZE) == PUPPET_FX_BLOCK_SIZE &&
+     PUPPET_FX_EV_OFF_TIMER + 2 <= PUPPET_FX_EVENT_SIZE && (PUPPET_FX_EVENT_SIZE % 4) == 0 &&
+     PUPPET_FX_OFF_BOOT == PUPPET_NAMES_OFF_BOOT && PUPPET_FX_OFF_MAGIC == 0 && (PUPPET_FX_BLOCK_SIZE % 4) == 0 &&
+     /* seq % COUNT stays continuous across the u32 wrap only for power-of-two counts */
+     (PUPPET_FX_IN_COUNT & (PUPPET_FX_IN_COUNT - 1)) == 0 && (PUPPET_FX_OUT_COUNT & (PUPPET_FX_OUT_COUNT - 1)) == 0) ? 1 : -1];
 
 #endif /* PUPPET_SHARED_H */

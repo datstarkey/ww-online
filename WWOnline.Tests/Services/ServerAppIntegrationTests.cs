@@ -158,4 +158,136 @@ public class ServerAppIntegrationTests
             GameHub.ConfigureHostToken(null);
         }
     }
+
+    [Fact]
+    public async Task SharedProjectilesRule_OnlyTheRoomOwnerCanChangeIt()
+    {
+        var adminName = Name("Admin");
+        var playerName = Name("Player");
+        GameHub.ConfigureHostToken("projectiles-key");
+        GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: true);
+        try
+        {
+            var (app, port) = await StartAsync();
+            await using var _ = app;
+
+            await using var owner = new SignalRClientService();
+            Assert.True((await owner.ConnectAsync("127.0.0.1", port, adminName, "projectiles-key")).success);
+            await using var player = new SignalRClientService();
+            Assert.True((await player.ConnectAsync("127.0.0.1", port, playerName)).success);
+
+            // A player who isn't the owner can't turn it off.
+            var rejected = await player.Connection!.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
+            rejected.SharedProjectiles = false;
+            await player.Connection!.InvokeAsync(HubConstants.SetRoomSettings, rejected);
+            var afterPlayer = await player.Connection!.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
+            Assert.True(afterPlayer.SharedProjectiles);
+
+            // The owner can; everyone sees it.
+            var requested = await owner.Connection!.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
+            Assert.Equal(adminName, requested.OwnerName);
+            requested.SharedProjectiles = false;
+            await owner.Connection!.InvokeAsync(HubConstants.SetRoomSettings, requested);
+            var afterOwner = await player.Connection!.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
+            Assert.False(afterOwner.SharedProjectiles);
+            Assert.True(afterOwner.SharedWallet && afterOwner.SharedWorld && afterOwner.SharedItems && afterOwner.SharedStory);
+        }
+        finally
+        {
+            GameHub.ConfigureHostToken(null);
+            GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: true);
+        }
+    }
+
+    private static PuppetData At(string stage, byte room, float x = 0, float z = 0) => new()
+    {
+        StageName = stage,
+        RoomNumber = room,
+        Position = new Vector3(x, 0, z),
+    };
+
+    private static PlayerEvent Bomb(string stage, byte room, uint seq) => new()
+    {
+        Origin = "integration",
+        Seq = seq,
+        Kind = (byte)PlayerEventKind.BombThrow,
+        Id = 0x1234,
+        StageName = stage,
+        RoomNumber = room,
+        Position = new Vector3(100, 50, 100),
+        SpeedF = 20,
+        SpeedY = 15,
+        Gravity = -2.9f,
+        Timer = 120,
+    };
+
+    /// <summary>The next event <paramref name="client"/> receives within <paramref name="ms"/>, else null.</summary>
+    private static async Task<PlayerEvent?> NextEvent(SignalRClientService client, Func<Task> send, int ms = 1500)
+    {
+        var got = new TaskCompletionSource<PlayerEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Handler(PlayerEvent e) => got.TrySetResult(e);
+        client.PlayerEventReceived += Handler;
+        try
+        {
+            await send();
+            var done = await Task.WhenAny(got.Task, Task.Delay(ms));
+            return done == got.Task ? got.Task.Result : null;
+        }
+        finally
+        {
+            client.PlayerEventReceived -= Handler;
+        }
+    }
+
+    [Fact]
+    public async Task PlayerEvent_GoesToTheRoomWhereItHappened_AndNotWhileTheRuleIsOff()
+    {
+        GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: true);
+        try
+        {
+            var (app, port) = await StartAsync();
+            await using var _ = app;
+
+            await using var sender = new SignalRClientService();
+            Assert.True((await sender.ConnectAsync("127.0.0.1", port, Name("Bomber"))).success);
+            await using var near = new SignalRClientService();
+            Assert.True((await near.ConnectAsync("127.0.0.1", port, Name("Near"))).success);
+            await using var away = new SignalRClientService();
+            Assert.True((await away.ConnectAsync("127.0.0.1", port, Name("Away"))).success);
+
+            // Where everyone is: the server learns it from their puppet data.
+            await sender.Connection!.InvokeAsync(HubConstants.SendPuppetData, At("M_Dai", 3));
+            await near.Connection!.InvokeAsync(HubConstants.SendPuppetData, At("M_Dai", 3));
+            await away.Connection!.InvokeAsync(HubConstants.SendPuppetData, At("M_Dai", 4));
+
+            var awayGot = NextEvent(away, () => Task.CompletedTask, 1000);
+            var nearGot = await NextEvent(near, () => sender.SendPlayerEventAsync(Bomb("M_Dai", 3, 1)));
+            Assert.NotNull(nearGot);
+            Assert.Equal(sender.Connection!.ConnectionId, nearGot!.PlayerId);
+            Assert.Equal((byte)PlayerEventKind.BombThrow, nearGot.Kind);
+            Assert.Equal(1u, nearGot.Seq);
+            Assert.Null(await awayGot); // another room of the dungeon: not relayed
+
+            // The sender walks into room 4; their bomb from room 3 still explodes for room 3, not room 4.
+            await sender.Connection!.InvokeAsync(HubConstants.SendPuppetData, At("M_Dai", 4));
+            var explode = Bomb("M_Dai", 3, 2);
+            explode.Kind = (byte)PlayerEventKind.Explode;
+            var awayGot2 = NextEvent(away, () => Task.CompletedTask, 1000);
+            var nearGot2 = await NextEvent(near, () => sender.SendPlayerEventAsync(explode));
+            Assert.NotNull(nearGot2);
+            Assert.Equal((byte)PlayerEventKind.Explode, nearGot2!.Kind);
+            Assert.Null(await awayGot2);
+
+            // Claiming another stage than the sender is in: dropped.
+            Assert.Null(await NextEvent(near, () => sender.SendPlayerEventAsync(Bomb("sea", 3, 3)), 500));
+
+            // Rule off: dropped.
+            GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: false);
+            Assert.Null(await NextEvent(near, () => sender.SendPlayerEventAsync(Bomb("M_Dai", 3, 4)), 500));
+        }
+        finally
+        {
+            GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: true);
+        }
+    }
 }

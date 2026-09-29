@@ -28,6 +28,10 @@ typedef struct PuppetHeld
   J3DModel *boomerang; // Link BDL_BOOMERANG, drawn in the left hand while the puppet holds a boomerang
   J3DModel *bomb;      // Link BDL_BOMB, drawn between the hands while the peer carries a bomb
   u32 state;           // PUPPET_HELD_STATE_*
+  u32 bombBck[4];      // an mDoExt_bckAnm (0x10: its J3DMtxCalcMayaAnm is in `heap`) playing Link BCK_BOMB
+  s16 fuse;            // the carried bomb's fuse, frames left, counted down here between slot updates; 0 = not lit
+  u8 netFuse;          // the slot's GRAB_FUSE as last read
+  u8 bckReady;         // bombBck initialised
   u8 showBomb;         // set by puppet_heldExecute for the draw
 } PuppetHeld;
 

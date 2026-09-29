@@ -33,6 +33,7 @@ public class SignalRClientService : IAsyncDisposable
     public event Action<RoomInventory>? RoomInventoryReceived;
     public event Action<StoryFlags>? StoryFlagsReceived;
     public event Action<RoomSwitches>? RoomSwitchesReceived;
+    public event Action<PlayerEvent>? PlayerEventReceived;
 
     // Connection lifecycle. ConnectionLost fires from SignalR's Reconnecting / Closed callbacks
     // (wipe per-connection state). Connected fires after EVERY successful connect — the initial
@@ -384,6 +385,11 @@ public class SignalRClientService : IAsyncDisposable
         {
             StoryFlagsReceived?.Invoke(flags);
         });
+
+        connection.On<PlayerEvent>(HubConstants.ReceivePlayerEvent, evt =>
+        {
+            PlayerEventReceived?.Invoke(evt);
+        });
     }
 
     public async Task<RoomSettings?> GetRoomSettingsAsync()
@@ -503,6 +509,8 @@ public class SignalRClientService : IAsyncDisposable
         if (connection?.State != HubConnectionState.Connected) return null;
         return await connection.InvokeAsync<bool>(HubConstants.SendRoomSwitches, gains);
     }
+    /// <summary>Report one of our projectiles (bomb thrown / exploded, cannon fired); false if not connected.</summary>
+    public Task<bool> SendPlayerEventAsync(PlayerEvent evt) => SendAsync(HubConstants.SendPlayerEvent, evt);
 
     public async ValueTask DisposeAsync()
     {

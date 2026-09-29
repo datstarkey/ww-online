@@ -5,7 +5,7 @@ using WWOnline.Shared.Models;
 namespace WWOnline.Services;
 
 /// <summary>
-/// The room's rules (shared wallet / world / items / story) as last pushed by the server, plus whether
+/// The room's rules (shared wallet / world / items / story, other players' projectiles) as last pushed by the server, plus whether
 /// this client is the room owner. Sync services check <see cref="Current"/> every tick; the
 /// dashboard shows it and lets the room owner change it.
 /// </summary>
@@ -41,21 +41,23 @@ public class RoomSettingsService : IDisposable
         catch (Exception ex) { Logger.Warning(ex, "[room] failed to fetch room settings"); }
     });
 
-    public Task SetAsync(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory)
+    public Task SetAsync(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory, bool sharedProjectiles)
     {
         var requested = Current.Clone();
         requested.SharedWallet = sharedWallet;
         requested.SharedWorld = sharedWorld;
         requested.SharedItems = sharedItems;
         requested.SharedStory = sharedStory;
+        requested.SharedProjectiles = sharedProjectiles;
         return _signalR.SetRoomSettingsAsync(requested);
     }
 
-    /// <summary>Room owner: set every rule at once from a preset (Full sync = all on, Co-op = all off).</summary>
+    /// <summary>Room owner: set every rule at once from a preset (Full sync = all on, Co-op = progress off, projectiles on).</summary>
     public Task SetPresetAsync(RoomPreset preset)
     {
         var requested = Current.Clone().ApplyPreset(preset);
-        return SetAsync(requested.SharedWallet, requested.SharedWorld, requested.SharedItems, requested.SharedStory);
+        return SetAsync(requested.SharedWallet, requested.SharedWorld, requested.SharedItems, requested.SharedStory,
+                        requested.SharedProjectiles);
     }
 
     private void Apply(RoomSettings settings)
@@ -64,6 +66,7 @@ public class RoomSettingsService : IDisposable
         Current = settings;
         if (old.SharedWallet != settings.SharedWallet || old.SharedWorld != settings.SharedWorld ||
             old.SharedItems != settings.SharedItems || old.SharedStory != settings.SharedStory ||
+            old.SharedProjectiles != settings.SharedProjectiles ||
             old.OwnerConnectionId != settings.OwnerConnectionId)
         {
             Logger.Information("[room] rules: {Rules}; owner {Owner}{Me}",

@@ -24,6 +24,8 @@
 #include "puppet_liveworld.c"
 // Animator pointers the puppet writes into Link's shared model data (swapped per window)
 #include "puppet_sharedanm.c"
+// Other players' bombs, boat-cannon shots and arrows, real in this world (after nametag + worldsync: shared helpers)
+#include "puppet_fx.c"
 
 /* Process condition flags */
 #define PROC_CONDITION_INIT 0x08
@@ -219,6 +221,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   this->appearanceCounted = 1;
   puppet_boatInit(&this->boat);
   puppet_nametag_onCreate();
+  puppet_fx_onCreate();
   puppet_heldInit(&this->held);
   puppet_liveworld_onCreate();
   puppet_shanmInit(&this->shanm, this->slotIndex);
@@ -595,6 +598,7 @@ int daPuppet_Execute(PUPPET_class *this)
   // the local Link doesn't show the local player's outfit/colour yet.
   puppet_worldsync_tick();
   puppet_appearance_tick();
+  puppet_fx_tick();
 
   // Inactive slot -> parked: no execute, no collision/attention, invisible.
   if (puppet_slotIsParked(this->slotIndex))

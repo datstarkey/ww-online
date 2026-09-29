@@ -53,8 +53,9 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 | **Shared world** | Chests, switches and pickups are gone for everyone once someone takes them. Small keys too: a key anyone finds is everyone's, and a door anyone unlocks uses it up for everyone. |
 | **Shared items** | One player finding an item unlocks it for the whole room, including heart containers and the magic meter. |
 | **Shared story** | Main story progress is shared, so you can split up and finish different parts of the game. |
+| **Other players' projectiles** | Other players' bombs, boat-cannon shots and arrows are real in your game: they fly, explode and hit your enemies and walls. Off: you still see them carry a bomb or aim, but nothing flies. |
 
-- **Full sync** turns everything on. **Co-op** turns everything off, so you only see each other and keep your own progress.
+- **Full sync** turns everything on. **Co-op** turns the four shared-progress rules off, so you see each other (and each other's projectiles) but keep your own progress.
 - Joining a room never throws away progress: if you're further ahead than the room, your progress is added to it.
 - Never shared: health, magic, bomb and arrow counts and bottle contents.
 - The Room page's **Dungeons** card shows each dungeon's small keys, map, compass, big key and boss.

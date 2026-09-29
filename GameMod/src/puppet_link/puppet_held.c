@@ -616,6 +616,10 @@ void puppet_heldPose(daPy_lk_c *puppet)
 #define HELD_ARC_NAME          "Link"
 #define HELD_RES_BDL_BOOMERANG 0x14        // dRes_INDEX_LINK_BDL_BOOMERANG_e (GZLE01 Link.h)
 #define HELD_RES_BDL_BOMB      0x3C        // dRes_INDEX_LINK_BDL_BOMB_e
+#define HELD_RES_BCK_BOMB      0x0B        // dRes_INDEX_LINK_BCK_BOMB_e: the fuse bck daBomb_c plays (createHeap, d_a_bomb3.inc:1350)
+#define HELD_BCK_LOOP          2           // J3DFrameCtrl::EMode_LOOP (d_a_bomb3.inc:1351)
+#define J3DANM_OFF_FRAME_MAX   0x06        // J3DAnmBase::mFrameMax (s16; draw_norm DOL 0x800D97EC: lha r4,6(brk))
+#define J3DANM_OFF_FRAME       0x08        // J3DAnmBase::mFrame (f32; draw_norm 0x800D9868: stfs f2,8(brk))
 #define HELD_MODEL_FLAG        0x80000
 #define HELD_BOOMERANG_DIFF    0x37220202  // daBoomerang_c::createHeap (d_a_boomerang.cpp:750)
 #define HELD_BOMB_DIFF         0x11000002  // daBomb_c::createHeap (d_a_bomb3.inc:1344)
@@ -630,6 +634,10 @@ void puppet_heldInit(PuppetHeld *held)
   held->boomerang = NULL;
   held->bomb = NULL;
   held->state = PUPPET_HELD_STATE_NONE;
+  held->bombBck[0] = held->bombBck[1] = held->bombBck[2] = held->bombBck[3] = 0;
+  held->fuse = 0;
+  held->netFuse = 0;
+  held->bckReady = 0;
   held->showBomb = 0;
 }
 
@@ -653,6 +661,14 @@ static int held_build(PuppetHeld *held)
     return 0;
   held->boomerang = mDoExt_J3DModel__create(boomData, HELD_MODEL_FLAG, HELD_BOOMERANG_DIFF);
   held->bomb = mDoExt_J3DModel__create(bombData, HELD_MODEL_FLAG, HELD_BOMB_DIFF);
+  // The fuse bck, as daBomb_c::createHeap: init(modelData, bck, FALSE, LOOP) makes a J3DMtxCalcMayaAnm
+  // in the current (our solid) heap; no frame control (we set the frame). Optional: without it the
+  // carried bomb just keeps its bind pose.
+  {
+    J3DAnmTransform *bck = (J3DAnmTransform *)held_getRes(HELD_RES_BCK_BOMB);
+    held->bckReady = bck != NULL &&
+                     mDoExt_bckAnm__init((mDoExt_bckAnm *)held->bombBck, bombData, bck, 0, HELD_BCK_LOOP, 1.0f, 0, -1, 0);
+  }
   mDoExt_restoreCurrentHeap();
   if (held->boomerang == NULL || held->bomb == NULL)
   {
@@ -672,6 +688,19 @@ void puppet_heldExecute(daPy_lk_c *puppet, PuppetHeld *held)
 
   held->showBomb = slotBase != 0 &&
                    *(volatile u8 *)(slotBase + PUPPET_SLOT_OFF_GRAB_KIND) == PUPPET_GRAB_KIND_BOMB;
+
+  // The carried bomb's fuse: the peer's mRestTime arrives 20 times a second; count it down here in
+  // between (as their bomb's checkExplodeTimer does), and snap to each new value.
+  {
+    u8 net = held->showBomb ? *(volatile u8 *)(slotBase + PUPPET_SLOT_OFF_GRAB_FUSE) : 0;
+    if (net == 0)
+      held->fuse = 0;
+    else if (net != held->netFuse)
+      held->fuse = net;
+    else if (held->fuse > 1)
+      held->fuse--;
+    held->netFuse = net;
+  }
   if (held->state == PUPPET_HELD_STATE_NONE &&
       (held->showBomb || PUPPET_DAPY_MEQUIPITEM(puppet) == ITEM_BOOMERANG))
   {
@@ -721,16 +750,36 @@ void puppet_heldDraw(daPy_lk_c *puppet, PuppetHeld *held)
     mDoMtx_YrotM(&m, FOPAC_SHAPE_ANGLE((fopAc_ac_c *)puppet)->y);
     PSMTXCopy(&m, (MTX34 *)((u8 *)held->bomb + 0x24));
     // Joint 0 of the SHARED bomb data carries the last daBomb's fuse bck (mBck0.entry, d_a_bomb3.inc:
-    // 143), possibly a deleted bomb's: calc ours in the bind pose and put it back.
+    // 143), possibly a deleted bomb's: calc ours with our own bck calc (or the bind pose) and put it back
+    // right after, so nothing of ours stays in the shared data (and nothing a puppet window records).
     if (joints != NULL && joints[0] != NULL)
     {
       savedCalc = *(void **)((u8 *)joints[0] + J3DJOINT_OFF_MTXCALC);
       *(void **)((u8 *)joints[0] + J3DJOINT_OFF_MTXCALC) = NULL;
+      // daBomb_c::draw_norm's bck frame: end - fuse, in [0, end) (d_a_bomb3.inc:139-148).
+      if (held->fuse > 0 && held->bckReady)
+      {
+        u8 *bck = (u8 *)held->bombBck[2]; // mDoExt_bckAnm::mpAnm (+0x08)
+        f32 end = (f32) * (s16 *)(bck + J3DANM_OFF_FRAME_MAX);
+        f32 f = end - (f32)held->fuse;
+        f = f < 0.0f ? 0.0f : (f >= end ? end - 0.001f : f);
+        mDoExt_bckAnm__entry((mDoExt_bckAnm *)held->bombBck, data, f); // frame + joint 0's calc = ours
+      }
     }
     // The fuse glow brk is the archive's, shared by every bomb (entryBrk, d_a_player_main.cpp:11990),
-    // and each bomb sets its frame before its draw (d_a_bomb3.inc:128-137): frame 0 = not flashing.
+    // and each bomb sets its frame before its draw: end - fuse + 2 (d_a_bomb3.inc:128-137), so it
+    // flashes faster as the fuse runs down. Frame 0 = not flashing (fuse unknown).
     if (brk != NULL)
-      *(f32 *)((u8 *)brk + 0x08) = 0.0f; // J3DAnmBase::mFrame
+    {
+      f32 f = 0.0f;
+      if (held->fuse > 0)
+      {
+        f32 end = (f32) * (s16 *)((u8 *)brk + J3DANM_OFF_FRAME_MAX);
+        f = end - (f32)held->fuse + 2.0f;
+        f = f < 0.0f ? 0.0f : (f >= end ? end - 0.001f : f);
+      }
+      *(f32 *)((u8 *)brk + J3DANM_OFF_FRAME) = f;
+    }
     daPy_lk_c__updateDLSetLight(puppet, held->bomb, 0);
     if (joints != NULL && joints[0] != NULL)
       *(void **)((u8 *)joints[0] + J3DJOINT_OFF_MTXCALC) = savedCalc;

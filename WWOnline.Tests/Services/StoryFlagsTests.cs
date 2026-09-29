@@ -173,11 +173,37 @@ public class RoomPresetTests
     {
         var coop = new RoomSettings().ApplyPreset(RoomPreset.Coop);
         Assert.False(coop.SharedWallet || coop.SharedWorld || coop.SharedItems || coop.SharedStory);
+        Assert.True(coop.SharedProjectiles); // Co-op still shows each other's projectiles
         Assert.Equal(RoomPreset.Coop, coop.MatchingPreset());
 
         var full = coop.ApplyPreset(RoomPreset.FullSync);
-        Assert.True(full.SharedWallet && full.SharedWorld && full.SharedItems && full.SharedStory);
+        Assert.True(full.SharedWallet && full.SharedWorld && full.SharedItems && full.SharedStory && full.SharedProjectiles);
         Assert.Equal(RoomPreset.FullSync, full.MatchingPreset());
+    }
+
+    [Fact]
+    public void Presets_TurnProjectilesBackOn()
+    {
+        var s = new RoomSettings { SharedProjectiles = false }.ApplyPreset(RoomPreset.Coop);
+        Assert.True(s.SharedProjectiles);
+        s.SharedProjectiles = false;
+        Assert.True(s.ApplyPreset(RoomPreset.FullSync).SharedProjectiles);
+    }
+
+    [Fact]
+    public void ProjectilesOff_IsCustom_ForBothPresetsRules()
+    {
+        Assert.Equal(RoomPreset.Custom, new RoomSettings { SharedProjectiles = false }.MatchingPreset());
+        var coopNoProjectiles = new RoomSettings().ApplyPreset(RoomPreset.Coop);
+        coopNoProjectiles.SharedProjectiles = false;
+        Assert.Equal(RoomPreset.Custom, coopNoProjectiles.MatchingPreset());
+    }
+
+    [Fact]
+    public void RulesSummary_NamesTheProjectilesRule()
+    {
+        Assert.Contains("other players' projectiles OFF", new RoomSettings { SharedProjectiles = false }.RulesSummary());
+        Assert.Contains("other players' projectiles ON", new RoomSettings().RulesSummary());
     }
 
     [Fact]

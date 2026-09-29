@@ -11,8 +11,10 @@ public static class HubConstants
     /// <see cref="ProtocolCheck"/>). BUMP IT whenever a hub method, a callback or a DTO that
     /// crosses the wire changes shape or meaning (PuppetData layout, RoomInventory fields, flag
     /// masks...). Pure app changes that don't touch the wire keep it.
+    /// 2: held items + boat parts. 3: live-world room switches. 4: player events / projectiles
+    /// (SendPlayerEvent, ReceivePlayerEvent, RoomSettings.SharedProjectiles).
     /// </summary>
-    public const int ProtocolVersion = 3; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches)
+    public const int ProtocolVersion = 4; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles)
 
     // Hub method names (server-side methods invoked by clients)
 
@@ -40,6 +42,10 @@ public static class HubConstants
     public const string JoinRoomSwitches = "JoinRoomSwitches";
     public const string SendRoomSwitches = "SendRoomSwitches";
 
+    /// <summary>One of the caller's projectiles (a <see cref="Models.PlayerEvent"/>: bomb thrown / exploded,
+    /// cannon fired, arrow shot). Relayed only to the players who can see the caller, while SharedProjectiles is on.</summary>
+    public const string SendPlayerEvent = "SendPlayerEvent";
+
     // Client callback names (server → client)
     public const string ReceiveStageFlags = "ReceiveStageFlags";
     public const string ReceiveRupeeTotal = "ReceiveRupeeTotal";
@@ -47,6 +53,7 @@ public static class HubConstants
     public const string ReceiveRoomInventory = "ReceiveRoomInventory";
     public const string ReceiveStoryFlags = "ReceiveStoryFlags";
     public const string ReceiveRoomSwitches = "ReceiveRoomSwitches";
+    public const string ReceivePlayerEvent = "ReceivePlayerEvent";
 
     /// <summary>Largest wallet in the game (dSv_player_status_a_c wallet size 2).</summary>
     public const int MaxRupees = 5000;

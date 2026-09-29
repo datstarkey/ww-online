@@ -63,14 +63,16 @@ if (logFileError != null)
 // Only touch GameHub AFTER the logger exists: its static Logger field binds to whatever
 // Log.Logger is on first use (before this line that's Serilog's silent default, and every
 // [room]/[world]/[wallet]/[items]/[story] line from the hub would be lost for the whole session).
-GameHub.ConfigureRoomDefaults(options.SharedWallet, options.SharedWorld, options.SharedItems, options.SharedStory);
+GameHub.ConfigureRoomDefaults(options.SharedWallet, options.SharedWorld, options.SharedItems, options.SharedStory,
+                              options.SharedProjectiles);
 GameHub.ConfigureHostToken(options.OwnerKey);
 
 try
 {
-    Log.Information("Starting {AppName} {Version} server (protocol {Protocol}) on port {Port} (shared wallet {Wallet}, shared world {World}, shared items {Items}, shared story {Story})",
+    Log.Information("Starting {AppName} {Version} server (protocol {Protocol}) on port {Port} (shared wallet {Wallet}, shared world {World}, shared items {Items}, shared story {Story}, other players' projectiles {Projectiles})",
         AppInfo.DisplayName, AppInfo.Version, HubConstants.ProtocolVersion, options.Port,
-        options.SharedWallet ? "ON" : "OFF", options.SharedWorld ? "ON" : "OFF", options.SharedItems ? "ON" : "OFF", options.SharedStory ? "ON" : "OFF");
+        options.SharedWallet ? "ON" : "OFF", options.SharedWorld ? "ON" : "OFF", options.SharedItems ? "ON" : "OFF", options.SharedStory ? "ON" : "OFF",
+        options.SharedProjectiles ? "ON" : "OFF");
     Log.Information(options.OwnerKey != null
         ? "[room] An owner key is set: the player who enters it becomes the room owner"
         : "[room] No owner key: the earliest-joined player is the room owner");

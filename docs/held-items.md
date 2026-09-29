@@ -144,7 +144,7 @@ The puppet has its **own item heaps**. `playerInit` → `createHeap` makes `mpIt
 | **1. Use poses** | Mirror the UPPER_MOVE2 anim (whitelist) and item procs (boomerang/hookshot/bow SUBJECT+MOVE, grab procs, fan swing, hammer swings, relabelled bottle/tact/scope poses) plus aim angles. REL-drawn held **boomerang** (left hand, `d_a_boomerang.cpp:436-440` transform) and held **bomb** model (between hands) | Slot 0x48→0x50 (grab kind, body angles), C# reads `mBodyAngle` + grab actor name; add bomb and arrow counts to the guard | 2-3 days | Low-medium. BOOMTHROW crash trap; no event-starting inits |
 | **2. Visual projectiles** (no damage) | Ghost boomerang (peer's thrown-actor pos streamed at 20 Hz + lerp, spinning model), ghost arrow (event pos+angle, straight flight at 200/frame with a BG line check to stop), ghost bomb (event + simple gravity/bounce, or a real bomb with collision off **(?)**), explosion effect only | Event channel (hub method, heap block + outbox in the REL, 1 scratch word) | 3-5 days | Medium: mostly plumbing. No world effects, so nothing to desync |
 | **3. Real bombs** | Real `daBomb` copies: spawn on the throw/place event, clear `0x6F0`, set fuse and velocity; authoritative explosion (`STATE_0` at the peer's position, delete the copy). Damages our enemies, breaks our walls, hurts the local Link if the rule allows. Add the KoRL cannon (`STATE_4`) | Stage 2 channel + a room rule (friendly fire / shared combat) | 2-4 days | Medium: double effects, rumble, timing. World switches reconcile through shared world |
-| **4. Real arrows/boomerang** | Per-instance `sub_method` wrapper that swaps `mpPlayerPtr[0]` to the puppet around the actor's execute/draw, inside the guard | Stage 2 | 1-2 weeks, **research spike first** | High (?): anything reading player 0 inside those executes; untested |
+| **4. Real arrows/boomerang** (arrows done, section 8: detached, no swap needed) | Per-instance `sub_method` wrapper that swaps `mpPlayerPtr[0]` to the puppet around the actor's execute/draw, inside the guard | Stage 2 | 1-2 weeks, **research spike first** | High (?): anything reading player 0 inside those executes; untested |
 | **5. Carried world objects** | Pots, barrels, rocks: identity match (name + `home.pos` + room), puppet grabs our copy, throw like a bomb | Stage 2-3 | 1 week | High: races with the local player picking the same pot, room reloads |
 
 **Recommendation:** do 0 → 1 first. They are cheap and highly visible, and stage 0 is REL-only because `mEquipItem` already arrives. Then build the event channel once (stage 2), since every "real" feature rides on it. Make bombs the first real projectile (stage 3), because the game already supports a second player's bombs. Treat arrows and the boomerang as real only after a spike proves the player-pointer swap is safe; until then they stay visual.
@@ -175,7 +175,7 @@ Code: `GameMod/src/puppet_link/puppet_held.c` (REL), called from `puppet_execute
 - Upper-body mirror from `ANIM_ID` (whitelist, with the peer's own `setActAnimeUpper` values): BOOMWAIT, BOOMTHROW, BOOMCATCH, HOOKSHOTWAIT, ARROWRELORD/ARROWSHOOT/BOWWAIT (+ the bow string bck), GRABWAIT. `checkItemAction` is skipped while one of these holds UPPER_MOVE2 (the BOOMTHROW trap). The mirror only resets anims it owns and never interrupts a draw/put-away.
 - Item bck frame (`m35EC`) follows the body anim for fan/hammer and the upper anim for the bow, as their per-frame procs do.
 - Aim: the peer's `mBodyAngle` x/y is applied after execute's decay, before the model calc, while the peer is in SCOPE, BOOMERANG/HOOKSHOT/BOW SUBJECT/MOVE or SHIP_SCOPE..SHIP_BOW.
-- REL models: `puppet_held.c` builds `BDL_BOOMERANG` and `BDL_BOMB` from the resident "Link" archive in a 0x8000 solid heap per puppet (adjusted; built on first need, destroyed with the puppet). Boomerang in the left hand (`daBoomerang_c::setKeepMatrix`), bomb between the hands (`setGrabItemPos` / `daBomb_c::set_mtx`), bind pose (the shared bomb joint 0 calc is cleared and restored), fuse brk frame 0.
+- REL models: `puppet_held.c` builds `BDL_BOOMERANG` and `BDL_BOMB` from the resident "Link" archive in a 0x8000 solid heap per puppet (adjusted; built on first need, destroyed with the puppet). Boomerang in the left hand (`daBoomerang_c::setKeepMatrix`), bomb between the hands (`setGrabItemPos` / `daBomb_c::set_mtx`), bind pose (the shared bomb joint 0 calc is cleared and restored), fuse brk frame 0. Since the projectiles work the carried bomb's fuse animates too: see section 7, "The carried bomb's fuse".
 - Global guard: pending arrow (`+0x5B80`) and bomb (`+0x5B84`) counts added (no puppet path should reach them).
 
 ### Size
@@ -192,8 +192,125 @@ Measured on origin/main 0f6baa1: REL 40,904 → 47,308 bytes (+6,404; `.text` +4
 8. Peer leaves/joins mid-use, room change while holding each item: no crash, no stray models.
 
 ### Left out (by design or risk)
-- No projectiles or real effects (stages 2-5): no flying boomerang, arrows, hookshot chain/tip, thrown bomb, explosions; the boomerang/bomb are models only.
+- No projectiles or real effects in stages 0-1 (bombs and the boat cannon are real since stages 2-3, section 7): no flying boomerang, arrows, hookshot chain/tip; the held boomerang is a model only.
 - Grappling hook (a rope actor) and carried pots/barrels/rocks: no model; carrying shows the pose only.
 - Wind Waker conducting beats (per-frame UPPER_MOVE1/2 ratios) and song playing: stance only. Deku Leaf glide: static parachute pose (the morf isn't played). Bottle procs: the first anim of each only.
 - GRAB_MISS, GRAB_HEAVY_WAIT, GRAB_REBOUND, ROPE_*, DEMO item procs other than DEMO_AGB_USE: WAIT.
 - Forest Water's sparkle emitter (bound to the model; would outlive it).
+
+---
+
+## 7. Implemented: stages 2 and 3 (bombs and the boat cannon)
+
+Code: `GameMod/src/puppet_link/puppet_fx.c` (REL), the events block in `puppet_shared.h` (`PUPPET_FX_*`); C# `PlayerEventBlock` + `PlayerEventService` (client), `PlayerEventRelay` + `GameHub.SendPlayerEvent` (server), `PlayerEvent` (Shared). Room rule: `RoomSettings.SharedProjectiles` ("Other players' projectiles", on in both presets). `HubConstants.ProtocolVersion` → 4.
+
+Stage 2 (the event channel) and stage 3 (real bombs) were built together. The "ghost bomb" step was skipped: a real `daBomb_c` copy is as cheap as a ghost and does everything a ghost would.
+
+### The channel
+- **Outbox (REL → C#).** Once per frame (any puppet's execute, parked ones too), `fx_trackLocal` watches the local Link:
+  - A bomb in `mActorKeepGrab` (`+0x318C` id) that is a `daBomb_c` in STATE_1..3 and not a copy is tracked as CARRIED.
+  - The frame after it leaves his hands (`freeGrabItem` cleared the grab: a throw or a put-down), it reports **BOMB_THROW** with the bomb's state then: `current.pos`, `speedF`, `speed.y`, `gravity`, `current.angle`, `mRestTime` (fuse).
+  - Carried again → **BOMB_PICKUP**. `mRestTime == 0` (`procExplode_init` zeroes it; a live bomb's is > 0) → **EXPLODE** at its position, in his hands or not. Gone without exploding (sank, or the stage ended) → **REMOVE**.
+  - The boat cannon: the frame `daSFLG_SHOOT_CANNON` is set on the local ship (`play.mpPlayerPtr[2]`, `mStateFlag +0x358`; set at the shot, `d_a_ship.cpp:4030`, cleared at its next execute, `:3594`), `fopAcIt_Judge` finds the one BOMB whose params are exactly the ship's (`prm_make(STATE_4, FALSE, TRUE)` = `0x80020004`; enemy cannons and ships use cheapEff = TRUE). **CANNON** reports its launch state (the no-gravity frames in TIMER); then EXPLODE / REMOVE like a bomb.
+- **C#** drains the outbox at 20 Hz, acks it, stamps each event with our stage, the projectile's own room (the REL writes its `current.roomNo`: a bomb thrown in room 1 still explodes in room 1 after its thrower walked on; our room only when the REL didn't know it), the app run's **origin** (a random id that survives reconnects) and a **seq**, and sends it (`SendPlayerEvent`). An event stays queued until it went out, or 2 s.
+- **Server** (`PlayerEventRelay`):
+  - `PlayerEvent.IsValid`: a known kind; a finite position within ±1e6; |speedF| and |speed.y| < 1000; |gravity| < 50; timer 0..600; variant 0; a stage name of 1-8 printable characters. Ranges only, never `Math.Abs` on ints.
+  - The sender must have sent puppet data; the event must be on the sender's stage and within 20000 units of them; a token bucket per sender (burst 20, 10/s).
+  - It relays to the players in the room where the event happened, by the event's own stage and room (a bomb thrown in room 1 explodes for room 1 even after its thrower walked into room 2), at sea to those within the sea hide distance of the event (`PuppetVisibility`, now in Shared); never back to the sender, and nothing while the rule is off.
+  - A location with no puppet update for 3 s is forgotten: a player whose game is detached neither sends nor gets events.
+  - An origin belongs to the connection that first used it (one origin per connection) until that connection leaves, so nobody can send under another player's origin with a huge seq to make receivers drop that player's events; a reconnecting client takes its origin back once its old connection is gone, or once that connection's location is stale (no puppet data for 3 s; after an unclean drop the server only notices the old connection at its 30 s client timeout).
+- **Inbox (C# → REL).** The receiver drops a repeated or older seq from the same origin (`PlayerEventDedup`; also an event re-sent under a new connection id after a reconnect), events older than 2 s (at most 32 queued, and stale ones are dropped while the game is detached), events that didn't happen in our stage and room (at sea: within sight of us), and senders without a puppet slot; then it writes the event with the sender's puppet slot. The REL checks it again (kind, slot, finite ranges) and applies up to 4 events a frame. While a stage change is pending it discards the inbox (those events belong to the old stage).
+
+### The copies (viewer)
+Real `daBomb_c`s made with `fopAcM_fastCreate`, like the game's own second-player bombs (the Tingle Tuner's, `d_a_agb.cpp:956`), in the puppet's stage layer:
+- **BOMB_THROW** → a STATE_1 bomb (lit: fuse sparks, smoke, hiss) at the sender's position, with their velocity, heading and fuse. A repeat for the same bomb re-places it.
+- **CANNON** → the ship's own STATE_4 cannonball with the sender's launch state and no-gravity frames. It flies with the fly sound, then explodes on ground, walls or anything it touches, or splashes into the sea.
+- **EXPLODE** → the copy is put where the sender's exploded and `procExplode_init` runs: the vanilla explosion (flash, smoke, debris, sound, light, wind, rumble, AI noise, AT sphere r=200). With no copy (it blew up in the sender's hands, or ours sank) a STATE_0 bomb appears there and explodes at create (as `d_a_canon.cpp:191`).
+- **BOMB_PICKUP** → the copy goes (the puppet's carried-bomb model from stage 0 shows it). **REMOVE** → the copy gets 30 frames to sink here too, then goes.
+- **Timing and de-dup:** each copy is keyed by (sender slot, the sender's bomb id = its process id there). Its fuse counts like the sender's, but is held at 3 frames for up to its fuse + 60 frames, so it explodes when the sender's EXPLODE arrives, at their position (not a latency early at a slightly different spot). If the EXPLODE never comes, its own fuse ends it. The hold only lasts while the copy is as spawned: once something here carries it (the local Link, an enemy), changes its state (an Armos swallowing it, `d_a_am.cpp:400`) or sets its fuse lower than the hold leaves it (`setBombRestTime(1)`, `d_a_am.cpp:942`), it is this world's bomb: its own fuse ends it where it is and the sender's EXPLODE is ignored. A copy that exploded here first (a sword, another explosion) ignores the sender's later EXPLODE. Finished entries are remembered for 300 frames, so late duplicates do nothing.
+
+### The carried bomb's fuse
+While the peer carries a lit bomb, the puppet's held bomb (stage 0's REL model) flashes and swells like the real one:
+- The sender reads the carried bomb's `mRestTime` (`daBomb_c +0x6FC`) with the grab kind and sends it in `PuppetData.Equipment.GrabFuse` (a byte, capped at 255; 0 = none). It goes into the slot's spare byte after `GRAB_KIND` (`PUPPET_SLOT_OFF_GRAB_FUSE` `+0x4D`); the slot stays 0x50.
+- The REL counts it down one per frame between the 20 Hz updates and snaps to each new value. The draw sets the shared bomb brk's frame to `end - fuse + 2` and plays the archive's `BCK_BOMB` at `end - fuse`, as `daBomb_c::draw_norm` does (`d_a_bomb3.inc:128-148`). The bck plays through the puppet's own `mDoExt_bckAnm` (its `J3DMtxCalcMayaAnm` lives in the held-model heap); joint 0's calc is put back right after the entry, so nothing of the puppet's stays in the shared bomb data, inside or outside a puppet's shared-animator window.
+- If the fuse runs out in the peer's hands, their EXPLODE event makes the explosion. The fuse sparks and smoke particles aren't drawn on the carried bomb (they are on the thrown copy).
+
+### Traps handled
+- **`field_0x6F0` / bomb count:** only STATE_3 sets it, and it makes explode / delete call the LOCAL Link's `decrementBombCnt`. Copies are never STATE_3 and get it cleared anyway. Nothing on this path touches the pending bomb count (gameInfo `+0x5B84`, still in the puppet guard).
+- **Echo:** every copy has `0x01000000` in its params. Bits 8-15 and 18-30 are unused (`prm_get_state`, cheapEff, angXZero and version read bits 0-7, 16, 17 and 31, and `change_state` keeps the rest), so the tracker never reports a copy, even after the REL was reloaded. The local Link may pick a copy up and throw it: it is then his, and explodes on its own fuse where it is (no snap back).
+- **Player 0:** a copy reads the local Link only for the shared bomb brk (`draw_norm`) and his grab id (`set_real_shadow_flag`), both harmless. It is never in his `mActorKeepGrab` unless he picks it up himself.
+- **Stage changes:** nothing is spawned or reported while `mNextStage` is pending, and the inbox is discarded; copies die with the stage layer.
+- **The local Link** is `play.mpPlayerPtr[0]`, not `dComIfGp_getPlayer(0)`: that is the NPC the player controls while playing Medli, Makar, a seagull or Hyoi (`procExplode_init` reads the same pointer).
+- **Minigames:** the client drops peers' events while `play.mMiniGameType` is set (the sailing race, Orca's training, Spectacle Island's cannon game, the auction, mail sorting, the bow game), so a peer's shot can't score in the viewer's minigame. Only `endMiniGame` clears that byte (a reset re-zeroes it: `play` is in the DOL's .bss), so a minigame left without ending it (a game over, back to the title) would stick; no minigame spans a stage change, so a type only counts in the stage where it was first seen (the gate reads it every tick), and a new type starts afresh, since `startMiniGame` can overwrite a stale type with no 0 between (`MinigameGate`).
+
+### Player damage: none
+A copy's AT has `cCcD_AtSPrm_VsPlayer_e` cleared (`+0x5A0`; `procExplode_init` only ORs the Set bit back). It breaks walls and boulders, hurts enemies and sets off other bombs (the enemy and other groups), but never hurts the local Link, his ship or puppets (the player Tg group; also Medli, Makar and a few objects with player-only Tg).
+- The copy lands ~100-200 ms after the sender's and may bounce differently, so a hit would feel unfair.
+- There is no friendly-fire rule yet, and a co-op room shouldn't let one player bomb another. A future "friendly fire" rule would just keep the bit.
+- The explosion's rumble, light and sound stay (vanilla, as for any bomb going off near you).
+
+**World state:** a bombable wall or boulder the copy breaks here is broken for real in this world. Its switch reaches the room through shared world, as the sender's own does (live world, #12, applies it without a reload). If the copy and the original disagree, the switch reconciles both.
+
+### Size
+Measured on origin/main d5e4dfb (REL stored Yaz0): REL 51,632 → 57,792 bytes (+6,160; `.text` +5.0 KB), RELS.arc growth 27,392 → 30,272 of the 65,536-byte guard (+2,880).
+
+### Verify in game
+1. Take out a bomb, walk, throw it. The other player sees the puppet carry it, then a lit bomb fly the same arc, bounce and explode when and where the thrower's does (effect, sound, light, rumble). The viewer's bomb count never changes, and neither Link is hurt by the other's bomb.
+2. Put a bomb down, pick it up again, throw: the copy disappears while it is carried and comes back on the throw.
+3. Let a bomb explode in hand: an explosion at the thrower's hands on the other screen.
+4. Throw a bomb at a bombable wall, a boulder, an enemy: it breaks or takes damage in both worlds.
+5. Throw a bomb into deep water: it sinks on both sides, no explosion.
+6. The viewer picks up the peer's lying bomb and throws it: it explodes where the viewer threw it.
+7. Boat cannon: fire at sea, at a target and at an island. The other player sees the cannonball leave the peer's cannon, fly, and explode or splash where the shooter's does.
+8. The room owner turns "Other players' projectiles" off: nothing spawns (the carried bomb model and aim poses still show). On again: it does.
+9. Throw a bomb and leave the room or change stage before it explodes; the peer leaves mid-flight: no crash, no stray bombs.
+10. Three players: each sees the other two's bombs, and nothing spawns twice.
+
+### What's left
+- Arrows: section 8.
+- Boomerang, hookshot chain and tip, grappling hook: visual only or not at all (they are bound to the local Link).
+- Carried pots, barrels, rocks and bomb flowers (`daBomb2`): stage 5.
+- A friendly-fire room rule (copies would keep VsPlayer), and PvP damage back to the thrower.
+
+---
+
+## 8. Implemented: stage 4 for arrows (normal, fire, ice, light)
+
+The stage 4 spike question ("does a real arrow need a player-pointer swap?") has a simpler answer: a `daArrow_c` can be made **detached** from the local Link, with no swap. `d_a_arrow` is in main.dol; every offset below is verified there.
+
+### What the arrow reads from player 0, and why none of it matters
+- `checkCreater`: the parent actor, to spot Zelda's arrows. `fopAcM_fastCreate` has no parent, so `mbSetByZelda` stays false.
+- `setTypeByPlayer` / `checkRestMp` (at create): the type is the static `m_keep_type` (`0x803F6B7C`), downgraded to normal when the local magic (gameInfo `+0x14`) is below its cost (`use_mp` 0/1/1/2). The light arrow's model (`BDL_ARROWGLITTER`) and heap (0x820) are chosen here, so the type can't be fixed after create.
+- `createInit` → `setKeepMatrix`: puts the arrow in the local Link's left hand, and `procWait` does that every frame until the arrow's param is 1. `procWait` on param 1 then calls `arrowUseMp` (spends the local magic) and `arrowShooting`.
+- `createInit` also reads the local Link's ice / light arrow btk (shared archive anims: a harmless read).
+- `procMove`, `procStop_*`, `procReturn`, `procWater`, draw and delete read no player. The only other local write is `procStop_BG`'s pickup: a CO hit on a stuck normal arrow gives the local Link +1 arrow (`dComIfGp_setItemArrowNumCount(1)`, d_a_arrow.cpp:976).
+- The fire / ice / light effect child (`d_a_arrow_lighteff`, a REL) sets and clears the local Link's `USE_ARROW_EFFECT` (it blocks his bow's reload), but only once the arrow's param has been 1 (`field_0x2EA`, lighteff.cpp:208-222, 315-327).
+
+### Sender
+`fx_trackLocal` remembers the arrow nocked in `mActorKeepEquip` (`+0x317C` id; name `0x1DE`). When the bow no longer holds that id and the arrow still exists with param 1 (`checkNextActionBowReady` sets it at the shot, d_a_player_bow.inc:136), it was shot: **ARROW** with its type (`mArrowType +0x601`) as VARIANT, its launch point (`current.pos`) and aim (`current.angle` x / y). The next frame the arrow hasn't moved yet (it executes after the puppets: lists 9 and 3). Switching the arrow type deletes the nocked arrow and nocks a new one, and a put-away arrow is deleted, so neither is reported. One event per arrow: the copy flies the same straight 200-per-frame line through the same stage.
+
+### Viewer (`fx_spawnArrow`)
+1. Save `m_keep_type` and the local magic; set the peer's type, and the magic to 2 if it is lower. `fopAcM_fastCreate(ARROW, param 0, launch point, -1, aim)`, synchronous. Put both back at once.
+2. `createInit` put it in the local Link's hand: set `current.pos` / `old.pos` to the launch point, `current.angle` = (x, y, 0) (up is +x, as `setKeepMatrix` sets it) and `shape_angle` = (-x, y, 0).
+3. Clear its CO sphere's Set bit (`mCoSph +0x4D4`, CO SPrm `+0x500`): no pickup.
+4. `mCurrProcFunc` (`+0x68C`) = the `procMove` PTMF `{0, -1, 0x800D5B20}` (the constant `procWait` copies, `0x803898B4`), then `arrowShooting()`: speed 200 along the aim, the typed shoot sound, blur, the AT capsule.
+5. Its model's base matrix = trans(launch point) · ZXYrot(shape x, y, 0), so its first draw isn't in the local Link's hand.
+6. Param stays 0: `procWait` never runs (no magic spent) and the effect child never touches the local Link's flag. It shows the "nocked" glow size while flying, a small visual difference.
+
+Keyed and de-duplicated like the bombs (a repeat does nothing). The pending arrow count (gameInfo `+0x5B80`) is never touched.
+
+`arrowShooting` registers the AT capsule in dCcS; that is the arrow's only registration in its spawn frame, because an actor `fopAcM_fastCreate`d during another's execute first executes the next frame (it enters the execute queue in `fpcCt_Handler`, before `fpcEx_Handler`: f_pc_create_req.cpp:100, f_pc_manager.cpp:284). So point-blank shots hit on that frame, as a local arrow's do.
+
+### What peer arrows hit: the viewer's world, never the viewer
+The arrow's AT is Set | VsEnemy | VsOther (`m_at_cps_src`), so it hits the viewer's enemies (the light arrow's instant kill too, except in GanonK), eye switches, torches (fire lights them), ice (fire melts), water (ice makes a platform), and sticks in walls and enemies, all as a local arrow would. It never hits the local Link, his ship or puppets (no VsPlayer bit, as vanilla). The local player's own arrows share the 5-arrow `m_count` ring, so a peer's arrows can retire their stuck arrows sooner (cosmetic). In the bow minigame, peer arrows are normal arrows (vanilla override).
+
+### Size
+REL 57,792 → 58,876 bytes (+1,084); RELS.arc growth 30,272 → 30,880 of the 65,536-byte guard (+608). After the review fixes (both sections): REL 59,084 bytes, RELS.arc growth 30,976. Rebased on origin/main d0ac5b5 (live world): REL 53,336 → 60,460 bytes, RELS.arc growth 28,416 → 31,904 of 65,536 (+3,488 for sections 7-8).
+
+### Verify in game
+1. Shoot normal, fire, ice and light arrows (standing, strafing, up and down): the other player sees the arrow leave the puppet's bow along the same line, with the right tip, glow, trail and shoot sound.
+2. Hit an enemy, a wall, water, lava: it hits, sticks, bounces, splashes, freezes, makes an ice platform or a magma rock, as a local arrow would.
+3. Shoot an eye switch or light a torch with a fire arrow: it triggers in the viewer's world.
+4. The viewer's magic and arrow count never change; touching a stuck peer arrow gives nothing; the viewer can reload their own bow normally while peer fire / ice / light arrows fly.
+5. Swap arrow types and put the bow away without shooting: nothing is sent.
+6. "Other players' projectiles" off: no arrows spawn (the bow poses still mirror).

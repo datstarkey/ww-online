@@ -280,6 +280,7 @@ public static class GameMemoryAddresses
         public const int SlotOffset_BodyAngleX = PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_X;   // daPy_py_c::mBodyAngle.x (+0x2B4, d_a_player.h:491)
         public const int SlotOffset_BodyAngleY = PuppetLayout.PUPPET_SLOT_OFF_BODY_ANGLE_Y;   // mBodyAngle.y (+0x2B6)
         public const int SlotOffset_GrabKind = PuppetLayout.PUPPET_SLOT_OFF_GRAB_KIND;        // mActorKeepGrab (+0x318C, d_a_player_main.h:2088) -> PUPPET_GRAB_KIND_*
+        public const int SlotOffset_GrabFuse = PuppetLayout.PUPPET_SLOT_OFF_GRAB_FUSE;        // the carried bomb's daBomb_c::mRestTime (+0x6FC), capped at 255
 
         // Hook tracking arrays
         public const uint ProcIdsAddr = PuppetLayout.PUPPET_PROC_IDS_ADDR;
@@ -389,6 +390,11 @@ public static class GameMemoryAddresses
         public const int RoomStatusOffZoneNo = 0x107;      // s8 mZoneNo (DOL getZoneNo 0x8005DCE0: lbz r3,0x107)
 
         public static uint RoomZoneNo(int room) => RoomStatusBase + (uint)(room * RoomStatusSize) + RoomStatusOffZoneNo;
+        /// <summary>play.mMiniGameType (d_com_inf_game.h "/* 0x4A3A */ u8 mMiniGameType"; daArrow_c::_create reads
+        /// it at 0x800D79C8): nonzero while a minigame runs (dComIfGp_startMiniGame: 1 sailing race, 2 / 6 Orca's
+        /// training, 3 Spectacle Island cannons, 5 auction, 7 mail sorting (d_a_npc_bmsw / btsw), 8 the bow game).
+        /// Only endMiniGame clears it (and a reset, which re-zeroes the DOL's .bss).</summary>
+        public const uint MiniGameType = Play + 0x4A3A;
     }
 
     /// <summary>
