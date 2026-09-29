@@ -37,6 +37,11 @@ public class ServerAppIntegrationTests
         return (app, new Uri(address).Port);
     }
 
+    // GameHub's player list is static and a previous test's connections may still be closing, so a
+    // name reused across tests ("Guesser") could belong to a lingering connection that is the room's
+    // earliest joiner. Every test names its players uniquely.
+    private static string Name(string role) => $"{role}-{Guid.NewGuid().ToString("N")[..8]}";
+
     [Fact]
     public async Task Health_Returns200_WithVersionAndProtocol()
     {
@@ -60,6 +65,8 @@ public class ServerAppIntegrationTests
     [Fact]
     public async Task OwnerKey_MakesTheSecondJoinerTheRoomOwner()
     {
+        var earlyName = Name("Early");
+        var adminName = Name("Admin");
         GameHub.ConfigureHostToken("owner-key-123");
         try
         {
@@ -68,15 +75,15 @@ public class ServerAppIntegrationTests
 
             // First joiner, no key: owner only until the key holder arrives.
             await using var first = new SignalRClientService();
-            Assert.True((await first.ConnectAsync("127.0.0.1", port, "Early")).success);
+            Assert.True((await first.ConnectAsync("127.0.0.1", port, earlyName)).success);
 
             await using var keyHolder = new SignalRClientService();
-            Assert.True((await keyHolder.ConnectAsync("127.0.0.1", port, "Admin", "owner-key-123")).success);
+            Assert.True((await keyHolder.ConnectAsync("127.0.0.1", port, adminName, "owner-key-123")).success);
 
             var connection = keyHolder.Connection!;
             var settings = await connection.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
             Assert.Equal(connection.ConnectionId, settings.OwnerConnectionId);
-            Assert.Equal("Admin", settings.OwnerName);
+            Assert.Equal(adminName, settings.OwnerName);
         }
         finally
         {
@@ -87,6 +94,8 @@ public class ServerAppIntegrationTests
     [Fact]
     public async Task WrongOwnerKey_DoesNotClaimTheRoom()
     {
+        var earlyName = Name("Early");
+        var guesserName = Name("Guesser");
         GameHub.ConfigureHostToken("right-key");
         try
         {
@@ -94,16 +103,16 @@ public class ServerAppIntegrationTests
             await using var _ = app;
 
             await using var first = new SignalRClientService();
-            Assert.True((await first.ConnectAsync("127.0.0.1", port, "Early")).success);
+            Assert.True((await first.ConnectAsync("127.0.0.1", port, earlyName)).success);
             await using var guesser = new SignalRClientService();
-            Assert.True((await guesser.ConnectAsync("127.0.0.1", port, "Guesser", "wrong-key")).success);
+            Assert.True((await guesser.ConnectAsync("127.0.0.1", port, guesserName, "wrong-key")).success);
 
             // (Not asserting WHO owns it: GameHub's player list is static, and a previous test's
             // connections may still be closing. The guesser, who joined last, must not.)
             var connection = guesser.Connection!;
             var settings = await connection.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
             Assert.NotEqual(connection.ConnectionId, settings.OwnerConnectionId);
-            Assert.NotEqual("Guesser", settings.OwnerName);
+            Assert.NotEqual(guesserName, settings.OwnerName);
         }
         finally
         {
@@ -114,6 +123,9 @@ public class ServerAppIntegrationTests
     [Fact]
     public async Task AfterTooManyWrongKeys_EvenTheRightKeyIsIgnored_OnThatConnection()
     {
+        var earlyName = Name("Early");
+        var guesserName = Name("Guesser");
+        var adminName = Name("Admin");
         GameHub.ConfigureHostToken("right-key");
         try
         {
@@ -122,10 +134,10 @@ public class ServerAppIntegrationTests
 
             // Someone joins first, so the guesser (joined later) could only own the room by claiming it.
             await using var first = new SignalRClientService();
-            Assert.True((await first.ConnectAsync("127.0.0.1", port, "Early")).success);
+            Assert.True((await first.ConnectAsync("127.0.0.1", port, earlyName)).success);
 
             await using var guesser = new SignalRClientService();
-            Assert.True((await guesser.ConnectAsync("127.0.0.1", port, "Guesser")).success);
+            Assert.True((await guesser.ConnectAsync("127.0.0.1", port, guesserName)).success);
             var connection = guesser.Connection!;
             for (int i = 0; i < OwnerKeyCheck.MaxFailedAttempts; i++)
                 await connection.InvokeAsync(HubConstants.ClaimRoomOwner, $"guess-{i}");
@@ -133,13 +145,13 @@ public class ServerAppIntegrationTests
 
             var settings = await connection.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
             Assert.NotEqual(connection.ConnectionId, settings.OwnerConnectionId);
-            Assert.NotEqual("Guesser", settings.OwnerName);
+            Assert.NotEqual(guesserName, settings.OwnerName);
 
             // Only that connection is locked out: a fresh one with the right key still claims the room.
             await using var owner = new SignalRClientService();
-            Assert.True((await owner.ConnectAsync("127.0.0.1", port, "Admin", "right-key")).success);
+            Assert.True((await owner.ConnectAsync("127.0.0.1", port, adminName, "right-key")).success);
             var after = await owner.Connection!.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
-            Assert.Equal("Admin", after.OwnerName);
+            Assert.Equal(adminName, after.OwnerName);
         }
         finally
         {
