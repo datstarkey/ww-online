@@ -172,12 +172,18 @@ public class WorldFlagSyncService : IDisposable
             ? _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.LiveMemory, GameMemoryAddresses.WorldFlags.MemorySize)
             : null;
 
+        var oceanBytes = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.Ocean, GameMemoryAddresses.WorldFlags.OceanLength);
+        var chartBytes = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.SalvagedCharts, GameMemoryAddresses.WorldFlags.SalvagedChartsLength);
+        if (oceanBytes == null || chartBytes == null) return;
+
         var table = _tables.Table;
         for (int i = 0; i < StageFlags.SlotCount; i++)
         {
             var local = Parse(savedBytes, i * GameMemoryAddresses.WorldFlags.MemorySize, i);
             if (i == slot && liveBytes != null)
                 local.MergeFrom(Parse(liveBytes, 0, i));
+            if (i == StageFlags.SeaSlot)
+                ParseSalvage(local, oceanBytes, chartBytes);
             var excluded = table?.MemoryExcludedWords(i);
             if (excluded != null)
                 PushBlockSwitches.Remove(local, excluded); // never sent...
@@ -198,6 +204,8 @@ public class WorldFlagSyncService : IDisposable
             _switchGuard.Filter(i, local, missing);
             if (missing.IsEmpty) continue;
 
+            if (missing.SalvageCount != 0)
+                ApplySalvage(missing);
             if (i == slot && liveBytes != null)
             {
                 // Current stage: the live copy is authoritative (putSave overwrites mSave[slot]
@@ -325,6 +333,80 @@ public class WorldFlagSyncService : IDisposable
             var b = _dolphin.ReadMemory(addr, 1);
             if (b != null) _dolphin.WriteMemory(addr, new[] { (byte)(b[0] | bits.DungeonItem) });
         }
+    }
+
+    /// <summary>
+    /// OR the salvage bits into the save (dSv_ocean_c, dSv_player_map_c's salvaged charts: global, not per stage),
+    /// then mark the matching registered salvage points done, as end_salvage does (setFlag(id, 1)): a point is only
+    /// checked against the save when its sea square loads (dSalvage_control_c::entry), so without this the peer's
+    /// treasure would stay salvageable here until then. The save bits go first: daSalvage_c::execute clears the
+    /// flag again only while the bit is unset (kinds 0, 2 and 4).
+    /// </summary>
+    private void ApplySalvage(StageFlags bits)
+    {
+        for (int g = 0; g < StageFlags.OceanWords; g++)
+            OrU16(GameMemoryAddresses.WorldFlags.Ocean + (uint)(g * 2), bits.Ocean[g]);
+        for (int w = 0; w < StageFlags.ChartWords; w++)
+            OrU32(GameMemoryAddresses.WorldFlags.SalvagedCharts + (uint)(w * 4), bits.SalvagedCharts[w]);
+
+        var ptr = _dolphin.ReadMemory(GameMemoryAddresses.Salvage.TagDataPtr, 4);
+        if (ptr == null) return;
+        uint ctl = ReadU32(ptr, 0);
+        if (ctl < 0x80000000 || ctl >= 0x81800000) return; // not built yet (no sea loaded since boot)
+        uint infos = ctl + GameMemoryAddresses.Salvage.InfoBase;
+        var buf = _dolphin.ReadMemory(infos, GameMemoryAddresses.Salvage.InfoCount * GameMemoryAddresses.Salvage.InfoSize);
+        if (buf == null) return;
+        int marked = 0;
+        foreach (int i in SalvagedPoints(buf, bits))
+        {
+            int flagOff = i * GameMemoryAddresses.Salvage.InfoSize + GameMemoryAddresses.Salvage.OffFlag;
+            _dolphin.WriteMemory(infos + (uint)flagOff, new[] { (byte)(buf[flagOff] | GameMemoryAddresses.Salvage.FlagDone) });
+            marked++;
+        }
+        if (marked != 0)
+            Logger.Information("[world] live world: {N} salvage point(s) here marked emptied", marked);
+    }
+
+    /// <summary>
+    /// The registered salvage points (dSalvage_control_c::mInfo, <paramref name="infos"/>) that <paramref name="bits"/>
+    /// empties and that are still salvageable: kind 0 by chart (mSaveNo, 1-based), kinds 2-4 by sea square (mRoomNo)
+    /// and point (mSaveNo), the keys end_salvage writes (d_a_salvage.cpp:504-519). Point 31 (no save) and kind 6
+    /// (an event bit) are left alone.
+    /// </summary>
+    public static IEnumerable<int> SalvagedPoints(byte[] infos, StageFlags bits)
+    {
+        for (int i = 0; i < GameMemoryAddresses.Salvage.InfoCount; i++)
+        {
+            int o = i * GameMemoryAddresses.Salvage.InfoSize;
+            if (o + GameMemoryAddresses.Salvage.InfoSize > infos.Length) yield break;
+            int room = (sbyte)infos[o + GameMemoryAddresses.Salvage.OffRoomNo];
+            int save = infos[o + GameMemoryAddresses.Salvage.OffSaveNo];
+            int kind = infos[o + GameMemoryAddresses.Salvage.OffKind];
+            if (room < 0 || (infos[o + GameMemoryAddresses.Salvage.OffFlag] & GameMemoryAddresses.Salvage.FlagDone) != 0)
+                continue;
+            bool done = kind switch
+            {
+                0 => save is >= 1 and <= 128 && (bits.SalvagedCharts[(save - 1) >> 5] & (1u << ((save - 1) & 31))) != 0,
+                2 or 3 or 4 => save < 16 && room < StageFlags.OceanWords && (bits.Ocean[room] & (1 << save)) != 0,
+                _ => false,
+            };
+            if (done) yield return i;
+        }
+    }
+
+    private static void ParseSalvage(StageFlags f, byte[] ocean, byte[] charts)
+    {
+        for (int g = 0; g < StageFlags.OceanWords; g++) f.Ocean[g] = (ushort)(ocean[g * 2] << 8 | ocean[g * 2 + 1]);
+        for (int w = 0; w < StageFlags.ChartWords; w++) f.SalvagedCharts[w] = ReadU32(charts, w * 4);
+    }
+
+    private void OrU16(uint addr, ushort bits)
+    {
+        if (bits == 0) return;
+        var b = _dolphin.ReadMemory(addr, 2);
+        if (b == null) return;
+        int v = (b[0] << 8 | b[1]) | bits;
+        _dolphin.WriteMemory(addr, new[] { (byte)(v >> 8), (byte)v });
     }
 
     private void OrU32(uint addr, uint bits)
