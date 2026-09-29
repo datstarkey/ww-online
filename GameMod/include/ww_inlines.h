@@ -1005,12 +1005,13 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define TBOX_FUNC_EXTRA_SAVE     7     // 7 and 8 read another stage's chest bits
 
 // Doors (d_door.cpp: getSwbit = prm & 0xFF, DOL 0x8006B39C). dDoor_key2_c mbEnabled at +0 (keyOn/keyOff DOL
-// 0x8006C948/0x8006C954). setKey (door10 REL .text 0xC8, door12 0xC0) gives keyOff whenever swbit < 0x80 and it is
-// set, for every door type. The action byte selects l_action[] (1 = Wait); only actionInit (0) re-runs setKey.
+// 0x8006C948/0x8006C954): read only, to skip a door with no lock showing. The action byte selects l_action[]
+// (1 = Wait). Live world re-creates a locked door; it never writes these.
 #define DOOR10_KEYLOCK_OFF       0x308 // door10 setKey: addi r3,r31,0x308 before keyOn/keyOff
 #define DOOR10_ACTION_OFF        0x354 // door10 actionInit: li r0,1; stb r0,0x354(r31)
 #define DOOR12_KEYLOCK_OFF       0x2E4 // door12 setKey: addi r3,r31,0x2E4
 #define DOOR12_ACTION_OFF        0x314 // door12 actionInit: stb r0,0x314(r31)
 #define DOOR_ACTION_WAIT         1
+#define DOOR12_ARG1_TMPBIT       8     // door12 create: arg1 (home.angle.z >> 8) 8 clears tmp bit 0x0440 (d_a_door12.cpp:581)
 
 #endif /* WW_INLINES_H */
