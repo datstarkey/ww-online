@@ -58,6 +58,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _sharedItemsOn = true;
     [ObservableProperty] private bool _sharedStoryOn = true;
     [ObservableProperty] private bool _sharedProjectilesOn = true;
+    [ObservableProperty] private bool _sharedBaitOn = true;
     [ObservableProperty] private string _roomOwnerText = "";
     [ObservableProperty] private string _ownerName = "";
 
@@ -66,7 +67,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isCoopPreset;
     [ObservableProperty] private bool _isCustomPreset;
     [ObservableProperty] private string _presetText = "Full sync";
-    [ObservableProperty] private string _presetNote = "Everything is shared: wallet, world, items and story.";
+    [ObservableProperty] private string _presetNote = "Everything is shared: wallet, world, items, story and bait bag.";
     private bool _applyingServerRules;
 
     /// <summary>Show the Room items sub-page instead of the room overview.</summary>
@@ -267,6 +268,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         SharedItemsOn = rules.SharedItems;
         SharedStoryOn = rules.SharedStory;
         SharedProjectilesOn = rules.SharedProjectiles;
+        SharedBaitOn = rules.SharedBait;
         UpdatePreset(rules.MatchingPreset());
         IsOwner = _room.IsOwner;
         OwnerName = rules.OwnerName ?? "";
@@ -327,6 +329,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     partial void OnSharedItemsOnChanged(bool value) { PushRules(); OnPropertyChanged(nameof(ItemsCardTitle)); OnPropertyChanged(nameof(ItemsLinkText)); }
     partial void OnSharedStoryOnChanged(bool value) => PushRules();
     partial void OnSharedProjectilesOnChanged(bool value) => PushRules();
+    partial void OnSharedBaitOnChanged(bool value) => PushRules();
 
     private void PushRules()
     {
@@ -336,9 +339,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         var items = SharedItemsOn;
         var story = SharedStoryOn;
         var projectiles = SharedProjectilesOn;
+        var bait = SharedBaitOn;
         _ = Task.Run(async () =>
         {
-            try { await _room.SetAsync(wallet, world, items, story, projectiles); }
+            try { await _room.SetAsync(wallet, world, items, story, projectiles, bait); }
             catch (Exception ex) { Serilog.Log.Warning(ex, "[room] failed to update room rules"); }
         });
     }
@@ -356,13 +360,13 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         };
         PresetNote = preset switch
         {
-            RoomPreset.FullSync => "Everything is shared: wallet, world, items and story.",
+            RoomPreset.FullSync => "Everything is shared: wallet, world, items, story and bait bag.",
             RoomPreset.Coop => "Players see each other and each other's projectiles, but progress stays on each save.",
             _ => "A custom mix. Pick a preset to reset.",
         };
     }
 
-    /// <summary>Room owner: wallet, world, items and story all shared.</summary>
+    /// <summary>Room owner: wallet, world, items, story and bait bag all shared.</summary>
     [RelayCommand]
     private void ApplyFullSyncPreset() => PushPreset(RoomPreset.FullSync);
 

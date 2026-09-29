@@ -20,6 +20,9 @@ public interface IGameHubClient
     /// <summary>The shared wallet's new total (someone gained or spent rupees).</summary>
     Task ReceiveRupeeTotal(int total);
 
+    /// <summary>The shared bait bag's new counts (someone used, bought or picked up bait or a Hyoi Pear).</summary>
+    Task ReceiveBaitTotal(BaitCounts total);
+
     /// <summary>Room rules or the room owner changed.</summary>
     Task ReceiveRoomSettings(RoomSettings settings);
 

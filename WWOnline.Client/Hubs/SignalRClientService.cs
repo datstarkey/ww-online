@@ -29,6 +29,7 @@ public class SignalRClientService : IAsyncDisposable
     public event Action<int>? PlayerCountUpdated;
     public event Action<StageFlags>? StageFlagsReceived;
     public event Action<int>? RupeeTotalReceived;
+    public event Action<BaitCounts>? BaitTotalReceived;
     public event Action<RoomSettings>? RoomSettingsReceived;
     public event Action<RoomInventory>? RoomInventoryReceived;
     public event Action<StoryFlags>? StoryFlagsReceived;
@@ -366,6 +367,11 @@ public class SignalRClientService : IAsyncDisposable
             RupeeTotalReceived?.Invoke(total);
         });
 
+        connection.On<BaitCounts>(HubConstants.ReceiveBaitTotal, total =>
+        {
+            BaitTotalReceived?.Invoke(total);
+        });
+
         connection.On<RoomSettings>(HubConstants.ReceiveRoomSettings, settings =>
         {
             RoomSettingsReceived?.Invoke(settings);
@@ -432,6 +438,20 @@ public class SignalRClientService : IAsyncDisposable
 
     /// <summary>Report a local rupee change; false if not connected (nothing sent).</summary>
     public Task<bool> SendRupeeDeltaAsync(int delta) => SendAsync(HubConstants.SendRupeeDelta, delta);
+
+    /// <summary>
+    /// Join the shared bait bag with this game's counts; returns the counts to adopt, or null if offline,
+    /// the rule is off, or the bag is still waiting for its owner to seed it (the client retries).
+    /// </summary>
+    public async Task<BaitCounts?> JoinBaitAsync(BaitCounts current)
+    {
+        var connection = _hubConnection;
+        if (connection?.State != HubConnectionState.Connected) return null;
+        return await connection.InvokeAsync<BaitCounts?>(HubConstants.JoinBait, current);
+    }
+
+    /// <summary>Report a local bait bag change (signed per type); false if not connected (nothing sent).</summary>
+    public Task<bool> SendBaitDeltaAsync(BaitCounts delta) => SendAsync(HubConstants.SendBaitDelta, delta);
 
     /// <summary>Report this game's flags for one stage slot to the shared world; false if not connected.</summary>
     public Task<bool> SendStageFlagsAsync(StageFlags flags) => SendAsync(HubConstants.SendStageFlags, flags);

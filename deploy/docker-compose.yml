@@ -18,6 +18,7 @@ services:
       WWO_SHARED_WORLD: "true"
       WWO_SHARED_ITEMS: "true"
       WWO_SHARED_STORY: "true"
+      WWO_SHARED_BAIT: "true"
       WWO_SHARED_PROJECTILES: "true"
       # A player who enters this in the client's "Owner key" field becomes the room owner.
       # Without it the first player to join owns the room. Pick your own long random string.

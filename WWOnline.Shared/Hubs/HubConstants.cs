@@ -12,10 +12,11 @@ public static class HubConstants
     /// crosses the wire changes shape or meaning (PuppetData layout, RoomInventory fields, flag
     /// masks...). Pure app changes that don't touch the wire keep it.
     /// 2: held items + boat parts. 3: live-world room switches. 4: player events / projectiles
-    /// (SendPlayerEvent, ReceivePlayerEvent, RoomSettings.SharedProjectiles). 5: body / face anim
-    /// mirror (AnimationState.Tracks and face / hand fields).
+    /// (SendPlayerEvent, ReceivePlayerEvent, RoomSettings.SharedProjectiles). 5 (v0.2.0): body / face
+    /// anim mirror (AnimationState.Tracks and face / hand fields) and the shared bait bag (JoinBait,
+    /// SendBaitDelta, ReceiveBaitTotal, BaitCounts, RoomSettings.SharedBait).
     /// </summary>
-    public const int ProtocolVersion = 5; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands)
+    public const int ProtocolVersion = 5; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait bag (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait)
 
     // Hub method names (server-side methods invoked by clients)
 
@@ -31,6 +32,13 @@ public static class HubConstants
     public const string GetWorldFlags = "GetWorldFlags";
     public const string JoinWallet = "JoinWallet";
     public const string SendRupeeDelta = "SendRupeeDelta";
+
+    /// <summary>Join the shared bait bag with this game's <see cref="Models.BaitCounts"/>; returns the room's
+    /// counts to adopt (null: rule off, or waiting for the room owner to seed it).</summary>
+    public const string JoinBait = "JoinBait";
+
+    /// <summary>A signed <see cref="Models.BaitCounts"/> change (bait used / bought / picked up), while SharedBait is on.</summary>
+    public const string SendBaitDelta = "SendBaitDelta";
     public const string GetRoomSettings = "GetRoomSettings";
     public const string SetRoomSettings = "SetRoomSettings";
     public const string ClaimRoomOwner = "ClaimRoomOwner";
@@ -50,6 +58,7 @@ public static class HubConstants
     // Client callback names (server → client)
     public const string ReceiveStageFlags = "ReceiveStageFlags";
     public const string ReceiveRupeeTotal = "ReceiveRupeeTotal";
+    public const string ReceiveBaitTotal = "ReceiveBaitTotal";
     public const string ReceiveRoomSettings = "ReceiveRoomSettings";
     public const string ReceiveRoomInventory = "ReceiveRoomInventory";
     public const string ReceiveStoryFlags = "ReceiveStoryFlags";

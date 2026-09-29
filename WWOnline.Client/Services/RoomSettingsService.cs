@@ -5,7 +5,7 @@ using WWOnline.Shared.Models;
 namespace WWOnline.Services;
 
 /// <summary>
-/// The room's rules (shared wallet / world / items / story, other players' projectiles) as last pushed by the server, plus whether
+/// The room's rules (shared wallet / world / items / story / bait bag, other players' projectiles) as last pushed by the server, plus whether
 /// this client is the room owner. Sync services check <see cref="Current"/> every tick; the
 /// dashboard shows it and lets the room owner change it.
 /// </summary>
@@ -41,7 +41,8 @@ public class RoomSettingsService : IDisposable
         catch (Exception ex) { Logger.Warning(ex, "[room] failed to fetch room settings"); }
     });
 
-    public Task SetAsync(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory, bool sharedProjectiles)
+    public Task SetAsync(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory, bool sharedProjectiles,
+                         bool sharedBait)
     {
         var requested = Current.Clone();
         requested.SharedWallet = sharedWallet;
@@ -49,6 +50,7 @@ public class RoomSettingsService : IDisposable
         requested.SharedItems = sharedItems;
         requested.SharedStory = sharedStory;
         requested.SharedProjectiles = sharedProjectiles;
+        requested.SharedBait = sharedBait;
         return _signalR.SetRoomSettingsAsync(requested);
     }
 
@@ -57,7 +59,7 @@ public class RoomSettingsService : IDisposable
     {
         var requested = Current.Clone().ApplyPreset(preset);
         return SetAsync(requested.SharedWallet, requested.SharedWorld, requested.SharedItems, requested.SharedStory,
-                        requested.SharedProjectiles);
+                        requested.SharedProjectiles, requested.SharedBait);
     }
 
     private void Apply(RoomSettings settings)
@@ -66,7 +68,7 @@ public class RoomSettingsService : IDisposable
         Current = settings;
         if (old.SharedWallet != settings.SharedWallet || old.SharedWorld != settings.SharedWorld ||
             old.SharedItems != settings.SharedItems || old.SharedStory != settings.SharedStory ||
-            old.SharedProjectiles != settings.SharedProjectiles ||
+            old.SharedProjectiles != settings.SharedProjectiles || old.SharedBait != settings.SharedBait ||
             old.OwnerConnectionId != settings.OwnerConnectionId)
         {
             Logger.Information("[room] rules: {Rules}; owner {Owner}{Me}",
