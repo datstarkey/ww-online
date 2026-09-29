@@ -92,6 +92,11 @@ public class BoatState
     [JsonPropertyName("flying")]
     public bool Flying { get; set; }
 
+    /// <summary>Nobody aboard: the boat is where its player left it (on the sea, they're ashore or swimming).
+    /// Receivers draw it empty; speed is 0.</summary>
+    [JsonPropertyName("parked")]
+    public bool Parked { get; set; }
+
     // The pose, as daShip_c's body/head joint callbacks and its two morfs use it (d_a_ship.cpp:110-231).
 
     /// <summary>m0392 == FN_MAST_ON2: the mast bck is the raise (else FN_MAST_OFF2, the lower).</summary>
@@ -386,6 +391,16 @@ public class AppearanceState
 
     [JsonPropertyName("colorB")]
     public byte ColorB { get; set; } = 35;
+
+    /// <summary>Boat hull colour (the King of Red Lions' red), 0,0,0 = the classic red.</summary>
+    [JsonPropertyName("boatR")]
+    public byte BoatR { get; set; }
+
+    [JsonPropertyName("boatG")]
+    public byte BoatG { get; set; }
+
+    [JsonPropertyName("boatB")]
+    public byte BoatB { get; set; }
 }
 
 /// <summary>

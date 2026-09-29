@@ -25,6 +25,8 @@ public class GameSettings
     public byte TunicColorR { get; set; } = PuppetLayout.TUNIC_COLOR_DEFAULT_R;      // Default = vanilla tunic
     public byte TunicColorG { get; set; } = PuppetLayout.TUNIC_COLOR_DEFAULT_G;
     public byte TunicColorB { get; set; } = PuppetLayout.TUNIC_COLOR_DEFAULT_B;
+    /// <summary>The boat hull colour's name on the Appearance page (AppearanceViewModel.BoatPresets).</summary>
+    public string BoatColorName { get; set; } = "Match tunic";
 
     /// <summary>Draw the other players' names above their Links (Appearance page, live).</summary>
     public bool ShowPlayerNames { get; set; } = true;

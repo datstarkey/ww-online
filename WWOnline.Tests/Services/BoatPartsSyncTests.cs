@@ -121,6 +121,23 @@ public class BoatPartsSyncTests
     }
 
     [Fact]
+    public void Flags_MarkAParkedBoat()
+    {
+        Assert.Equal(0u, PuppetSyncService.BoatFlags(new BoatState()) & PuppetLayout.PUPPET_BOAT_FLAG_PARKED);
+        uint parked = PuppetSyncService.BoatFlags(new BoatState { Parked = true });
+        Assert.NotEqual(0u, parked & PuppetLayout.PUPPET_BOAT_FLAG_PARKED);
+        Assert.NotEqual(0u, parked & PuppetLayout.PUPPET_BOAT_FLAG_ACTIVE); // still drawn
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, 0x0000)]       // classic red
+    [InlineData(255, 255, 255, 0xFFFF)]
+    [InlineData(30, 60, 180, 0x19F6)]
+    [InlineData(4, 2, 4, 0x0001)]       // encodes to 0: sent as 1, not "classic"
+    public void BoatColor565_IsTheHullPaletteFormat(byte r, byte g, byte b, int expected) =>
+        Assert.Equal(expected, PuppetSyncService.BoatColor565(new AppearanceState { BoatR = r, BoatG = g, BoatB = b }));
+
+    [Fact]
     public void CannonAndCraneWords_AreBigEndianAtTheSharedOffsets()
     {
         var boat = new BoatState { CannonYaw = -0x1234, CannonPitch = 0x3FFF, CraneAngle = -0x3800, RopeLength = 123 };

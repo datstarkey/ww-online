@@ -303,11 +303,23 @@ public class PuppetSyncService : IDisposable
     /// <summary>A riding peer's boat FLAGS word (PUPPET_BOAT_OFF_FLAGS).</summary>
     public static uint BoatFlags(BoatState boat) =>
         PuppetLayout.PUPPET_BOAT_FLAG_ACTIVE
+        | (boat.Parked ? PuppetLayout.PUPPET_BOAT_FLAG_PARKED : 0u)
         | (boat.Flying ? PuppetLayout.PUPPET_BOAT_FLAG_FLY : 0u)
         | (boat.MastRaised ? PuppetLayout.PUPPET_BOAT_FLAG_MAST_ON : 0u)
         | (boat.MastHidden ? PuppetLayout.PUPPET_BOAT_FLAG_MAST_HIDE : 0u)
         | (uint)(boat.Part & PuppetLayout.PUPPET_BOAT_PART_MASK) << PuppetLayout.PUPPET_BOAT_PART_SHIFT
         | (uint)(boat.HeadBck & PuppetLayout.PUPPET_BOAT_HEAD_BCK_MASK) << PuppetLayout.PUPPET_BOAT_HEAD_BCK_SHIFT;
+
+    /// <summary>
+    /// A player's hull colour for the slot (PUPPET_SLOT_OFF_BOAT_COLOR): RGB565, 0 = the classic red. A real colour
+    /// that encodes to 0 (black) is sent as 0x0001 so it isn't read as "classic".
+    /// </summary>
+    public static ushort BoatColor565(AppearanceState a)
+    {
+        if (a.BoatR == 0 && a.BoatG == 0 && a.BoatB == 0) return 0;
+        ushort c = (ushort)((a.BoatR >> 3) << 11 | (a.BoatG >> 2) << 5 | a.BoatB >> 3);
+        return c == 0 ? (ushort)1 : c;
+    }
 
     /// <summary>A boat's cannon word (PUPPET_BOAT_CANNON_*, big-endian) into <paramref name="dest"/>.</summary>
     public static void EncodeBoatCannon(BoatState boat, byte[] dest)
@@ -947,6 +959,7 @@ public class PuppetSyncService : IDisposable
                         slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorR] = puppet.Appearance.ColorR;
                         slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorG] = puppet.Appearance.ColorG;
                         slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorB] = puppet.Appearance.ColorB;
+                        WriteBigEndianU16(slotData, PuppetLayout.PUPPET_SLOT_OFF_BOAT_COLOR, BoatColor565(puppet.Appearance));
 
                         // v2 extended state — full animation-relevant Link fields.
                         WriteBigEndianFloat(slotData, GameMemoryAddresses.PuppetSync.SlotOffset_SpeedF,         puppet.Action.SpeedF);
@@ -1202,11 +1215,14 @@ public class PuppetSyncService : IDisposable
                     ColorR = appearance.ColorR,
                     ColorG = appearance.ColorG,
                     ColorB = appearance.ColorB,
+                    BoatR = appearance.BoatR,
+                    BoatG = appearance.BoatG,
+                    BoatB = appearance.BoatB,
                 },
                 StageName = stageName,
                 RoomNumber = roomNumber ?? 0,
                 Timestamp = DateTime.UtcNow,
-                Boat = ReadLocalBoat(curProc),
+                Boat = ReadLocalBoat(curProc, stageName),
                 Warp = LocalWarp,
             };
             // Body / face anims for the procs other players' RELs have no init for (puppet_anmmirror.c).
@@ -1226,17 +1242,21 @@ public class PuppetSyncService : IDisposable
     /// bit OR a ship proc: the REL zeroes the status words while a puppet executes (puppet_execute.c
     /// guard), so a status read can land mid-puppet and miss the bit.
     /// </summary>
-    private BoatState? ReadLocalBoat(byte curProc)
+    private BoatState? ReadLocalBoat(byte curProc, string stageName)
     {
         uint status0 = ReadBigEndianU32FromAddress(GameMemoryAddresses.Player.PlayerStatusBitfield0.Address);
         bool riding = (status0 & GameMemoryAddresses.Sea.PlayerStatus0ShipRide) != 0
                       || curProc is >= GameMemoryAddresses.Sea.ProcShipFirst and <= GameMemoryAddresses.Sea.ProcShipLast
                       || curProc == GameMemoryAddresses.Sea.ProcDemoShipSit;
-        if (!riding)
+        // Not aboard: the boat left on the Great Sea still shows, parked. Only on the sea stage, and only while the
+        // ship pointer is a live daShip_c (play.mpPlayerPtr[2] isn't cleared when a stage without the boat loads).
+        if (!riding && stageName != GameMemoryAddresses.Sea.SeaStageName)
             return null;
 
         uint ship = ReadPointer(GameMemoryAddresses.Sea.ShipActorPtr);
         if (ship == 0)
+            return null;
+        if (!riding && ReadBigEndianU16FromAddress(ship + GameMemoryAddresses.Sea.ActorOffsetProcName) != GameMemoryAddresses.Sea.ProcNameShip)
             return null;
 
         var boat = new BoatState
@@ -1247,9 +1267,11 @@ public class PuppetSyncService : IDisposable
                 ReadBigEndianFloat(ship + GameMemoryAddresses.Sea.ShipOffsetPosX + 8)),
             Rotation = (short)ReadBigEndianU16FromAddress(ship + GameMemoryAddresses.Sea.ShipOffsetRotY),
             SpeedF = ReadBigEndianFloat(ship + GameMemoryAddresses.Sea.ShipOffsetSpeedF),
-            Flying = (ReadBigEndianU32FromAddress(ship + GameMemoryAddresses.Sea.ShipOffsetStateFlag)
-                      & GameMemoryAddresses.Sea.ShipStateFly) != 0,
+            Flying = riding && (ReadBigEndianU32FromAddress(ship + GameMemoryAddresses.Sea.ShipOffsetStateFlag)
+                                & GameMemoryAddresses.Sea.ShipStateFly) != 0,
+            Parked = !riding,
         };
+        if (boat.Parked) boat.SpeedF = 0; // drifting to a stop: no prediction on the receiver
         ReadLocalBoatPose(ship, boat);
         return boat.IsValid() ? boat : null;
     }

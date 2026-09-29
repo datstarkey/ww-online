@@ -180,6 +180,51 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Boat colour -->
+                    <Border Classes="ww-card" Padding="24,22">
+                        <StackPanel Spacing="16">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Border Width="20" Height="20" CornerRadius="6" Background="{Binding BoatPreviewBrush}"
+                                            BorderBrush="{StaticResource OutlineBrush}" BorderThickness="1" VerticalAlignment="Center" />
+                                    <TextBlock Text="Boat colour" Classes="ww-card-title" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <Border Grid.Column="1" Classes="ww-pill on">
+                                    <TextBlock Text="{Binding SelectedBoatColor.Name}" />
+                                </Border>
+                            </Grid>
+
+                            <ItemsControl ItemsSource="{Binding BoatSwatches}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TunicSwatchViewModel">
+                                        <Button Classes="ww-bare" Margin="0,0,12,12" ToolTip.Tip="{Binding Name}"
+                                                AutomationProperties.Name="{Binding Name}"
+                                                Command="{Binding $parent[UserControl].((vm:AppearanceViewModel)DataContext).SelectBoatColorCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Spacing="6">
+                                                <Border Classes="swatch-ring" Classes.selected="{Binding IsSelected}">
+                                                    <Border CornerRadius="15" Background="{Binding Brush}"
+                                                            BorderBrush="#33FFFFFF" BorderThickness="1">
+                                                        <Viewbox Width="26" Height="26" IsVisible="{Binding IsSelected}">
+                                                            <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{Binding CheckBrush}" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </Border>
+                                                <TextBlock Text="{Binding Name}" Classes="swatch-name" Classes.selected="{Binding IsSelected}" />
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Text="The red of your King of Red Lions, as the other players see it (sailing or parked). Match tunic uses your tunic colour, like the sail. Your own boat stays red on your screen."
+                                       FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource Text2Brush}" />
+                        </StackPanel>
+                    </Border>
+
                     <!-- Player names -->
                     <Border Classes="ww-card" Padding="24,22">
                         <StackPanel Spacing="12">
