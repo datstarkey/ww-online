@@ -273,6 +273,41 @@ public class RoomInventoryMemoryTests
         Assert.True(reread.GainsOver(after).IsEmpty);
     }
 
+    [Theory]
+    [InlineData(false, false, 0)]
+    [InlineData(true, false, 16)]
+    [InlineData(true, true, 32)]
+    [InlineData(false, true, 32)]
+    public void MagicFromFlags_DekuLeafGivesTheMeter_TheGreatFairyDoublesIt(bool leaf, bool fairy, int expected) =>
+        Assert.Equal(expected, RoomInventory.MagicFromFlags(leaf, fairy));
+
+    [Fact]
+    public void Read_MaxMagic_ComesFromTheFlags_NotTheGamesByte()
+    {
+        Assert.Equal(GameMemoryAddresses.Events.EventBits + 0x31, GameMemoryAddresses.Events.DoubleMagicEventByte.Address);
+        // A second Deku Leaf pickup took the game's own byte to 32 (item_func_deku_leaf adds 16 each time).
+        _game.Set(GameMemoryAddresses.Player.MaxMagicMeter.Address, 32);
+        Assert.Equal(0, RoomInventoryMemory.Read(_game)!.MaxMagic); // no leaf, no fairy
+        _game.Set(GameMemoryAddresses.Inventory.ItemSlots.Address + RoomInventory.DekuLeafSlot, 0x34);
+        Assert.Equal(16, RoomInventoryMemory.Read(_game)!.MaxMagic);
+        _game.Set(GameMemoryAddresses.Events.DoubleMagicEventByte.Address, 0x80);
+        Assert.Equal(32, RoomInventoryMemory.Read(_game)!.MaxMagic);
+    }
+
+    [Fact]
+    public void Apply_PutsTheGamesMaxMagicBack_WhenOnlyItsOwnByteIsOff()
+    {
+        _game.Set(GameMemoryAddresses.Inventory.ItemSlots.Address + RoomInventory.DekuLeafSlot, 0x34);
+        _game.Set(GameMemoryAddresses.Player.MaxMagicMeter.Address, 32, 32); // max, current
+        var local = RoomInventoryMemory.Read(_game)!; // 16: from the flags
+        var room = local.Clone();
+
+        RoomInventoryMemory.Apply(_game, room, local, applySword: false, applyShield: false, []);
+
+        Assert.Equal(16, _game.Get(GameMemoryAddresses.Player.MaxMagicMeter.Address));
+        Assert.Equal(16, _game.Get(GameMemoryAddresses.Player.CurrentMagicMeter.Address));
+    }
+
     [Fact]
     public void Apply_EquippedSwordNotForced_WhenCallerSaysUnchanged()
     {

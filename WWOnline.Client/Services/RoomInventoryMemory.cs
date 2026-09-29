@@ -45,7 +45,7 @@ public static class RoomInventoryMemory
             TriforceShards = B(GameMemoryAddresses.Inventory.TriforceShards),
             Pearls = B(GameMemoryAddresses.Inventory.PearlsBitfield),
             MaxHealth = U16(GameMemoryAddresses.Player.MaxHealth),
-            MaxMagic = B(GameMemoryAddresses.Player.MaxMagicMeter),
+            // Derived from the flags (RoomInventory.MagicFromFlags), set below; Apply compares with the game's own byte.
             MaxArrows = B(GameMemoryAddresses.Inventory.MaxArrows),
             MaxBombs = B(GameMemoryAddresses.Inventory.MaxBombs),
             WalletSize = B(GameMemoryAddresses.Player.CurrentWallet),
@@ -56,6 +56,9 @@ public static class RoomInventoryMemory
         Array.Copy(buf, GetFlagsAddr - BlockStart, inv.ItemGetFlags, 0, RoomInventory.SlotCount);
         if (ReadSeaMap(dolphin) is not { } seaMap) return null;
         inv.SeaMap = seaMap;
+        if (dolphin.Read(GameMemoryAddresses.Events.DoubleMagicEventByte) is not byte magicEvents) return null;
+        inv.MaxMagic = RoomInventory.MagicFromFlags(inv.Items[RoomInventory.DekuLeafSlot] != RoomInventory.NoItem,
+            (magicEvents & (RoomInventory.DoubleMagicEventFlag & 0xFF)) != 0);
         // Unknown equip ids (e.g. mid-cutscene values) read as "none" so they never become gains.
         if (RoomInventory.SwordTier(inv.EquippedSword) == 0) inv.EquippedSword = RoomInventory.NoItem;
         if (RoomInventory.ShieldTier(inv.EquippedShield) == 0) inv.EquippedShield = RoomInventory.NoItem;
@@ -147,7 +150,7 @@ public static class RoomInventoryMemory
             if (dolphin.Read(GameMemoryAddresses.Player.CurrentHealth) is ushort hp && hp > room.MaxHealth)
                 dolphin.Write(GameMemoryAddresses.Player.CurrentHealth, room.MaxHealth);
         }
-        if (room.MaxMagic != local.MaxMagic)
+        if (room.MaxMagic != (dolphin.Read(GameMemoryAddresses.Player.MaxMagicMeter) ?? local.MaxMagic))
         {
             dolphin.Write(GameMemoryAddresses.Player.MaxMagicMeter, room.MaxMagic);
             after.MaxMagic = room.MaxMagic;

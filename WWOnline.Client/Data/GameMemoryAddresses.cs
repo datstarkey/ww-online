@@ -215,6 +215,7 @@ public static class GameMemoryAddresses
         // dSv_save_c /* 0x624 */ mEvent; isEventBit(no) = mFlags[no >> 8] & (no & 0xFF) (d_save.cpp:1197).
         // playerInit tests EVENT_BIT_HERO_CLOTHES there (DOL 0x80125AD0: addi r3,r3,0x624; li r4,0x2A80).
         public const uint EventBits = GameInfo + 0x624;
+        public static readonly MemoryAddress<byte> DoubleMagicEventByte = new(EventBits + (WWOnline.Shared.Models.RoomInventory.DoubleMagicEventFlag >> 8), "DoubleMagicEventByte", "Event byte holding the double-magic Great Fairy's bit (0x3180)");
         public static readonly MemoryAddress<byte> HeroClothesEventByte = new(EventBits + (PuppetLayout.EVENT_BIT_HERO_CLOTHES >> 8), "HeroClothesEventByte", "Event byte holding the hero's-clothes bit (EVENT_BIT_HERO_CLOTHES)");
         public static readonly MemoryAddress<uint> EventControlStructure = new(0x803C9DE0, "EventControlStructure", "Event control structure");
         public static readonly ByteArrayMemoryAddress EventFlagBitfield = new(0x803C9F10, 1280, "EventFlagBitfield", "Extended event flag bitfield");
@@ -473,6 +474,10 @@ public static class GameMemoryAddresses
         /// 0x5B76(gameInfo)); dMeter_LifeMove adds it to mMaxLife clamped 0..80, zeroes it, refills life on a gain and
         /// clamps it on a loss, and animates the heart row (d_meter.cpp:1405-1433).</summary>
         public static readonly MemoryAddress<short> PendingMaxLife = new(Play + 0x48D6, "PendingMaxLife", "Max-life change queued for the HUD (dComIfGp_setItemMaxLifeCount)");
+        /// <summary>dComIfG_play_c::mItemMaxMagicCount (d_com_inf_game.h 0x48DC, beside mItemMaxLifeCount): the max-magic
+        /// gain the Deku Leaf / Great Fairy queued, which the magic meter adds to mMaxMagic (capped at 32) and zeroes
+        /// (d_meter.cpp:4045-4052).</summary>
+        public static readonly MemoryAddress<short> PendingMaxMagic = new(Play + 0x48DC, "PendingMaxMagic", "Max-magic change queued for the HUD (dComIfGp_setItemMaxMagicCount)");
     }
 
     /// <summary>

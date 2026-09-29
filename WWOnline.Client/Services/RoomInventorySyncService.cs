@@ -279,6 +279,7 @@ public class RoomInventorySyncService : IDisposable
             }
         }
         _baseline = local; // losses (story events, drinking a bottle...) are never sent
+        ClampMaxMagic(local.MaxMagic);
 
         // 2. Apply the newest room state — but not while our gains are in flight: the push that
         //    includes them is on its way, and an older one would take them away again.
@@ -307,6 +308,24 @@ public class RoomInventorySyncService : IDisposable
     /// didn't stick, write it once more; if the REL is mid-swap, try again next tick (for at most
     /// <see cref="EquipVerifyMaxTicks"/>). Only ever after a push that changed the room's choice.
     /// </summary>
+    /// <summary>
+    /// Max magic is derived from the flags (<see cref="RoomInventory.MagicFromFlags"/>), but the game adds 16 again
+    /// on every Deku Leaf pickup: a player picking one up after the room shared the meter went to double magic. Put
+    /// the game's own byte back to what the flags (or the room) allow at once, not only on the next push. Not during
+    /// an event, the pause menu or with a gain still queued for the meter: the Great Fairy raises it in her event and
+    /// sets her flag only when it ends.
+    /// </summary>
+    private void ClampMaxMagic(byte derived)
+    {
+        byte allowed = Math.Max(derived, _lastApplied?.MaxMagic ?? (byte)0);
+        if (_dolphin.Read(GameMemoryAddresses.Player.MaxMagicMeter) is not byte game || game <= allowed) return;
+        if (!SceneStabilityGate.IsIdle(_dolphin) || _dolphin.Read(GameMemoryAddresses.Hearts.PendingMaxMagic) is not 0) return;
+        _dolphin.Write(GameMemoryAddresses.Player.MaxMagicMeter, allowed);
+        if (_dolphin.Read(GameMemoryAddresses.Player.CurrentMagicMeter) is byte mp && mp > allowed)
+            _dolphin.Write(GameMemoryAddresses.Player.CurrentMagicMeter, allowed);
+        Logger.Information("[items] max magic {Game} is more than the flags give ({Allowed}): set back to {Allowed}", game, allowed, allowed);
+    }
+
     private void VerifyEquipped(RoomInventory local)
     {
         if (_verifySword == null && _verifyShield == null) return;

@@ -51,6 +51,21 @@ public class RoomInventory
     // Level limits (validation)
     public const ushort MaxHealthLimit = 80; // 20 hearts, in quarter hearts
     public const byte MaxMagicLimit = 32;
+
+    /// <summary>Items slot of the Deku Leaf (dInvSlot_DEKU_LEAF_e).</summary>
+    public const int DekuLeafSlot = 6;
+    /// <summary>Event flag set when the Great Fairy who doubles the magic meter (daBigelf type 6, the one whose gift
+    /// isn't a wallet / bomb bag / quiver upgrade: getEventFlag 0x3180) ends her event.</summary>
+    public const int DoubleMagicEventFlag = 0x3180;
+
+    /// <summary>
+    /// Max magic from the flags that grant it, never from the game's own byte: the meter comes with the Deku Leaf
+    /// (item_func_deku_leaf, d_item.cpp:810-815: +16) and the Great Fairy doubles it (item_func_max_mp_up1: +32,
+    /// capped at 32). The game ADDS 16 on every Deku Leaf pickup, so a second player picking one up after the room
+    /// shared the meter read as double magic (2026-09-29).
+    /// </summary>
+    public static byte MagicFromFlags(bool hasDekuLeaf, bool doubleMagic) =>
+        doubleMagic ? MaxMagicLimit : hasDekuLeaf ? (byte)16 : (byte)0;
     public const byte MaxAmmoLimit = 99;
     public const byte MaxWalletSize = 2;
 
