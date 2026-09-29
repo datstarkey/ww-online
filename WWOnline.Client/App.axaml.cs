@@ -45,6 +45,7 @@ public partial class App : Application
         services.AddSingleton<RoomInventorySyncService>();
         services.AddSingleton<WorldFlagSyncService>();
         services.AddSingleton<SharedWalletService>();
+        services.AddSingleton<SharedBaitService>();
         services.AddSingleton<StorySyncService>();
         services.AddSingleton<SmallKeyTableProvider>();
         services.AddSingleton<SharedSmallKeyService>();

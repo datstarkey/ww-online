@@ -107,8 +107,8 @@ public static class ItemIDs
     /// </summary>
     public static class Bait
     {
-        public const byte HyoiPear = 0x27;           // Hyoi Pear (control seagulls)
-        public const byte AllPurposeBait = 0x28;     // All-Purpose Bait
+        public const byte AllPurposeBait = 0x82;     // All-Purpose Bait (d_item_data.h dItemNo_BIRD_BAIT_5_e)
+        public const byte HyoiPear = 0x83;           // Hyoi Pear, control seagulls (dItemNo_HYOI_PEAR_e)
     }
     
     /// <summary>

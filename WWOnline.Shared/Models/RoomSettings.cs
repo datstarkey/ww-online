@@ -1,7 +1,7 @@
 namespace WWOnline.Shared.Models;
 
 /// <summary>
-/// Room rules (shared wallet / world / items / story, other players' projectiles), owned by the server. Defaults come from the server's command line; the room owner (the
+/// Room rules (shared wallet / world / items / story / bait bag, other players' projectiles), owned by the server. Defaults come from the server's command line; the room owner (the
 /// player who started the server, else the earliest-joined player still connected) can change them at runtime. Clients pause the matching
 /// sync while a rule is off, and the server ignores that sync's messages.
 /// </summary>
@@ -20,6 +20,12 @@ public class RoomSettings
     public bool SharedStory { get; set; } = true;
 
     /// <summary>
+    /// The bait bag's All-Purpose Bait and Hyoi Pears are one room total (BaitCounts): anyone's purchase,
+    /// pickup or use changes everyone's bag. Seeded by the room owner's bag, then changed by deltas.
+    /// </summary>
+    public bool SharedBait { get; set; } = true;
+
+    /// <summary>
     /// Other players' bombs, boat-cannon shots and arrows are real in your world: they fly, explode and hit
     /// your enemies and walls. When off the server drops those events and clients don't spawn them; the
     /// carried-bomb model and aim poses still show. It shares no progress (only what players see each other
@@ -35,13 +41,13 @@ public class RoomSettings
     public RoomSettings Clone() => (RoomSettings)MemberwiseClone();
 
     /// <summary>
-    /// "Full sync" = every rule on; "Co-op" = the four progress rules (wallet, world, items, story) off and
+    /// "Full sync" = every rule on; "Co-op" = the progress rules (wallet, world, items, story, bait bag) off and
     /// other players' projectiles on (players see each other and fight together, progress stays per save).
     /// </summary>
-    public RoomPreset MatchingPreset() => (SharedWallet, SharedWorld, SharedItems, SharedStory, SharedProjectiles) switch
+    public RoomPreset MatchingPreset() => (SharedWallet, SharedWorld, SharedItems, SharedStory, SharedBait, SharedProjectiles) switch
     {
-        (true, true, true, true, true) => RoomPreset.FullSync,
-        (false, false, false, false, true) => RoomPreset.Coop,
+        (true, true, true, true, true, true) => RoomPreset.FullSync,
+        (false, false, false, false, false, true) => RoomPreset.Coop,
         _ => RoomPreset.Custom,
     };
 
@@ -53,14 +59,14 @@ public class RoomSettings
     {
         if (preset == RoomPreset.Custom) return this;
         bool on = preset == RoomPreset.FullSync;
-        SharedWallet = SharedWorld = SharedItems = SharedStory = on;
+        SharedWallet = SharedWorld = SharedItems = SharedStory = SharedBait = on;
         SharedProjectiles = true;
         return this;
     }
 
     public string RulesSummary() =>
         $"shared wallet {OnOff(SharedWallet)}, shared world {OnOff(SharedWorld)}, shared items {OnOff(SharedItems)}, " +
-        $"shared story {OnOff(SharedStory)}, other players' projectiles {OnOff(SharedProjectiles)}";
+        $"shared story {OnOff(SharedStory)}, shared bait bag {OnOff(SharedBait)}, other players' projectiles {OnOff(SharedProjectiles)}";
 
     private static string OnOff(bool b) => b ? "ON" : "OFF";
 }
@@ -71,10 +77,10 @@ public enum RoomPreset
     /// <summary>Any other mix of rules.</summary>
     Custom,
 
-    /// <summary>Wallet, world, items and story all shared; other players' projectiles on.</summary>
+    /// <summary>Wallet, world, items, story and bait bag all shared; other players' projectiles on.</summary>
     FullSync,
 
-    /// <summary>No progress shared (wallet, world, items, story off): players see each other, and
+    /// <summary>No progress shared (wallet, world, items, story, bait bag off): players see each other, and
     /// other players' projectiles stay on.</summary>
     Coop,
 }

@@ -62,6 +62,7 @@ public class GameHub : Hub<IGameHubClient>
         ItemsSeedGate.Forget(connectionId);
         StorySeedGate.Forget(connectionId);
         WalletSeedGate.Forget(connectionId);
+        BaitSeedGate.Forget(connectionId);
         RoomSwitchState.Leave(connectionId);
 
         if (exception != null)
@@ -155,13 +156,13 @@ public class GameHub : Hub<IGameHubClient>
 
     /// <summary>Server defaults from the command line (Program.cs), before anyone connects.</summary>
     public static void ConfigureRoomDefaults(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory,
-                                             bool sharedProjectiles = true)
+                                             bool sharedProjectiles = true, bool sharedBait = true)
     {
         lock (RoomLock)
             _roomSettings = new RoomSettings
             {
                 SharedWallet = sharedWallet, SharedWorld = sharedWorld, SharedItems = sharedItems, SharedStory = sharedStory,
-                SharedProjectiles = sharedProjectiles,
+                SharedProjectiles = sharedProjectiles, SharedBait = sharedBait,
             };
     }
 
@@ -269,16 +270,18 @@ public class GameHub : Hub<IGameHubClient>
             return;
         }
 
-        bool walletTurnedOff, worldTurnedOff;
+        bool walletTurnedOff, worldTurnedOff, baitTurnedOff;
         lock (RoomLock)
         {
             walletTurnedOff = _roomSettings.SharedWallet && !requested.SharedWallet;
             worldTurnedOff = _roomSettings.SharedWorld && !requested.SharedWorld;
+            baitTurnedOff = _roomSettings.SharedBait && !requested.SharedBait;
             _roomSettings.SharedWallet = requested.SharedWallet;
             _roomSettings.SharedWorld = requested.SharedWorld;
             _roomSettings.SharedItems = requested.SharedItems;
             _roomSettings.SharedStory = requested.SharedStory;
             _roomSettings.SharedProjectiles = requested.SharedProjectiles;
+            _roomSettings.SharedBait = requested.SharedBait;
         }
         if (walletTurnedOff)
         {
@@ -287,6 +290,14 @@ public class GameHub : Hub<IGameHubClient>
             Wallet.Reset();
             WalletSeedGate.Reset();
             Logger.Information("[wallet] shared wallet turned off — total cleared; it re-seeds when turned back on");
+        }
+        if (baitTurnedOff)
+        {
+            // Everyone keeps their own bag now; when it's back on it re-seeds (owner first) and every
+            // client rejoins, like the wallet.
+            Bait.Reset();
+            BaitSeedGate.Reset();
+            Logger.Information("[bait] shared bait bag turned off — counts cleared; it re-seeds when turned back on");
         }
         if (worldTurnedOff)
         {
@@ -508,6 +519,59 @@ public class GameHub : Hub<IGameHubClient>
         }
         Logger.Information("[wallet] {Player} {Delta:+#;-#} → {Total}", GetPlayerName(Context.ConnectionId), delta, total);
         await Clients.All.ReceiveRupeeTotal(total);
+    }
+
+    // ── Shared bait bag ──────────────────────────────────────────────────────
+
+    private static readonly BaitStore Bait = new();
+    private static readonly OwnerSeedGate BaitSeedGate = new();
+
+    /// <summary>
+    /// A client whose game has the bait bag attaches it. The room owner's bag seeds the shared counts
+    /// (with no claimed owner the first joiner does; see <see cref="OwnerSeedGate"/>); everyone gets the
+    /// counts back and writes them into their own bag. Null when the rule is off, the payload is
+    /// malformed, or the bag is still waiting for its owner (the client retries).
+    /// </summary>
+    public Task<BaitCounts?> JoinBait(BaitCounts current)
+    {
+        if (!RoomRules.SharedBait) return Task.FromResult<BaitCounts?>(null); // room rule off: keep your own
+        if (current == null || !current.IsValidTotal())
+        {
+            Logger.Warning("[bait] JoinBait rejected: invalid bag {Bag} from {Player}",
+                current?.ToString() ?? "null", GetPlayerName(Context.ConnectionId));
+            return Task.FromResult<BaitCounts?>(null);
+        }
+        if (CheckSeedGate(BaitSeedGate, Bait.IsSeeded, "bait", "shared bait bag") is not { } decision)
+            return Task.FromResult<BaitCounts?>(null);
+
+        var (total, seeded) = Bait.Join(current);
+        if (seeded)
+        {
+            BaitSeedGate.Reset();
+            LogSeeded("bait", "shared bait bag", decision, BaitSeedGate, total.ToString());
+        }
+        return Task.FromResult<BaitCounts?>(total);
+    }
+
+    /// <summary>A client used (-) or gained (+) bait / Hyoi Pears. Applied to the shared counts and pushed to everyone.</summary>
+    public async Task SendBaitDelta(BaitCounts delta)
+    {
+        if (!RoomRules.SharedBait) return; // room rule off
+        if (delta == null || !delta.IsValidDelta())
+        {
+            Logger.Warning("[bait] SendBaitDelta rejected: {Delta} from {Player}",
+                delta == null ? "null" : $"bait {delta.Bait}, pears {delta.Pears}", GetPlayerName(Context.ConnectionId));
+            return;
+        }
+        if (Bait.ApplyDelta(delta) is not { } total)
+        {
+            // Unseeded (e.g. just turned back on): the sender must rejoin first.
+            Logger.Warning("[bait] SendBaitDelta {Delta} from {Player} rejected: the bag isn't seeded (client must rejoin)",
+                delta.DeltaText(), GetPlayerName(Context.ConnectionId));
+            return;
+        }
+        Logger.Information("[bait] {Player} {Delta} → {Total}", GetPlayerName(Context.ConnectionId), delta.DeltaText(), total);
+        await Clients.All.ReceiveBaitTotal(total);
     }
 
     // ── Room inventory (shared items) ────────────────────────────────────────

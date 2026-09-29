@@ -44,6 +44,13 @@ public static class GameMemoryAddresses
         public static readonly MemoryAddress<byte> XButtonItem = new(0x803C4C11, "XButtonItem", "X button equipped item");
         public static readonly MemoryAddress<byte> YButtonItem = new(0x803C4C12, "YButtonItem", "Y button equipped item");
         public static readonly MemoryAddress<byte> ZButtonItem = new(0x803C4C13, "ZButtonItem", "Z button equipped item");
+        /// <summary>dSv_player_status_a_c /* 0x09 */ mSelectItem[5] (dComIfGs_getSelectItem): the INVENTORY SLOT
+        /// on X, Y, Z (bait bag slots are 36-43, dInvSlot_BaitFirst_e; 0xFF = none). Same bytes as X/Y/ZButtonItem.</summary>
+        public const uint SelectItemSlots = GameInfo + 0x09;
+        /// <summary>play.mSelectItem[4] (d_com_inf_game.h "/* 0x4933 */"; DOL setBaitItemChange 0x8005A0C0:
+        /// stb 0x5BD3(gameInfo)): the ITEM NUMBER on X, Y, Z that the HUD and Link use, refreshed from the
+        /// save's slot by dComIfGp_setSelectItem.</summary>
+        public const uint PlaySelectItems = Play + 0x4933;
         public static readonly MemoryAddress<byte> CurrentSword = new(0x803C4C16, "CurrentSword", "Currently equipped sword ID");
         public static readonly MemoryAddress<byte> CurrentShield = new(0x803C4C17, "CurrentShield", "Currently equipped shield ID");
         public static readonly MemoryAddress<byte> PowerBracelets = new(0x803C4C18, "PowerBracelets", "Equipped bracelets item id (mSelectEquip[2]; 0x28 = Power Bracelets)");
@@ -124,6 +131,15 @@ public static class GameMemoryAddresses
 
         // Bag contents
         public static readonly ByteArrayMemoryAddress BagContents = new(0x803C4C7E, 24, "BagContents", "Spoils, Bait, and Delivery bag contents");
+
+        // The bait bag (d_save.h). dSv_player_c /* 0x076 */ mBagItem -> dSv_player_bag_item_c /* 0x08 */
+        // mBait[8] (item numbers, 0xFF = empty); /* 0x090 */ mGetBagItem -> dSv_player_get_bag_item_c /* 0x5 */
+        // mBaitFlags (bit 0 All-Purpose Bait, bit 1 Hyoi Pear ever obtained: item_func_bird_esa_5 /
+        // item_func_animal_esa); /* 0x09C */ mBagItemRecord -> dSv_player_bag_item_record_c /* 0x08 */
+        // mBaitNum[8] (DOL setBaitItem 0x8005A294: gameInfo + 0x9C, stb 3 at +8+i).
+        public const uint BaitItems = GameInfo + 0x76 + 0x08;
+        public const uint BaitGetFlags = GameInfo + 0x90 + 0x5;
+        public const uint BaitNums = GameInfo + 0x9C + 0x08;
 
         // Capacities (dSv_player_c /* 0x06E */ mItemMax: +1 arrows, +2 bombs) — the COUNTS are
         // Player.CurrentArrowCount / CurrentBombCount (mItemRecord).
