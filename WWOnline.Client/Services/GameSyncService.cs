@@ -22,6 +22,7 @@ public class GameSyncService : IDisposable
     private readonly WorldFlagSyncService _worldFlagSync;
     private readonly SharedWalletService _sharedWallet;
     private readonly StorySyncService _storySync;
+    private readonly SharedSmallKeyService _smallKeys;
 
     private System.Timers.Timer? _puppetBroadcastTimer;
     private System.Timers.Timer? _gameStateBroadcastTimer;
@@ -40,7 +41,8 @@ public class GameSyncService : IDisposable
         RoomInventorySyncService roomInventorySync,
         WorldFlagSyncService worldFlagSync,
         SharedWalletService sharedWallet,
-        StorySyncService storySync)
+        StorySyncService storySync,
+        SharedSmallKeyService smallKeys)
     {
         _signalR = signalR;
         _puppetSync = puppetSync;
@@ -49,6 +51,7 @@ public class GameSyncService : IDisposable
         _worldFlagSync = worldFlagSync;
         _sharedWallet = sharedWallet;
         _storySync = storySync;
+        _smallKeys = smallKeys;
     }
 
     /// <summary>
@@ -87,6 +90,8 @@ public class GameSyncService : IDisposable
         _roomInventorySync.Start();
         // Shared story: event flags (story, cutscenes, side quests, NPC state) OR-merged across players
         _storySync.Start();
+        // Shared small keys: each dungeon's count derived from the shared world's flags
+        _smallKeys.Start();
 
         // Start puppet broadcast timer (reads local player and sends to server at 20Hz)
         _puppetBroadcastTimer = new System.Timers.Timer(50); // 20Hz — fast combo swings (~0.3s) need the extra samples
@@ -153,6 +158,7 @@ public class GameSyncService : IDisposable
         _sharedWallet.Stop();
         _roomInventorySync.Stop();
         _storySync.Stop();
+        _smallKeys.Stop();
 
         // Stop puppet sync (clears shared memory and slot assignments)
         _puppetSync.Stop();

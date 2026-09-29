@@ -203,7 +203,7 @@
                                         <Path Classes="icon" Data="{StaticResource IconInfo}" Stroke="{StaticResource Text2Brush}" />
                                     </Viewbox>
                                     <TextBlock Grid.Column="1" Margin="10,0,0,0" FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
-                                               Text="Never shared: bomb and arrow counts, bottle contents, health, magic and small keys." />
+                                               Text="Never shared: bomb and arrow counts, bottle contents, health and magic. Small keys are shared per dungeon (Shared world)." />
                                 </Grid>
                             </Border>
                         </StackPanel>

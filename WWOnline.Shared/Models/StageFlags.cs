@@ -5,7 +5,8 @@ namespace WWOnline.Shared.Models;
 /// memory switches, placed items collected, rooms visited, dungeon items/boss state).
 /// Shared-world sync treats these as a grow-only set: players' flags are OR-merged, so once
 /// anyone opens a chest or collects a placed rupee, it's done for everyone.
-/// Small-key counts are deliberately NOT synced (a count, not a flag).
+/// Small-key counts are not synced (a count, not a flag): each client derives them from these flags
+/// (keys taken - key doors opened, the client's SmallKeyReconciler).
 /// </summary>
 public class StageFlags
 {

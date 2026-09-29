@@ -169,6 +169,56 @@
                 </StackPanel>
             </Border>
         </DataTemplate>
+        <!-- ═══ Dungeons card: small keys (derived from the shared world), map, compass, boss key, boss ═══ -->
+        <DataTemplate x:Key="DungeonsCard" x:DataType="vm:DashboardViewModel">
+            <Border Classes="ww-card" Padding="22,20">
+                <StackPanel Spacing="4">
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,8">
+                        <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                            <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconKey}" Stroke="{StaticResource GoldCBrush}" />
+                        </Viewbox>
+                        <TextBlock Grid.Column="1" Text="DUNGEONS" Classes="ww-section-header" Margin="8,0,0,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="{Binding Dungeons.StateText}" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}" IsVisible="{Binding Dungeons.IsShared}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="{Binding Dungeons.StateText}" FontSize="12" FontWeight="SemiBold"
+                                   Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !Dungeons.IsShared}" VerticalAlignment="Center" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Dungeons.Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DungeonRowViewModel">
+                                <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,10">
+                                    <StackPanel Spacing="6">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding DetailText}" FontSize="12" Foreground="{StaticResource Text2Brush}"
+                                                           TextWrapping="Wrap" IsVisible="{Binding DetailText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Classes="ww-pill" Classes.on="{Binding HasKeys}" Margin="12,0,0,0"
+                                                    ToolTip.Tip="Small keys held" AutomationProperties.Name="Small keys held">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                                                        <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconKey}" Stroke="{StaticResource GoldCBrush}" />
+                                                    </Viewbox>
+                                                    <TextBlock Text="{Binding KeysText}" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+                                        <WrapPanel Orientation="Horizontal">
+                                            <Border Classes="ww-pill" Classes.on="{Binding HasMap}" Padding="9,3" Margin="0,0,6,0"><TextBlock Text="MAP" /></Border>
+                                            <Border Classes="ww-pill" Classes.on="{Binding HasCompass}" Padding="9,3" Margin="0,0,6,0"><TextBlock Text="COMPASS" /></Border>
+                                            <Border Classes="ww-pill" Classes.on="{Binding HasBossKey}" Padding="9,3" Margin="0,0,6,0"><TextBlock Text="BIG KEY" /></Border>
+                                            <Border Classes="ww-pill" Classes.on="{Binding BossBeaten}" Padding="9,3"><TextBlock Text="BOSS" /></Border>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding Dungeons.Note}" FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Panel>
@@ -531,6 +581,7 @@
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource WalletCard}" />
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ItemsCard}" />
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource FlagsCard}" />
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource DungeonsCard}" />
                         </StackPanel>
                     </Grid>
 
@@ -585,6 +636,7 @@
                         <StackPanel Grid.Column="2" Spacing="20" VerticalAlignment="Top">
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ItemsCard}" />
                             <ContentControl Content="{Binding}" ContentTemplate="{StaticResource FlagsCard}" />
+                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource DungeonsCard}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="4" Spacing="20">

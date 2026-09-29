@@ -331,7 +331,7 @@ public static class GameMemoryAddresses
         public const int OffSwitch = 0x04;      // u32[4]
         public const int OffItem = 0x14;        // u32
         public const int OffVisitedRoom = 0x18; // u32[2]
-        public const int OffKeyNum = 0x20;      // u8 — NOT synced (a count)
+        public const int OffKeyNum = 0x20;      // u8 mKeyNum — not a flag: derived from the flags (SmallKeyReconciler)
         public const int OffDungeonItem = 0x21; // u8
 
         public static uint SavedSlot(int slot) => SavedMemoryBase + (uint)(slot * MemorySize);
@@ -341,6 +341,20 @@ public static class GameMemoryAddresses
         /// (dStage_stagInfo_GetSaveTbl; DOL dComIfGs_onStageTbox 0x800538B0).</summary>
         public const uint StagInfoPtr = Play + 0x3EB0 + 0x48;  // play mStageData + mpStagInfo
         public const int StagSaveTblOffset = 0x09;
+        /// <summary>stage_stag_info_class::mProp bit 0 (the same byte as <see cref="StagSaveTblOffset"/>):
+        /// dStage_stagInfo_ChkKeyDisp, the stage shows the small-key HUD. dMeter_keyMove applies
+        /// <see cref="PendingKeyDelta"/> only then (DOL 0x801FCF58: lbz r0,9(stagInfo); clrlwi. r0,r0,31).</summary>
+        public const int StagKeyDispMask = 0x01;
+
+        /// <summary>The live mKeyNum of the current stage (dSv_info_c /* 0x0778 */ mMemory + dSv_memBit_c /* 0x20 */
+        /// mKeyNum) = 0x803C53A0. DOL dMeter_keyMove 0x801FCF78 / 0x801FCFB4: lbz / stb 0x798(gameInfo).</summary>
+        public const uint LiveKeyNum = LiveMemory + OffKeyNum;
+
+        /// <summary>play.mItemKeyNumCount (d_com_inf_game.h "/* 0x48D4 */ s16") = 0x803CA77C: the small-key change
+        /// queued for the HUD. item_func_small_key adds 1 (DOL 0x800C31B8: lha 0x5B74(gameInfo)), dDoor_key2_c::keyInit
+        /// subtracts 1 (0x8006C52C); dMeter_keyMove adds it to mKeyNum clamped 0..99, zeroes it and animates the HUD
+        /// digit (0x801FCF6C-0x801FCFBC) — only in a stage with <see cref="StagKeyDispMask"/>.</summary>
+        public static readonly MemoryAddress<short> PendingKeyDelta = new(Play + 0x48D4, "PendingKeyDelta", "Small-key change queued for the HUD (dComIfGp_setItemKeyNumCount)");
         /// <summary>play.mNextStage.mEnable (s8) — nonzero while a stage change is pending; the
         /// live copy and stag pointer are in flux then (putSave → getSave).</summary>
         public const uint NextStageEnable = Play + 0x3EA0 + 0x0C; // play mNextStage + mEnable

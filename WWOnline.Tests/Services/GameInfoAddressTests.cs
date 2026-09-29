@@ -22,6 +22,23 @@ public class GameInfoAddressTests
         Assert.Equal(0x803CA768u, GameMemoryAddresses.Player.PendingRupeeDelta.Address);
 
     [Fact]
+    public void SmallKeyAddresses_MatchTheVanillaDol()
+    {
+        // dMeter_keyMove (DOL 0x801FCF28): lha 0x5B74(gameInfo) = play.mItemKeyNumCount, lbz/stb 0x798(gameInfo) = the
+        // live mKeyNum, and lbz 9(stagInfo) bit 0 = ChkKeyDisp. item_func_small_key (0x800C31B0) and
+        // dDoor_key2_c::keyInit (0x8006C52C) change the same 0x5B74.
+        Assert.Equal(0x803CA77Cu, GameMemoryAddresses.WorldFlags.PendingKeyDelta.Address);
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x5B74, GameMemoryAddresses.WorldFlags.PendingKeyDelta.Address);
+        Assert.Equal(0x803C53A0u, GameMemoryAddresses.WorldFlags.LiveKeyNum);
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x798, GameMemoryAddresses.WorldFlags.LiveKeyNum);
+        Assert.Equal(0x09, GameMemoryAddresses.WorldFlags.StagSaveTblOffset);
+        Assert.Equal(0x01, GameMemoryAddresses.WorldFlags.StagKeyDispMask);
+        // Saved mKeyNum per dungeon slot (docs/small-keys.md §1): DRC 3, Wind Temple 7.
+        Assert.Equal(0x803C5014u, GameMemoryAddresses.WorldFlags.SavedSlot(3) + GameMemoryAddresses.WorldFlags.OffKeyNum);
+        Assert.Equal(0x803C50A4u, GameMemoryAddresses.WorldFlags.SavedSlot(7) + GameMemoryAddresses.WorldFlags.OffKeyNum);
+    }
+
+    [Fact]
     public void ClothesInputs_MatchPlayerInit()
     {
         // daPy_lk_c::playerInit (DOL 0x80125AC8-0x80125AEC): isEventBit(gameInfo + 0x624, 0x2A80) and

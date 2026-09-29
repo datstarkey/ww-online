@@ -36,12 +36,19 @@ public class Yaz0Codec
     /// <summary>
     /// Decompresses Yaz0-encoded data. Returns the original data unchanged if not Yaz0-compressed.
     /// </summary>
-    public static byte[] Decompress(byte[] compData)
+    public static byte[] Decompress(byte[] compData) => Decompress(compData, int.MaxValue);
+
+    /// <summary>
+    /// Decompresses only the first <paramref name="maxLength"/> bytes (or all, if the data is shorter):
+    /// enough to read an archive's header and one early file without inflating the whole thing.
+    /// Returns the original data unchanged if not Yaz0-compressed.
+    /// </summary>
+    public static byte[] Decompress(byte[] compData, int maxLength)
     {
         if (!CheckIsCompressed(compData))
             return compData;
 
-        int uncompSize = (int)BinaryPrimitives.ReadUInt32BigEndian(compData.AsSpan(4, 4));
+        int uncompSize = (int)Math.Min(BinaryPrimitives.ReadUInt32BigEndian(compData.AsSpan(4, 4)), (uint)Math.Max(maxLength, 0));
 
         var output = new byte[uncompSize];
         int outputLen = 0;
@@ -85,7 +92,7 @@ public class Yaz0Codec
                     numBytes += 2;
                 }
 
-                for (int i = 0; i < numBytes; i++)
+                for (int i = 0; i < numBytes && outputLen < uncompSize; i++)
                 {
                     output[outputLen] = output[copySrcOffset];
                     outputLen++;

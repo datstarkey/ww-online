@@ -50,6 +50,7 @@ internal sealed class FakeDolphin : IDolphinService
         uint a = address.Address;
         if (typeof(T) == typeof(byte)) return (T)(object)Get(a);
         if (typeof(T) == typeof(ushort)) return (T)(object)(ushort)(Get(a) << 8 | Get(a + 1));
+        if (typeof(T) == typeof(short)) return (T)(object)(short)(Get(a) << 8 | Get(a + 1));
         if (typeof(T) == typeof(uint)) return (T)(object)GetU32(a);
         if (typeof(T) == typeof(int)) return (T)(object)(int)GetU32(a);
         throw new NotSupportedException(typeof(T).Name);
@@ -62,6 +63,7 @@ internal sealed class FakeDolphin : IDolphinService
         {
             case byte b: Set(address.Address, b); break;
             case ushort u: Set(address.Address, (byte)(u >> 8), (byte)u); break;
+            case short s16: Set(address.Address, (byte)(s16 >> 8), (byte)s16); break;
             case uint u32: SetU32(address.Address, u32); break;
             case int i32: SetU32(address.Address, (uint)i32); break;
             default: throw new NotSupportedException(typeof(T).Name);

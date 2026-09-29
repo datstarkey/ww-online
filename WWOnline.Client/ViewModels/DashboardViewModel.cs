@@ -14,7 +14,7 @@ namespace WWOnline.ViewModels;
 /// The Room page (nav "Room"; class name kept from the old Dashboard). Composite: it surfaces the
 /// existing Server / GameState / GameLog / DebugTools view-models plus the Room items and Story
 /// flags sub-pages (<see cref="Items"/>, <see cref="Flags"/>), and owns the room rules card. Disconnected it shows the connect / host
-/// form; connected it shows the room: rules, players, wallet, room items, and for non-owners a
+/// form; connected it shows the room: rules, players, wallet, room items, dungeons, and for non-owners a
 /// "What's happening" feed.
 ///
 /// The room owner sees everything read-only until Edit room (<see cref="Edit"/>); rule toggles and
@@ -30,6 +30,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     public DebugToolsViewModel Tools { get; }
     public RoomItemsViewModel Items { get; }
     public RoomFlagsViewModel Flags { get; }
+
+    /// <summary>The Dungeons card: small keys, map, compass, boss key and boss per dungeon.</summary>
+    public DungeonsCardViewModel Dungeons { get; }
 
     private readonly SharedWalletService _wallet;
     private readonly RoomSettingsService _room;
@@ -114,7 +117,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         RoomItemsViewModel items,
         RoomFlagsViewModel flags,
         SharedWalletService wallet,
-        RoomSettingsService room)
+        RoomSettingsService room,
+        SharedSmallKeyService smallKeys)
     {
         Server = server;
         Live = live;
@@ -122,6 +126,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Tools = tools;
         Items = items;
         Flags = flags;
+        Dungeons = new DungeonsCardViewModel(smallKeys, a => Dispatcher.UIThread.Post(a));
         _wallet = wallet;
         _room = room;
         _wallet.TotalChanged += OnWalletTotalChanged;
@@ -450,5 +455,6 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Flags.Edit.PropertyChanged -= OnFlagsEditPropertyChanged;
         Flags.BackRequested -= OnFlagsBack;
         Live.PropertyChanged -= OnLivePropertyChanged;
+        Dungeons.Dispose();
     }
 }
