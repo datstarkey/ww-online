@@ -411,8 +411,16 @@ static int daPuppet_phase_3(PUPPET_class *this)
   // 2. Waiting for ground collision (returns cPhs_INIT_e if not ready)
   // 3. Initializing first process (procWait_init, etc.)
   // makeBgWait sets the CL joints' mMtxCalc and calcs: a shared-animator window like execute.
+  // It also starts the puppet's first proc, whose commonProcInit clears the LOCAL player's status
+  // words (clearPlayerStatus0/1, d_a_player_main.cpp:5807-5808): SHIP_RIDE and SAIL among them. A
+  // puppet created while the local Link sails (a new sea square, a live-world worker) left the boat
+  // dead in the water with its sail gone until the Wind Waker re-set them. Keep them, as phase_2
+  // does around playerInit and Delete around playerDelete.
+  PuppetGlobalSnapshot globals;
   puppet_shanmBegin(&this->shanm);
+  puppet_saveGlobals(&globals);
   int result = daPy_lk_c__makeBgWait(link);
+  puppet_restoreGlobals(&globals);
   puppet_shanmEnd(0);
 
   // OSReport("PUPPET: makeBgWait returned %d\n", result);
