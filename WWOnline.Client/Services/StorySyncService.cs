@@ -261,6 +261,13 @@ public class StorySyncService : IDisposable
         // Warp jars, as daObj_Warpt_c::onWarpBit does (getEventReg, OR the bit, setEventReg).
         for (int i = 0; i < StoryFlags.WarpJarByteCount; i++)
             OrByte(dolphin, StoryFlags.WarpJarRegisterBytes[i], (byte)(bits.WarpJars[i] & StoryFlags.WarpJarMask));
+        // Beedle's points: raised to the room's, never lowered (as buying only ever adds, npc_bs1).
+        if (bits.BeedlePoints != 0)
+        {
+            uint addr = EventFlagCatalog.EventBitfieldAddress + StoryFlags.BeedlePointsRegisterByte;
+            if (dolphin.ReadMemory(addr, 1) is [byte have] && have < bits.BeedlePoints)
+                dolphin.WriteMemory(addr, [bits.BeedlePoints]);
+        }
     }
 
     private static void OrByte(IDolphinService dolphin, int eventByte, byte add)
@@ -307,7 +314,7 @@ public class StorySyncService : IDisposable
                     _joined = true;
                     _loggedWaiting = false;
                     var fresh = room.Except(snapshot).Except(_applied);
-                    toApply = fresh.BitCount + fresh.FigurineCount + fresh.WarpJarCount;
+                    toApply = fresh.BitCount + fresh.FigurineCount + fresh.WarpJarCount + (fresh.BeedlePoints != 0 ? 1 : 0);
                 }
                 Logger.Information("[story] joined room story ({Room} in room, this game brought {Mine}); {N} to apply",
                     room.CountText(), snapshot.CountText(), toApply);

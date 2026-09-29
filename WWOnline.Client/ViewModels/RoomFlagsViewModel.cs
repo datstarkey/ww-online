@@ -130,6 +130,9 @@ public partial class EventRegisterRow : ObservableObject
     /// <summary>One of the warp jar registers (<see cref="StoryFlags.WarpJarRegisterBytes"/>): shared with Shared story on.</summary>
     public bool IsSharedWarpJars { get; }
 
+    /// <summary>Beedle's point card (<see cref="StoryFlags.BeedlePointsRegisterByte"/>): shared (MAX) with Shared story on.</summary>
+    public bool IsSharedBeedlePoints { get; }
+
     /// <summary>Current value (byte &amp; mask), null while no game is loaded.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ValueText))]
@@ -146,7 +149,9 @@ public partial class EventRegisterRow : ObservableObject
         Code = info.Id.ToString("X4", CultureInfo.InvariantCulture);
         IsSharedFigurines = StoryFlags.FigurineRegisterBytes.Contains((byte)info.ByteIndex);
         IsSharedWarpJars = StoryFlags.WarpJarRegisterBytes.Contains((byte)info.ByteIndex) && info.Mask == StoryFlags.WarpJarMask;
-        PolicyText = IsSharedFigurines ? "Figurines (Shared story)" : IsSharedWarpJars ? "Warp jars (Shared story)" : info.Policy switch
+        IsSharedBeedlePoints = info.ByteIndex == StoryFlags.BeedlePointsRegisterByte;
+        PolicyText = IsSharedFigurines ? "Figurines (Shared story)" : IsSharedWarpJars ? "Warp jars (Shared story)"
+            : IsSharedBeedlePoints ? "Beedle points (Shared story)" : info.Policy switch
         {
             EventRegisterPolicy.BitwiseOr => "Bitfield",
             EventRegisterPolicy.Max => "Progress state",
@@ -158,7 +163,9 @@ public partial class EventRegisterRow : ObservableObject
                       ? "Nintendo Gallery figurines Carlov has made, one bit each. With Shared story on, a figurine set here merges into the room and every player gets it."
                       : IsSharedWarpJars
                           ? "A dungeon's warp jars that are open, one bit each. With Shared story on, a jar opened here opens for every player."
-                          : "Registers are never synced: this changes your game only.");
+                          : IsSharedBeedlePoints
+                              ? "Beedle's membership points. With Shared story on, the room keeps the highest card and every player's is raised to it."
+                              : "Registers are never synced: this changes your game only.");
     }
 }
 

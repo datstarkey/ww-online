@@ -692,7 +692,7 @@ public static class EventFlagCatalog
         R(0x83FF, "UNK_83FF", P.BitwiseOr),                  // Figurine bits
         R(0x84FF, "UNK_84FF", P.BitwiseOr),                  // Figurine bits
         R(0x85FF, "UNK_85FF", P.LocalOnly),                  // Ghost Ship spawn start code (d_a_ghostship)
-        R(0x86FF, "UNK_86FF", P.LocalOnly),                  // Beedle points card (npc_bs1 counter)
+        R(0x86FF, "UNK_86FF", P.Max),                        // Beedle points card (npc_bs1 counter, +1 per purchase): Shared story, MAX (StoryFlags.BeedlePoints)
         R(0x870F, "UNK_870F", P.LocalOnly),                  // Manny transient counter, zeroed on create/delete (npc_mn)
         R(0x8803, "GHOST_SHIP", P.Max),                      // GHOST_SHIP progress 0..3 (tag_ghostship)
         R(0x89FF, "UNK_89FF", P.LocalOnly),                  // Picto Box picture count (d_picture_box; preserved by reinit)
