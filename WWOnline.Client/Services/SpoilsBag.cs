@@ -192,6 +192,55 @@ public enum BagWriteResult
 /// <summary>Byte-level helpers the bag writers share.</summary>
 public static class BagMemory
 {
+    /// <summary>dItemBtn_COUNT_e: X, Y, Z.</summary>
+    public const int ButtonCount = 3;
+
+    /// <summary>dInvSlot_NONE_e / dItemNo_NONE_e.</summary>
+    public const byte NoSlot = 0xFF;
+
+    /// <summary>Bit i set = bag slot i (inventory slot <paramref name="firstInvSlot"/> + i) is on X, Y or Z
+    /// (<paramref name="selectSlots"/>: the save's mSelectItem).</summary>
+    public static int EquippedMask(int firstInvSlot, int slotCount, ReadOnlySpan<byte> selectSlots)
+    {
+        int mask = 0;
+        for (int b = 0; b < Math.Min(ButtonCount, selectSlots.Length); b++)
+        {
+            int slot = selectSlots[b] - firstInvSlot;
+            if (slot >= 0 && slot < slotCount) mask |= 1 << slot;
+        }
+        return mask;
+    }
+
+    /// <summary>
+    /// What dComIfGp_setSelectItem (d_com_inf_game.h) does after a bag slot changes under a button: a button on a
+    /// slot that is now empty is cleared (save slot and play item 0xFF), and one on a slot that now holds another
+    /// item shows that item. <paramref name="firstInvSlot"/> is the bag's first inventory slot number (bait 36,
+    /// delivery 48). Returns the new save select slots and play select items (X, Y, Z), and whether anything changed.
+    /// </summary>
+    public static (byte[] SaveSelect, byte[] PlaySelect, bool Changed) FixButtons(
+        int firstInvSlot, byte[] before, byte[] after, ReadOnlySpan<byte> saveSelect, ReadOnlySpan<byte> playSelect)
+    {
+        var save = saveSelect.ToArray();
+        var play = playSelect.ToArray();
+        bool changed = false;
+        for (int b = 0; b < Math.Min(ButtonCount, Math.Min(save.Length, play.Length)); b++)
+        {
+            int slot = save[b] - firstInvSlot;
+            if (slot < 0 || slot >= after.Length || before[slot] == after[slot]) continue;
+            if (after[slot] == NoSlot)
+            {
+                save[b] = NoSlot;
+                play[b] = NoSlot;
+            }
+            else
+            {
+                play[b] = after[slot];
+            }
+            changed = true;
+        }
+        return (save, play, changed);
+    }
+
     /// <summary>Write the span of <paramref name="next"/> that differs from <paramref name="old"/>, if any.</summary>
     public static bool WriteChanged(IDolphinService dolphin, uint address, byte[] old, byte[] next)
     {

@@ -23,6 +23,7 @@ public class GameSyncService : IDisposable
     private readonly SharedWalletService _sharedWallet;
     private readonly SharedBaitService _sharedBait;
     private readonly SharedSpoilsService _sharedSpoils;
+    private readonly SharedDeliveryService _sharedDelivery;
     private readonly StorySyncService _storySync;
     private readonly SharedSmallKeyService _smallKeys;
     private readonly SharedHeartService _hearts;
@@ -48,6 +49,7 @@ public class GameSyncService : IDisposable
         SharedWalletService sharedWallet,
         SharedBaitService sharedBait,
         SharedSpoilsService sharedSpoils,
+        SharedDeliveryService sharedDelivery,
         StorySyncService storySync,
         SharedSmallKeyService smallKeys,
         SharedHeartService hearts,
@@ -62,6 +64,7 @@ public class GameSyncService : IDisposable
         _sharedWallet = sharedWallet;
         _sharedBait = sharedBait;
         _sharedSpoils = sharedSpoils;
+        _sharedDelivery = sharedDelivery;
         _storySync = storySync;
         _smallKeys = smallKeys;
         _hearts = hearts;
@@ -107,6 +110,8 @@ public class GameSyncService : IDisposable
         _sharedBait.Start();
         // Shared spoils bag: one count per spoil type, one room total
         _sharedSpoils.Start();
+        // Shared delivery bag: the quest items (trade goods, letters...), one room bag
+        _sharedDelivery.Start();
         // Shared items: the room's inventory / equipment / upgrades, owned by the server
         _roomInventorySync.Start();
         // Shared story: event flags (story, cutscenes, side quests, NPC state) OR-merged across players
@@ -184,6 +189,7 @@ public class GameSyncService : IDisposable
         _sharedWallet.Stop();
         _sharedBait.Stop();
         _sharedSpoils.Stop();
+        _sharedDelivery.Stop();
         _roomInventorySync.Stop();
         _storySync.Stop();
         _smallKeys.Stop();

@@ -34,12 +34,13 @@ Everything is set through environment variables (`-e NAME=value`, or `environmen
 | Variable | Default | What it does |
 |---|---|---|
 | `WWO_PORT` | `6969` | The port the server listens on inside the container. Change the `-p` mapping to match, e.g. `-p 7000:7000 -e WWO_PORT=7000`. (To only change the port players use, change the left side of the mapping instead: `-p 7000:6969`.) |
-| `WWO_SHARED_WALLET` | `true` | The room's starting rules. `true`/`false` (also `1`/`0`, `yes`/`no`, `on`/`off`). The room owner can change them any time from the Room page, so these only set how a fresh room starts. `false` for the six shared-progress rules and `WWO_ALLOW_WARPING` (with projectiles left `true`) is the Co-op preset. |
+| `WWO_SHARED_WALLET` | `true` | The room's starting rules. `true`/`false` (also `1`/`0`, `yes`/`no`, `on`/`off`). The room owner can change them any time from the Room page, so these only set how a fresh room starts. `false` for the seven shared-progress rules and `WWO_ALLOW_WARPING` (with projectiles left `true`) is the Co-op preset. |
 | `WWO_SHARED_WORLD` | `true` | |
 | `WWO_SHARED_ITEMS` | `true` | |
 | `WWO_SHARED_STORY` | `true` | Shared story: story, cutscene and side-quest event flags, and the Nintendo Gallery figurines Carlov has made. |
 | `WWO_SHARED_BAIT` | `true` | Shared bait bag: the bait bag's All-Purpose Bait and Hyoi Pears are one room total. |
 | `WWO_SHARED_SPOILS` | `true` | Shared spoils bag: the spoils bag's counts (Joy Pendants, Skull Necklaces, Chu Jellies...) are one room total. |
+| `WWO_SHARED_DELIVERY` | `true` | Shared delivery bag: the delivery bag's quest items (trade goods, letters, Cabana Deed, Beedle's tickets) are one room bag. |
 | `WWO_SHARED_PROJECTILES` | `true` | Other players' projectiles: their bombs, boat-cannon shots and arrows are real in your world (they fly, explode and hit your enemies and walls). `false` drops them; their carried bomb and aim poses still show. On in both presets. |
 | `WWO_ALLOW_WARPING` | `true` | Allow warping: players can warp to each other from the Room page's Players list (same area: next to them; anywhere else: the entrance they came in through). It gets a player unstuck when shared story or world progress closes their way forward ([softlocks](softlocks.md)). `false` hides the button and the server stops passing on where players entered their area. Off in Co-op. |
 | `WWO_OWNER_KEY` | none | A secret. The player who enters it in the app's **Owner key** field becomes the room owner. See [The room owner](#the-room-owner). |
@@ -51,11 +52,11 @@ A bad value (a port that isn't a number, a rule that isn't true or false, an own
 
 **Log file on a bind mount:** the server runs as UID 1654 (the image's `app` user). A named volume on `/data` just works; a host folder mounted there (`-v ./logs:/data`) must be writable by that UID, e.g. `sudo chown 1654 ./logs`, or the server can't create `WWO_LOG_FILE` (it logs an error and carries on with the console log).
 
-Outside Docker, the server takes the same variables, plus command-line flags, which win over the variables: `WWOnline.Server [port] [--owner-key <key>] [--log-file <path>] [--no-shared-wallet] [--no-shared-world] [--no-shared-items] [--no-shared-story] [--no-shared-bait] [--no-shared-spoils] [--no-shared-projectiles] [--no-warping]`. `--help` lists them and `--version` prints the version.
+Outside Docker, the server takes the same variables, plus command-line flags, which win over the variables: `WWOnline.Server [port] [--owner-key <key>] [--log-file <path>] [--no-shared-wallet] [--no-shared-world] [--no-shared-items] [--no-shared-story] [--no-shared-bait] [--no-shared-spoils] [--no-shared-delivery] [--no-shared-projectiles] [--no-warping]`. `--help` lists them and `--version` prints the version.
 
 ## The room owner
 
-The room owner picks the rules (Full sync, Co-op or a mix), and their game seeds the room's items, story, wallet, bait bag and spoils bag when the room is new.
+The room owner picks the rules (Full sync, Co-op or a mix), and their game seeds the room's items, story, wallet, bait bag, spoils bag and delivery bag when the room is new.
 
 - **Without an owner key**, the first player to join owns the room. If they leave, the player who joined earliest after them takes over.
 - **With `WWO_OWNER_KEY`**, the player who enters that key in the app's **Owner key** field (under Server host, before pressing **Join**) owns the room, even if someone else joined first. The app sends it again after every reconnect, so the owner keeps the room. While the key holder isn't connected, the earliest joiner owns the room, and the first player to join an empty room seeds it. While the key holder is connected, their game seeds an empty room; if it hasn't within 30 seconds (say they're still in the menus), a joiner seeds it so nobody is stuck waiting.

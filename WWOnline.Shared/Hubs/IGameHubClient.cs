@@ -26,6 +26,9 @@ public interface IGameHubClient
     /// <summary>The shared spoils bag's new counts (someone picked up, sold or traded spoils).</summary>
     Task ReceiveSpoilsTotal(SpoilsCounts total);
 
+    /// <summary>The shared delivery bag's new contents (someone received, handed over or traded a quest item).</summary>
+    Task ReceiveDeliveryTotal(DeliveryCounts total);
+
     /// <summary>Room rules or the room owner changed.</summary>
     Task ReceiveRoomSettings(RoomSettings settings);
 

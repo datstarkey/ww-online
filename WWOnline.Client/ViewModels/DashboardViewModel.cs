@@ -61,6 +61,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _sharedProjectilesOn = true;
     [ObservableProperty] private bool _sharedBaitOn = true;
     [ObservableProperty] private bool _sharedSpoilsOn = true;
+    [ObservableProperty] private bool _sharedDeliveryOn = true;
     [ObservableProperty] private bool _allowWarpingOn = true;
     [ObservableProperty] private string _roomOwnerText = "";
     [ObservableProperty] private string _ownerName = "";
@@ -284,6 +285,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         SharedProjectilesOn = rules.SharedProjectiles;
         SharedBaitOn = rules.SharedBait;
         SharedSpoilsOn = rules.SharedSpoils;
+        SharedDeliveryOn = rules.SharedDelivery;
         AllowWarpingOn = rules.AllowWarping;
         UpdatePreset(rules.MatchingPreset());
         IsOwner = _room.IsOwner;
@@ -347,6 +349,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     partial void OnSharedProjectilesOnChanged(bool value) => PushRules();
     partial void OnSharedBaitOnChanged(bool value) => PushRules();
     partial void OnSharedSpoilsOnChanged(bool value) => PushRules();
+    partial void OnSharedDeliveryOnChanged(bool value) => PushRules();
     partial void OnAllowWarpingOnChanged(bool value) => PushRules();
 
     private void PushRules()
@@ -359,10 +362,11 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         var projectiles = SharedProjectilesOn;
         var bait = SharedBaitOn;
         var spoils = SharedSpoilsOn;
+        var delivery = SharedDeliveryOn;
         var warping = AllowWarpingOn;
         _ = Task.Run(async () =>
         {
-            try { await _room.SetAsync(wallet, world, items, story, projectiles, bait, spoils, warping); }
+            try { await _room.SetAsync(wallet, world, items, story, projectiles, bait, spoils, delivery, warping); }
             catch (Exception ex) { Serilog.Log.Warning(ex, "[room] failed to update room rules"); }
         });
     }
@@ -386,7 +390,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         };
     }
 
-    /// <summary>Room owner: wallet, world, items, story, bait bag and spoils bag all shared.</summary>
+    /// <summary>Room owner: wallet, world, items, story, bait bag, spoils bag and delivery bag all shared.</summary>
     [RelayCommand]
     private void ApplyFullSyncPreset() => PushPreset(RoomPreset.FullSync);
 

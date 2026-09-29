@@ -64,6 +64,7 @@ public class GameHub : Hub<IGameHubClient>
         WalletSeedGate.Forget(connectionId);
         BaitSeedGate.Forget(connectionId);
         SpoilsSeedGate.Forget(connectionId);
+        DeliverySeedGate.Forget(connectionId);
         RoomSwitchState.Leave(connectionId);
 
         if (exception != null)
@@ -158,14 +159,14 @@ public class GameHub : Hub<IGameHubClient>
     /// <summary>Server defaults from the command line (Program.cs), before anyone connects.</summary>
     public static void ConfigureRoomDefaults(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory,
                                              bool sharedProjectiles = true, bool sharedBait = true, bool sharedSpoils = true,
-                                             bool allowWarping = true)
+                                             bool allowWarping = true, bool sharedDelivery = true)
     {
         lock (RoomLock)
             _roomSettings = new RoomSettings
             {
                 SharedWallet = sharedWallet, SharedWorld = sharedWorld, SharedItems = sharedItems, SharedStory = sharedStory,
                 SharedProjectiles = sharedProjectiles, SharedBait = sharedBait, SharedSpoils = sharedSpoils,
-                AllowWarping = allowWarping,
+                SharedDelivery = sharedDelivery, AllowWarping = allowWarping,
             };
     }
 
@@ -273,13 +274,14 @@ public class GameHub : Hub<IGameHubClient>
             return;
         }
 
-        bool walletTurnedOff, worldTurnedOff, baitTurnedOff, spoilsTurnedOff;
+        bool walletTurnedOff, worldTurnedOff, baitTurnedOff, spoilsTurnedOff, deliveryTurnedOff;
         lock (RoomLock)
         {
             walletTurnedOff = _roomSettings.SharedWallet && !requested.SharedWallet;
             worldTurnedOff = _roomSettings.SharedWorld && !requested.SharedWorld;
             baitTurnedOff = _roomSettings.SharedBait && !requested.SharedBait;
             spoilsTurnedOff = _roomSettings.SharedSpoils && !requested.SharedSpoils;
+            deliveryTurnedOff = _roomSettings.SharedDelivery && !requested.SharedDelivery;
             _roomSettings.SharedWallet = requested.SharedWallet;
             _roomSettings.SharedWorld = requested.SharedWorld;
             _roomSettings.SharedItems = requested.SharedItems;
@@ -287,6 +289,7 @@ public class GameHub : Hub<IGameHubClient>
             _roomSettings.SharedProjectiles = requested.SharedProjectiles;
             _roomSettings.SharedBait = requested.SharedBait;
             _roomSettings.SharedSpoils = requested.SharedSpoils;
+            _roomSettings.SharedDelivery = requested.SharedDelivery;
             _roomSettings.AllowWarping = requested.AllowWarping;
         }
         if (walletTurnedOff)
@@ -310,6 +313,12 @@ public class GameHub : Hub<IGameHubClient>
             Spoils.Reset();
             SpoilsSeedGate.Reset();
             Logger.Information("[spoils] shared spoils bag turned off — counts cleared; it re-seeds when turned back on");
+        }
+        if (deliveryTurnedOff)
+        {
+            Delivery.Reset();
+            DeliverySeedGate.Reset();
+            Logger.Information("[delivery] shared delivery bag turned off — bag cleared; it re-seeds when turned back on");
         }
         if (worldTurnedOff)
         {
@@ -536,12 +545,14 @@ public class GameHub : Hub<IGameHubClient>
         await Clients.All.ReceiveRupeeTotal(total);
     }
 
-    // ── Shared bags (bait, spoils) ───────────────────────────────────────────
+    // ── Shared bags (bait, spoils, delivery) ─────────────────────────────────
 
     private static readonly BaitStore Bait = new();
     private static readonly OwnerSeedGate BaitSeedGate = new();
     private static readonly SpoilsStore Spoils = new();
     private static readonly OwnerSeedGate SpoilsSeedGate = new();
+    private static readonly DeliveryStore Delivery = new();
+    private static readonly OwnerSeedGate DeliverySeedGate = new();
 
     /// <summary>
     /// A client whose game has the bait bag attaches it. The room owner's bag seeds the shared counts
@@ -573,7 +584,25 @@ public class GameHub : Hub<IGameHubClient>
             await Clients.All.ReceiveSpoilsTotal(total);
     }
 
-    /// <summary>The shared part of JoinBait / JoinSpoils: rule, payload, seed gate, then join (maybe seeding).</summary>
+    /// <summary>
+    /// A client whose game has the delivery bag attaches it; as <see cref="JoinBait"/>, for the Shared delivery
+    /// bag rule. Null when the rule is off, the payload is malformed, or the bag is waiting for its owner.
+    /// </summary>
+    public Task<DeliveryCounts?> JoinDelivery(DeliveryCounts current) =>
+        Task.FromResult(JoinBag(RoomRules.SharedDelivery, Delivery, DeliverySeedGate, current, "delivery", "shared delivery bag", nameof(JoinDelivery)));
+
+    /// <summary>
+    /// A client received (+), handed over, posted, traded or threw away (-) quest items, or first obtained some
+    /// (<see cref="DeliveryCounts.Obtained"/>). Applied to the room's bag (a delta that gives away an item the
+    /// room no longer has is refused, see <see cref="DeliveryStore"/>) and the bag is pushed to everyone.
+    /// </summary>
+    public async Task SendDeliveryDelta(DeliveryCounts delta)
+    {
+        if (ApplyBagDelta(RoomRules.SharedDelivery, Delivery, delta, "delivery", nameof(SendDeliveryDelta)) is { } total)
+            await Clients.All.ReceiveDeliveryTotal(total);
+    }
+
+    /// <summary>The shared part of JoinBait / JoinSpoils / JoinDelivery: rule, payload, seed gate, then join (maybe seeding).</summary>
     private T? JoinBag<T>(bool ruleOn, BagCountsStore<T> store, OwnerSeedGate gate, T? current,
                           string tag, string what, string method) where T : class, IBagCounts<T>
     {
@@ -595,7 +624,7 @@ public class GameHub : Hub<IGameHubClient>
         return total;
     }
 
-    /// <summary>The shared part of SendBaitDelta / SendSpoilsDelta: the new total to push, or null (dropped).</summary>
+    /// <summary>The shared part of SendBaitDelta / SendSpoilsDelta / SendDeliveryDelta: the new total to push, or null (dropped).</summary>
     private T? ApplyBagDelta<T>(bool ruleOn, BagCountsStore<T> store, T? delta, string tag, string method)
         where T : class, IBagCounts<T>
     {
@@ -606,14 +635,19 @@ public class GameHub : Hub<IGameHubClient>
                 tag, method, delta?.ToString() ?? "null", GetPlayerName(Context.ConnectionId));
             return null;
         }
-        if (store.ApplyDelta(delta) is not { } total)
+        if (store.Apply(delta) is not { } applied)
         {
             // Unseeded (e.g. just turned back on): the sender must rejoin first.
             Logger.Warning("[{Tag}] {Method} {Delta} from {Player} rejected: the bag isn't seeded (client must rejoin)",
                 tag, method, delta.DeltaText(), GetPlayerName(Context.ConnectionId));
             return null;
         }
-        Logger.Information("[{Tag}] {Player} {Delta} → {Total}", tag, GetPlayerName(Context.ConnectionId), delta.DeltaText(), total);
+        var (total, refused) = applied;
+        if (refused != null)
+            Logger.Warning("[{Tag}] {Player} {Delta} → {Total} ({Reason})",
+                tag, GetPlayerName(Context.ConnectionId), delta.DeltaText(), total, refused);
+        else
+            Logger.Information("[{Tag}] {Player} {Delta} → {Total}", tag, GetPlayerName(Context.ConnectionId), delta.DeltaText(), total);
         return total;
     }
 
