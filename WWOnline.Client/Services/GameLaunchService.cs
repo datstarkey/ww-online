@@ -375,7 +375,7 @@ public sealed class GameLaunchService : IDisposable
         var result = await AttachAsync(processId, requirePatchedGame: false).ConfigureAwait(false);
         return result switch
         {
-            PatchedGameCheck.Result.Ok => (true, null),
+            PatchedGameCheck.Result.Ok or PatchedGameCheck.Result.NotInGame => (true, null),
             PatchedGameCheck.Result.SmallMemory or PatchedGameCheck.Result.NotPatched =>
                 (true, "Attached anyway, but careful: " + OutcomeMessage(ToOutcome(result), startedHere: false)),
             _ => (false, null),
@@ -449,6 +449,7 @@ public sealed class GameLaunchService : IDisposable
     private async Task<AttachOutcome> WaitAndAttachAsync(int? processId, bool startedHere, CancellationToken ct)
     {
         int notPatched = 0;
+        bool saidLoadSave = false;
         for (int attempt = 1; attempt <= _maxAttachAttempts; attempt++)
         {
             await Task.Delay(_attachInterval, ct).ConfigureAwait(false);
@@ -466,8 +467,19 @@ public sealed class GameLaunchService : IDisposable
                 case PatchedGameCheck.Result.SmallMemory:
                     return AttachOutcome.SmallMemory;
                 case PatchedGameCheck.Result.NotPatched:
-                    // Booted, but Link hasn't been drawn by the patched hook yet: give it a few tries.
+                    // A save is loaded but Link hasn't been drawn by the patched hook yet: give it a few tries.
                     if (++notPatched >= NotPatchedGraceAttempts) return AttachOutcome.NotPatched;
+                    break;
+                case PatchedGameCheck.Result.NotInGame:
+                    // Title screen or file select: nothing to judge until a save is loaded, however long
+                    // the player takes (leaving the room or closing Dolphin still ends the wait).
+                    notPatched = 0;
+                    attempt--;
+                    if (!saidLoadSave)
+                    {
+                        saidLoadSave = true;
+                        SetStatus(new(GameLaunchState.WaitingForGame, "Your game is running: load your save and WW-Online links up."));
+                    }
                     break;
             }
             if (attempt % 10 == 0)
