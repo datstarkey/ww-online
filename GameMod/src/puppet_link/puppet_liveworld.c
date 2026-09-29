@@ -118,14 +118,18 @@ typedef int (*LwDeleteFn)(fopAc_ac_c *ac); /* fopAcM_delete(fopAc_ac_c*) returns
  * (an actor placed in a room lives in that room's layer). The current layer is not (f_pc_base.cpp:47), and an
  * actor created there would outlive the room and duplicate on reload. Only if the delete was accepted
  * (fpcDt_Delete refuses one being created or already deleting): two chests would give the item twice. The
- * deleted actor's fields stay readable until next frame's deletor. False if nothing happened. */
+ * layer is read BEFORE the delete: an accepted delete moves the actor to the delete queue, and
+ * fpcLyTg_QueueTo clears mLyTg.mpLayer (+0x2C) on the way (f_pc_layer_tag.cpp:38, DOL 0x8003E044), so
+ * afterwards it is NULL and a create there writes through NULL. The deleted actor's other fields stay
+ * readable until next frame's deletor. False if nothing happened. */
 static int lw_recreate(fopAc_ac_c *ac)
 {
   LwDeleteFn del = (LwDeleteFn)(u32)fopAcM_delete;
-  if (!del(ac))
+  layer_class *layer = BASE_LAYER(ac);
+  if (layer == NULL || !del(ac))
     return 0;
   layer_class *saved = f_pc_layer__fpcLy_CurrentLayer();
-  f_pc_layer__fpcLy_SetCurrentLayer(BASE_LAYER(ac));
+  f_pc_layer__fpcLy_SetCurrentLayer(layer);
   fpc_ProcID id = fopAcM_create(BASE_PROC_NAME(ac), BASE_PARAMETERS(ac), FOPAC_HOME_POS(ac), FOPAC_HOME_ROOMNO(ac),
                                 FOPAC_HOME_ANGLE(ac), FOPAC_SCALE(ac), (byte)FOPAC_ARGUMENT(ac), 0);
   f_pc_layer__fpcLy_SetCurrentLayer(saved);
