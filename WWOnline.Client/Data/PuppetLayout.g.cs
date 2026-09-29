@@ -354,6 +354,34 @@ public static class PuppetLayout
     public const int DAPY_FLG1_CASUAL_CLOTHES = 0x08;
     /// <summary>ResTIMG::imageOffset, relative to the header (JUTTexture.h:36)</summary>
     public const int RESTIMG_OFF_IMAGE_OFFSET = 0x1C;
+    /// <summary>u32 C: puppet_seachart_draw while a REL is loaded, else 0 (read by seachart_players.asm)</summary>
+    public const uint SEACHART_FN_ADDR = 0x803FD12C;
+    /// <summary>u32 C: sea chart block (game heap), 0 = none yet</summary>
+    public const uint SEACHART_PTR_ADDR = 0x803FCFAC;
+    /// <summary>"SCHT"</summary>
+    public const int SEACHART_MAGIC = 0x53434854;
+    /// <summary>u32[2] C: __OSStartTime of the allocating boot (= PUPPET_NAMES_OFF_BOOT)</summary>
+    public const int SEACHART_OFF_BOOT = 0x08;
+    /// <summary>entries, SEACHART_ENTRY_SIZE each</summary>
+    public const int SEACHART_OFF_ENTRY0 = 0x10;
+    public const int SEACHART_MAX_ENTRIES = 8;
+    public const int SEACHART_ENTRY_SIZE = 0x10;
+    /// <summary>SEACHART_OFF_ENTRY0 + SEACHART_MAX_ENTRIES * SEACHART_ENTRY_SIZE</summary>
+    public const int SEACHART_BLOCK_SIZE = 0x90;
+    /// <summary>f32 C#: current.pos.x</summary>
+    public const int SEACHART_E_OFF_X = 0x00;
+    /// <summary>f32 C#: current.pos.z</summary>
+    public const int SEACHART_E_OFF_Z = 0x04;
+    /// <summary>s16 C#: shape_angle.y (the boat's while they sail)</summary>
+    public const int SEACHART_E_OFF_ANGLE = 0x08;
+    /// <summary>u8  C#: SEACHART_FLAG_*</summary>
+    public const int SEACHART_E_OFF_FLAGS = 0x0A;
+    /// <summary>u8  C#: marker colour (their tunic colour)</summary>
+    public const int SEACHART_E_OFF_R = 0x0C;
+    public const int SEACHART_E_OFF_G = 0x0D;
+    public const int SEACHART_E_OFF_B = 0x0E;
+    /// <summary>a player on the sea: draw them</summary>
+    public const int SEACHART_FLAG_SHOW = 0x01;
     public const uint PUPPET_BOAT_0 = 0x803FD170;
     /// <summary>3 slots end at 0x803FD1D0; 0x803FD1D0..DF is reserved (docs/small-keys.md)</summary>
     public const int PUPPET_BOAT_SIZE = 0x20;

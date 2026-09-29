@@ -1106,4 +1106,28 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define GAMEINFO_MAGIC(gameInfo)           (*(u8*)((u8*)(gameInfo) + 0x14))
 #define CCD_CO_SPRM_SET                    0x01  // cCcD_CoSPrm_Set_e (c_cc_d.h:47)
 
+// dMenu_Fmap_c (d_menu_fmap.h), the sea chart menu: offsets checked in main.dol (setDspNormalMapLink 0x801B3A2C:
+// lbz 0x517F, lwz 0x2E04, lfs 0x511C/0x5120; setDspLargeMapLink 0x801B3C4C: lfs 0x30C8/0x30CC, stfs 0x2EF8;
+// _draw 0x801B4E14: addi r6,r31,0x1C).
+#define FMAP_OFF_DL                        0x1C    // dDlst_FMAP_c fmapDl: what dDlst_FMAP_c::draw's this points at
+#define FMAP_LNK1_PANE(menu)               (*(J2DPane**)((u8*)(menu) + 0x2E04))  // mLnk1Pane.pane: Link on the world map
+#define FMAP_LNK2_PANE(menu)               (*(J2DPane**)((u8*)(menu) + 0x2EE4))  // mLnk2Pane.pane: Link on a zoomed square
+#define FMAP_CLB_SIZE_ORIG_X(menu)         (*(f32*)((u8*)(menu) + 0x30C8))       // mClbPane.mSizeOrig.x
+#define FMAP_CLB_SIZE_ORIG_Y(menu)         (*(f32*)((u8*)(menu) + 0x30CC))
+#define FMAP_PLAYER_X(menu)                (*(f32*)((u8*)(menu) + 0x511C))       // mPlayerPos.x = Link's current.pos.x
+#define FMAP_PLAYER_Z(menu)                (*(f32*)((u8*)(menu) + 0x5120))       // mPlayerPos.y = Link's current.pos.z
+#define FMAP_ON_SEA(menu)                  (*(u8*)((u8*)(menu) + 0x517F))        // mFishmanActive: the chart opened on the sea stage
+#define FMAP_NORMAL_SCALE                  (56.0f / 100000.0f)                  // setDspNormalMapLink: pane units per world unit
+#define FMAP_LARGE_MARGIN                  50.0f                                 // setDspLargeMapLink: (size - 50) / 100000
+#define FMAP_SQUARE                        100000.0f
+
+// J2DPane / J2DPicture (J2DPane.h, J2DPicture.h), checked in main.dol: J2DPane::draw 0x802D0078 (lbz 0xAA, lfs 0x0C..0x18),
+// makeMatrix 0x802D0714 (0x9C/0xA0 base position, 0xA4 rotation), playerPointGridAnime (stb 0x104 / 0x108).
+#define J2DPANE_BOUNDS(p)                  ((f32*)((u8*)(p) + 0x0C))   // TBox2<f32> mBounds: i.x, i.y, f.x, f.y
+#define J2DPANE_MTX(p)                     ((u8*)(p) + 0x3C)           // Mtx mMtx (0x30 bytes), rebuilt by calcMtx
+#define J2DPANE_ROTATION(p)                (*(f32*)((u8*)(p) + 0xA4))  // mRotation (degrees)
+#define J2DPANE_VISIBLE(p)                 (*(u8*)((u8*)(p) + 0xAA))   // mVisible
+#define J2DPICTURE_WHITE(p)                ((u8*)(p) + 0x104)          // TColor mColorWhite (r, g, b, a)
+#define J2DPICTURE_BLACK(p)                ((u8*)(p) + 0x108)          // TColor mColorBlack
+
 #endif /* WW_INLINES_H */
