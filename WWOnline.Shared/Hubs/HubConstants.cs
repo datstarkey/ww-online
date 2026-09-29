@@ -12,9 +12,10 @@ public static class HubConstants
     /// crosses the wire changes shape or meaning (PuppetData layout, RoomInventory fields, flag
     /// masks...). Pure app changes that don't touch the wire keep it.
     /// 2: held items + boat parts. 3: live-world room switches. 4: player events / projectiles
-    /// (SendPlayerEvent, ReceivePlayerEvent, RoomSettings.SharedProjectiles).
+    /// (SendPlayerEvent, ReceivePlayerEvent, RoomSettings.SharedProjectiles). 5: body / face anim
+    /// mirror (AnimationState.Tracks and face / hand fields).
     /// </summary>
-    public const int ProtocolVersion = 4; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles)
+    public const int ProtocolVersion = 5; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands)
 
     // Hub method names (server-side methods invoked by clients)
 

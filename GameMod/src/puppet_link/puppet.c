@@ -28,6 +28,8 @@
 #include "puppet_sharedanm.c"
 // Other players' bombs, boat-cannon shots and arrows, real in this world (after nametag + worldsync: shared helpers)
 #include "puppet_fx.c"
+// The peer's own anims for procs without an init (after nametag: puppet_bootBlock)
+#include "puppet_anmmirror.c"
 
 /* Process condition flags */
 #define PROC_CONDITION_INIT 0x08
@@ -224,6 +226,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   puppet_boatInit(&this->boat);
   puppet_nametag_onCreate();
   puppet_fx_onCreate();
+  puppet_anmMirrorOnCreate(this->slotIndex);
   puppet_heldInit(&this->held);
   puppet_liveworld_onCreate();
   puppet_shanmInit(&this->shanm, this->slotIndex);
