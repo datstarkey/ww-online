@@ -118,11 +118,17 @@ public static class WarpMemory
         BinaryPrimitives.WriteSingleBigEndian(p.AsSpan(0), pos.X);
         BinaryPrimitives.WriteSingleBigEndian(p.AsSpan(4), pos.Y);
         BinaryPrimitives.WriteSingleBigEndian(p.AsSpan(8), pos.Z);
-        bool ok = dolphin.WriteMemory(actor + GameMemoryAddresses.Warp.ActorOffPos, p);
+        // Link's execute restores current.pos / angles from these statics first thing every frame
+        // (GameMemoryAddresses.Warp.LinkKeepPos): without them the move is undone before it's seen.
+        bool ok = dolphin.WriteMemory(GameMemoryAddresses.Warp.LinkKeepPos, p);
+        ok &= dolphin.WriteMemory(actor + GameMemoryAddresses.Warp.ActorOffPos, p);
         ok &= dolphin.WriteMemory(actor + GameMemoryAddresses.Warp.ActorOffOldPos, p);
 
         var a = new byte[2];
         BinaryPrimitives.WriteInt16BigEndian(a, angleY);
+        // csXyz y is at +2 in both statics.
+        ok &= dolphin.WriteMemory(GameMemoryAddresses.Warp.LinkKeepShapeAngle + 2, a);
+        ok &= dolphin.WriteMemory(GameMemoryAddresses.Warp.LinkKeepCurrentAngle + 2, a);
         ok &= dolphin.WriteMemory(actor + GameMemoryAddresses.Warp.ActorOffShapeAngleY, a);
         ok &= dolphin.WriteMemory(actor + GameMemoryAddresses.Warp.ActorOffAngleY, a);
 

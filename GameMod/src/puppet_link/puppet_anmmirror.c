@@ -315,10 +315,7 @@ static void am_load(daPy_lk_c *link, AnmMirrorState *st, volatile u8 *e, const u
   // Not a setMoveAnime blend: no step offsets (execute's setStepsOffset reads m34C3 1/4/9/10).
   // (No setSeAnime: the puppet plays no anim sounds, puppet_execute.c leaves setAnimSound out.)
   DAPY_LK_M34C3(link) = 0;
-
-  OSReport("[PUPPET] mirror %02x: bck %03x %03x %03x %03x (slot %d)\n", st->proc,
-           want[0], anm[1] ? want[1] : 0xFFFF, anm[2] != anm[0] ? want[2] : 0xFFFF,
-           anm[3] != anm[1] ? want[3] : 0xFFFF, (int)slot);
+  // No OSReport per load: it fired on every mirrored anim change. A failed load still reports.
 }
 
 // setDrawHandModel shows hands.bdl joint mLeftHandIdx / mRightHandIdx (0 = the body's own hand)

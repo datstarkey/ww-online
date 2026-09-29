@@ -279,6 +279,13 @@ public class WarpTests
         Assert.Equal(unchecked((short)0xC000), S16(d, Link + GameMemoryAddresses.Warp.ActorOffAngleY));
         Assert.Equal(0f, F32(d, Link + GameMemoryAddresses.Warp.ActorOffSpeedF));
         Assert.Equal(new byte[12], d.ReadMemory(Link + GameMemoryAddresses.Warp.ActorOffSpeed, 12));
+
+        // Link's execute restores current.pos / angles from these statics every frame, so they carry the move too.
+        Assert.Equal(-100.5f, F32(d, GameMemoryAddresses.Warp.LinkKeepPos));
+        Assert.Equal(250f, F32(d, GameMemoryAddresses.Warp.LinkKeepPos + 4));
+        Assert.Equal(3000f, F32(d, GameMemoryAddresses.Warp.LinkKeepPos + 8));
+        Assert.Equal(unchecked((short)0xC000), S16(d, GameMemoryAddresses.Warp.LinkKeepShapeAngle + 2));
+        Assert.Equal(unchecked((short)0xC000), S16(d, GameMemoryAddresses.Warp.LinkKeepCurrentAngle + 2));
     }
 
     // ── The planner ──────────────────────────────────────────────────────────
