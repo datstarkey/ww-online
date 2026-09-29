@@ -47,6 +47,12 @@ public partial class SettingsViewModel : ViewModelBase
 
     public event Action? SettingsSaved;
 
+    /// <summary>"Run setup again": MainViewModel opens the first-run setup.</summary>
+    public event Action? SetupRequested;
+
+    /// <summary>Both game folders are filled in, so Patch game can run.</summary>
+    public bool HasGamePaths => !string.IsNullOrWhiteSpace(VanillaGamePath) && !string.IsNullOrWhiteSpace(GamePath);
+
     /// <summary>
     /// Set by the View to provide file/folder browse capability.
     /// </summary>
@@ -62,13 +68,23 @@ public partial class SettingsViewModel : ViewModelBase
         PatchOptions = patchOptions;
         Updates = updates;
 
-        // Load existing settings
+        ReloadFromSettings();
+    }
+
+    /// <summary>Show the saved paths again (after the setup wizard changed them).</summary>
+    public void ReloadFromSettings()
+    {
         var settings = _gameSettingsService.Load();
         DolphinPath = settings.DolphinPath;
         GamePath = settings.GamePath;
         VanillaGamePath = settings.VanillaGamePath;
         AutoLaunchDolphin = settings.AutoLaunchDolphin;
+        ValidationError = null;
+        IsSaved = false;
     }
+
+    [RelayCommand]
+    private void RunSetup() => SetupRequested?.Invoke();
 
     [RelayCommand]
     private async Task BrowseDolphinPath()
@@ -132,10 +148,16 @@ public partial class SettingsViewModel : ViewModelBase
         && !string.IsNullOrWhiteSpace(GamePath);
 
     partial void OnIsPatchingChanged(bool value) => PatchGameCommand.NotifyCanExecuteChanged();
-    partial void OnVanillaGamePathChanged(string value) => PatchGameCommand.NotifyCanExecuteChanged();
+    partial void OnVanillaGamePathChanged(string value)
+    {
+        PatchGameCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasGamePaths));
+    }
+
     partial void OnGamePathChanged(string value)
     {
         PatchGameCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasGamePaths));
         // The build status beside Patch game follows the folder being edited, saved or not.
         PatchOptions.SetGamePath(value);
     }

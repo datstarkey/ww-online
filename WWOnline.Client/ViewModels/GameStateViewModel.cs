@@ -17,6 +17,7 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
     private readonly IDolphinService _dolphinService;
     private readonly GameMemoryMonitorService _memoryMonitor;
     private readonly GameSyncService _gameSyncService;
+    private readonly GameLaunchService _launch;
     private bool _disposed;
 
     [ObservableProperty]
@@ -133,12 +134,16 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
         IGameStateService gameStateService,
         IDolphinService dolphinService,
         GameMemoryMonitorService memoryMonitor,
-        GameSyncService gameSyncService)
+        GameSyncService gameSyncService,
+        GameLaunchService launch)
     {
         _gameStateService = gameStateService;
         _dolphinService = dolphinService;
         _memoryMonitor = memoryMonitor;
         _gameSyncService = gameSyncService;
+        _launch = launch;
+        _launch.StatusChanged += OnLaunchStatusChanged;
+        ApplyLaunchStatus(_launch.Status);
 
         _gameStateService.StateChanged += OnStateChanged;
         _dolphinService.ConnectionChanged += OnDolphinConnectionChanged;
@@ -157,6 +162,7 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
         IsDolphinConnected = _dolphinService.IsConnected;
         ConnectedProcessId = _dolphinService.ConnectedProcessId;
         if (!IsDolphinConnected) HasData = false;
+        else if (SelectedDolphin?.ProcessId != ConnectedProcessId) RefreshDolphins();
     }
 
     [RelayCommand]
@@ -167,12 +173,12 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
         foreach (var p in _dolphinService.EnumerateProcesses())
             AvailableDolphins.Add(p);
 
-        // Preserve selection if still present, otherwise prefer the currently-connected PID, else first entry.
+        // The attached Dolphin first (also after an automatic attach), else keep the selection, else the first.
         DolphinProcessInfo? restore = null;
-        if (current is int pid)
-            restore = AvailableDolphins.FirstOrDefault(d => d.ProcessId == pid);
-        if (restore == null && ConnectedProcessId is int attachedPid)
+        if (ConnectedProcessId is int attachedPid)
             restore = AvailableDolphins.FirstOrDefault(d => d.ProcessId == attachedPid);
+        if (restore == null && current is int pid)
+            restore = AvailableDolphins.FirstOrDefault(d => d.ProcessId == pid);
         SelectedDolphin = restore ?? AvailableDolphins.FirstOrDefault();
     }
 
@@ -189,14 +195,8 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
         IsBusy = true;
         try
         {
-            var ok = await _dolphinService.ConnectAsync(SelectedDolphin.ProcessId);
-            if (ok)
-            {
-                _memoryMonitor.Start();
-                _gameSyncService.Start();
-                Logger.Information("GameState attached to Dolphin PID {Pid}", SelectedDolphin.ProcessId);
-            }
-            else
+            var ok = await _launch.AttachAsync(SelectedDolphin.ProcessId);
+            if (!ok)
             {
                 DolphinError = $"Failed to attach to PID {SelectedDolphin.ProcessId}. Is the game booted?";
             }
@@ -233,6 +233,42 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
         {
             SyncConnectionState();
         }
+    }
+
+    // === Start game (GameLaunchService) ===
+
+    /// <summary>Starting Dolphin / waiting for the game, or why it was refused ("" when idle).</summary>
+    [ObservableProperty] private string _launchMessage = "";
+    [ObservableProperty] private bool _isLaunching;
+    [ObservableProperty] private bool _launchProblem;
+
+    /// <summary>Start the patched game in Dolphin and attach (refused while the game needs patching).</summary>
+    [RelayCommand]
+    private async Task StartGame()
+    {
+        DolphinError = null;
+        try
+        {
+            await _launch.StartGameAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Start game failed");
+            DolphinError = $"Start game failed: {ex.Message}";
+        }
+        RefreshDolphins();
+    }
+
+    [RelayCommand]
+    private void DismissLaunchMessage() => _launch.ClearStatus();
+
+    private void OnLaunchStatusChanged(GameLaunchStatus status) => Dispatcher.UIThread.Post(() => ApplyLaunchStatus(status));
+
+    private void ApplyLaunchStatus(GameLaunchStatus status)
+    {
+        IsLaunching = status.IsBusy;
+        LaunchProblem = status.IsProblem;
+        LaunchMessage = status.IsBusy || status.IsProblem ? status.Message : "";
     }
 
     private void OnStateChanged(object? sender, GameStateChangedEventArgs e)
@@ -278,5 +314,6 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
         _disposed = true;
         _gameStateService.StateChanged -= OnStateChanged;
         _dolphinService.ConnectionChanged -= OnDolphinConnectionChanged;
+        _launch.StatusChanged -= OnLaunchStatusChanged;
     }
 }

@@ -11,7 +11,8 @@
         Foreground="{StaticResource TextBrush}"
         Background="{StaticResource GroundBrush}">
 
-    <DockPanel Background="{StaticResource GroundBrush}">
+    <Panel>
+    <DockPanel Background="{StaticResource GroundBrush}" IsVisible="{Binding !IsWizardOpen}">
         <!-- ═══ Sidebar: brand · nav · local player ═══ -->
         <Border DockPanel.Dock="Left" Width="232"
                 Background="{StaticResource SidebarBrush}"
@@ -89,25 +90,6 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Patch banner (above the update banner): the patched game is out of date, e.g. after an
-                     update that shipped new game code. A prompt only: patching stays the player's call. -->
-                <Border DockPanel.Dock="Bottom" Margin="0,0,0,10" Classes="ww-warn-banner" IsVisible="{Binding ShowPatchBanner}">
-                    <StackPanel Spacing="10">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
-                                <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />
-                            </Viewbox>
-                            <TextBlock Text="Patch the game again" FontSize="13" FontWeight="SemiBold"
-                                       Foreground="{StaticResource GoldTextBrush}" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <TextBlock Text="Your patched game isn't patched yet, or doesn't match this version of WW-Online."
-                                   FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource GoldTextSoftBrush}"
-                                   ToolTip.Tip="{Binding PatchOptions.BuildStatusText}" />
-                        <Button Content="Open Settings" Classes="ww-accent" MinHeight="34" HorizontalAlignment="Stretch"
-                                HorizontalContentAlignment="Center" Command="{Binding ShowSettingsCommand}" />
-                    </StackPanel>
-                </Border>
-
                 <!-- Connection status (above the player card) -->
                 <StackPanel DockPanel.Dock="Bottom" Margin="8,0,8,12" Spacing="6">
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Server.IsConnected}">
@@ -168,7 +150,43 @@
             </DockPanel>
         </Border>
 
+        <!-- ═══ Patch banner: the game isn't patched or is out of date. WW-Online won't start or
+             attach to Dolphin until it is; patching stays the player's click. ═══ -->
+        <Border DockPanel.Dock="Top" Classes="ww-warn-banner" Margin="32,20,32,0" Padding="16,12"
+                IsVisible="{Binding ShowPatchBanner}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <Viewbox Width="20" Height="20" VerticalAlignment="Top" Margin="0,2,12,0">
+                    <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />
+                </Viewbox>
+                <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                    <TextBlock Text="Patch your game to play online" FontWeight="SemiBold" Foreground="{StaticResource GoldTextBrush}" />
+                    <TextBlock Text="It isn't patched yet, or doesn't match your patches or this version of WW-Online. Until it's patched, WW-Online won't start Dolphin or attach to it."
+                               FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource GoldTextSoftBrush}"
+                               ToolTip.Tip="{Binding PatchOptions.BuildStatusText}" />
+                    <StackPanel Spacing="6" Margin="0,6,0,0" IsVisible="{Binding SettingsPage.IsPatching}">
+                        <ProgressBar IsIndeterminate="True" Classes="ww-generic" Foreground="{StaticResource GoldCBrush}" MaxWidth="360"
+                                     HorizontalAlignment="Left" />
+                        <TextBlock Text="{Binding SettingsPage.PatchProgress}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource GoldTextSoftBrush}" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding SettingsPage.PatchError}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}"
+                               IsVisible="{Binding SettingsPage.PatchError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="16,0,0,0">
+                    <Button Content="Choose patches" Classes="ww-ghost" Command="{Binding ShowSettingsCommand}" />
+                    <Button Content="Run setup" Classes="ww-secondary" Command="{Binding OpenSetupCommand}"
+                            IsVisible="{Binding !SettingsPage.HasGamePaths}" />
+                    <Button Content="Patch now" Classes="ww-accent" Command="{Binding SettingsPage.PatchGameCommand}"
+                            IsVisible="{Binding SettingsPage.HasGamePaths}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
         <!-- ═══ Content ═══ -->
         <ContentControl Content="{Binding CurrentView}" />
     </DockPanel>
+
+    <!-- ═══ First-run setup, over everything ═══ -->
+    <ContentControl Content="{Binding Wizard}" IsVisible="{Binding IsWizardOpen}" />
+    </Panel>
 </Window>

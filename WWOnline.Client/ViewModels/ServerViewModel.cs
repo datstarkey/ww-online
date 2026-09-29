@@ -33,6 +33,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     private readonly GameSettingsService _gameSettingsService;
     private readonly GameLaunchService _gameLaunchService;
     private readonly PuppetSyncService _puppetSyncService;
+    private readonly StartupOptions _startupOptions;
     private Process? _serverProcess;
     private System.Timers.Timer? _diagnosticsTimer;
 
@@ -139,7 +140,8 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         GameSyncService gameSyncService,
         GameSettingsService gameSettingsService,
         GameLaunchService gameLaunchService,
-        PuppetSyncService puppetSyncService)
+        PuppetSyncService puppetSyncService,
+        StartupOptions startupOptions)
     {
         _signalRClient = signalRClient;
         _dolphinService = dolphinService;
@@ -149,6 +151,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         _gameSettingsService = gameSettingsService;
         _gameLaunchService = gameLaunchService;
         _puppetSyncService = puppetSyncService;
+        _startupOptions = startupOptions;
 
         _dolphinService.ConnectionChanged += OnDolphinConnectionChanged;
         _signalRClient.PlayerJoined += OnPlayerJoined;
@@ -444,7 +447,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
             if (success)
             {
                 ConnectionState = ConnectionState.Hosting;
-                // Dolphin attach is manual via GameState picker — see GameStateViewModel.
+                StartGameAfterJoin();
             }
             else
             {
@@ -463,6 +466,31 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         finally
         {
             IsLoading = false;
+        }
+    }
+
+    /// <summary>
+    /// After hosting or joining: start the patched game in Dolphin and attach (Settings → "Start Dolphin
+    /// and attach", on by default). GameLaunchService refuses, with a message on the Room and Dolphin
+    /// pages, while the game needs patching. Skipped when already attached, and for scripted starts
+    /// (--auto-attach: dev-test.ps1 attaches each client to its own Dolphin itself).
+    /// </summary>
+    private void StartGameAfterJoin()
+    {
+        if (_startupOptions.AutoAttach || _dolphinService.IsConnected) return;
+        if (!_gameSettingsService.Load().AutoLaunchDolphin) return;
+        _ = StartGameInBackgroundAsync();
+    }
+
+    private async Task StartGameInBackgroundAsync()
+    {
+        try
+        {
+            await _gameLaunchService.StartGameAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Starting the game after joining failed");
         }
     }
 
@@ -526,7 +554,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
             if (success)
             {
                 ConnectionState = ConnectionState.Connected;
-                // Dolphin attach is manual via GameState picker — see GameStateViewModel.
+                StartGameAfterJoin();
             }
             else
             {

@@ -7,7 +7,16 @@ public class GameSettings
     public string DolphinPath { get; set; } = "";
     public string GamePath { get; set; } = "";
     public string VanillaGamePath { get; set; } = "";
+
+    /// <summary>Start Dolphin with the patched game and attach to it after hosting or joining a room
+    /// (GameLaunchService). Only ever happens while the patched game is up to date.</summary>
     public bool AutoLaunchDolphin { get; set; } = true;
+
+    /// <summary>
+    /// The first-run setup has been finished or skipped (FirstRun). False in settings files from before
+    /// the setup existed: FirstRun marks those done when they already hold a working setup.
+    /// </summary>
+    public bool SetupCompleted { get; set; }
     public string PlayerName { get; set; } = "";
 
     // Appearance (puppet_shared.h APPEARANCE_CLOTHES_* / TUNIC_COLOR_DEFAULT_*)

@@ -47,27 +47,9 @@ public class GamePatcherService
     public string PatchDataPath { get; }
 
     /// <summary>
-    /// Validate that the vanilla game path contains the required files.
+    /// Validate that the vanilla game path is the extracted US game (<see cref="GameFolderCheck.CheckVanilla"/>).
     /// </summary>
-    public string? ValidateVanillaPath(string vanillaPath)
-    {
-        if (string.IsNullOrWhiteSpace(vanillaPath))
-            return "Vanilla game path is required";
-
-        if (!Directory.Exists(vanillaPath))
-            return $"Vanilla game folder not found: {vanillaPath}";
-
-        if (!File.Exists(Path.Combine(vanillaPath, "sys", "main.dol")))
-            return $"main.dol not found in {vanillaPath}/sys/";
-
-        if (!File.Exists(Path.Combine(vanillaPath, "files", "RELS.arc")))
-            return $"RELS.arc not found in {vanillaPath}/files/";
-
-        if (!File.Exists(Path.Combine(vanillaPath, "sys", "bi2.bin")))
-            return $"bi2.bin not found in {vanillaPath}/sys/";
-
-        return null;
-    }
+    public string? ValidateVanillaPath(string vanillaPath) => GameFolderCheck.CheckVanilla(vanillaPath).Error;
 
     /// <summary>
     /// Copy vanilla game files to the output folder and apply all patches. Prefers a live
@@ -109,8 +91,20 @@ public class GamePatcherService
     {
         // Both paths read the vanilla files from the UI's vanilla game folder (the live pipeline
         // overrides config.json's vanilla_game_path with it), so validate it up front.
-        var validationError = ValidateVanillaPath(vanillaPath);
+        var validationError = ValidateVanillaPath(vanillaPath) ?? GameFolderCheck.CheckPatchedFolder(vanillaPath, outputPath);
         if (validationError != null) return validationError;
+
+        // The patch steps only rewrite the files they change, so a new (empty) output folder first
+        // gets the rest of the game: Dolphin boots sys/main.dol only from a complete extracted disc.
+        try
+        {
+            await Task.Run(() => CopyMissingGameFiles(vanillaPath, outputPath, progress));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.Error(ex, "Copying the game into {OutputPath} failed", outputPath);
+            return $"Couldn't copy the game into {outputPath}: {ex.Message}";
+        }
 
         PatchSelection selection;
         try
@@ -310,6 +304,35 @@ public class GamePatcherService
             dir = dir.Parent;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Copy every file of the extracted game that <paramref name="outputPath"/> doesn't have yet
+    /// (all of it the first time, nothing after that). Existing files are left alone: the patch steps
+    /// overwrite the ones they change, and GamePatchApplier restores the ones optional patches touch.
+    /// </summary>
+    /// <returns>How many files were copied.</returns>
+    public static int CopyMissingGameFiles(string vanillaPath, string outputPath, IProgress<string>? progress = null)
+    {
+        var vanilla = Path.GetFullPath(vanillaPath);
+        var missing = Directory.EnumerateFiles(vanilla, "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(vanilla, f))
+            .Where(rel => !string.Equals(rel, BuildStamp.FileName, StringComparison.OrdinalIgnoreCase))
+            .Where(rel => !File.Exists(Path.Combine(outputPath, rel)))
+            .ToList();
+        if (missing.Count == 0) return 0;
+
+        Logger.Information("Copying {Count} game files from {Vanilla} into {Output}", missing.Count, vanilla, outputPath);
+        progress?.Report($"Copying the game into the patched folder (first time only): {missing.Count} files...");
+        for (int i = 0; i < missing.Count; i++)
+        {
+            var target = Path.Combine(outputPath, missing[i]);
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(Path.Combine(vanilla, missing[i]), target, overwrite: false);
+            if ((i + 1) % 250 == 0)
+                progress?.Report($"Copying the game into the patched folder (first time only): {i + 1} of {missing.Count} files...");
+        }
+        return missing.Count;
     }
 
     private static async Task CopyFileAsync(string source, string destination)

@@ -286,11 +286,14 @@ $clientsInfo = @()
 for ($n = 1; $n -le $Clients; $n++) {
     $name = "Player$n"
     $log = Join-Path $Latest "client-$name.log"
-    $c = Start-Process -FilePath $ClientExe -PassThru -ArgumentList @(
+    $clientArgs = @(
         '--player', $name, '--host', 'localhost', '--port', $Port,
         $(if ($n -eq 1 -and -not $DedicatedServer) { '--host-server' } else { '--auto-connect' }),
         '--auto-attach', '--dolphin-pid', $dolphins[$n - 1].Id,
         '--log-file', "`"$log`"")
+    # The client refuses to --auto-attach to a stale game unless told otherwise.
+    if ($AllowStale) { $clientArgs += '--allow-stale' }
+    $c = Start-Process -FilePath $ClientExe -PassThru -ArgumentList $clientArgs
     $clientsInfo += "  $name client pid $($c.Id) -> Dolphin pid $($dolphins[$n - 1].Id), log $log"
     Start-Sleep -Milliseconds 500
 }
