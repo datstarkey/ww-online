@@ -282,8 +282,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     private void UpdateAddress()
     {
-        var host = Server.IsHosting ? (LanAddress() ?? "localhost") : Server.ServerHost;
-        RoomAddress = $"{host}:{Server.ServerPort}";
+        RoomAddress = Server.IsHosting ? $"{LanAddress() ?? "localhost"}:{Server.ServerPort}" : Server.ServerAddress;
         RoomLabel = $"ROOM · {RoomAddress.ToUpperInvariant()}";
     }
 

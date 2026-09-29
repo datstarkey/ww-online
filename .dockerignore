@@ -1,0 +1,11 @@
+# Docker build context for WWOnline.Server/Dockerfile (built from the repo root).
+# Allow-list: the image needs only the server, the shared DTOs, the build props and the licence.
+# Everything else (the client, GameMod, tww-decomp, assets, logs, build output) stays out.
+*
+!Directory.Build.props
+!LICENSE
+!WWOnline.Server/
+!WWOnline.Shared/
+**/bin/
+**/obj/
+WWOnline.Server/Dockerfile

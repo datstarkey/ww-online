@@ -59,7 +59,27 @@ public class SignalRClientService : IAsyncDisposable
     private string _playerName = "";
     private string? _hostToken;
 
-    /// <param name="hostToken">The token passed to a server this client launched; claims room ownership.</param>
+    /// <summary>
+    /// The hub URL for what the player typed. A plain host ("192.168.1.20", "wwo.example.com")
+    /// means http://host:port. A full URL ("https://wwo.example.com", for a server behind a TLS
+    /// reverse proxy; docs/self-hosting.md) is used as it is, and the port field is ignored; the
+    /// hub path is added when the URL has no path.
+    /// </summary>
+    public static string BuildHubUrl(string host, int port)
+    {
+        host = host.Trim();
+        if (host.Contains("://", StringComparison.Ordinal) &&
+            Uri.TryCreate(host, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            var path = uri.AbsolutePath.TrimEnd('/');
+            return uri.GetLeftPart(UriPartial.Authority) + (path.Length == 0 ? HubConstants.HubPath : path);
+        }
+        return $"http://{host}:{port}{HubConstants.HubPath}";
+    }
+
+    /// <param name="hostToken">Claims room ownership: the token passed to a server this client
+    /// launched, or a dedicated server's owner key.</param>
     public async Task<(bool success, string message)> ConnectAsync(string host, int port, string playerName = "", string? hostToken = null)
     {
         await _connectionSemaphore.WaitAsync();
@@ -74,9 +94,9 @@ public class SignalRClientService : IAsyncDisposable
             }
 
             _playerName = playerName;
-            _hostToken = hostToken;
+            _hostToken = string.IsNullOrWhiteSpace(hostToken) ? null : hostToken.Trim();
             var connection = new HubConnectionBuilder()
-                .WithUrl($"http://{host}:{port}{HubConstants.HubPath}")
+                .WithUrl(BuildHubUrl(host, port))
                 .WithAutomaticReconnect()
                 .Build();
             _hubConnection = connection;

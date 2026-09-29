@@ -1,6 +1,7 @@
 name: CI
 
-# Every push and pull request: no Nintendo files, a 0-warning build, and both test projects.
+# Every push and pull request: no Nintendo files, a 0-warning build, both test projects, and the
+# dedicated server's Docker image (built for amd64 and smoke-tested, never pushed).
 
 on:
   push:
@@ -48,3 +49,53 @@ jobs:
 
       - name: Test patcher
         run: dotnet test WWOnline.Patcher.Tests/WWOnline.Patcher.Tests.csproj -c Release --no-build
+
+  server-image:
+    name: Server image (build + smoke test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v3
+
+      # amd64 only and loaded into the runner's Docker, not pushed. The release workflow builds
+      # both architectures and pushes.
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: WWOnline.Server/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ww-online-server:ci
+          build-args: |
+            VERSION=0.0.0-ci
+            COMMIT=${{ github.sha }}
+          cache-from: type=gha,scope=server-image
+          cache-to: type=gha,mode=max,scope=server-image
+
+      - name: Smoke test (/health, SignalR negotiate, healthy, graceful stop)
+        shell: bash
+        run: |
+          docker run -d --name wwo -p 6969:6969 -e WWO_OWNER_KEY=ci-key ww-online-server:ci
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:6969/health && break
+            sleep 1
+          done
+          echo
+          curl -fsS http://127.0.0.1:6969/health | grep -q '"status":"ok"'
+          curl -fsS -X POST "http://127.0.0.1:6969/gamehub/negotiate?negotiateVersion=1" | grep -q connectionToken
+          for _ in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' wwo)
+            [ "$status" = healthy ] && break
+            sleep 2
+          done
+          echo "health: $status"
+          [ "$status" = healthy ]
+          docker stop wwo
+          docker logs wwo
+          docker logs wwo 2>&1 | grep -q "Server stopped"
+          [ "$(docker inspect -f '{{.State.ExitCode}}' wwo)" = 0 ]

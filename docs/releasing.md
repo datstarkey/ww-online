@@ -13,7 +13,7 @@ Releases are GitHub Releases in this repo. Players install the app once (`WWOnli
    ```
    That's all. You don't edit a version file: the tag is the version. `Directory.Build.props` only holds the version that dev builds report.
 
-To rehearse without releasing, run the **Release** workflow by hand (Actions → Release → Run workflow) with a version like `0.0.1-dryrun`. It builds and packs everything and keeps the packages as a workflow artifact, but doesn't create a release.
+To rehearse without releasing, run the **Release** workflow by hand (Actions → Release → Run workflow) with a version like `0.0.1-dryrun`. It builds and packs everything and keeps the packages as a workflow artifact, but doesn't create a release. It also builds the server image for both architectures without pushing it.
 
 ## What the release workflow does
 
@@ -32,6 +32,7 @@ To rehearse without releasing, run the **Release** workflow by hand (Actions →
    - Runs `vpk pack`: packId `WWOnline`, title `WW-Online`, main exe `WWOnline.Client.exe`, icon `assets/branding/app.ico`.
    - Runs the guard on the packages (it opens the `.nupkg` and `Portable.zip`).
    - Runs `vpk upload github --publish` to create the release. `gh release upload` then attaches the server zips.
+4. **docker** (Linux, after **windows**, so an image only exists for a version that was released): builds the dedicated server's image from `WWOnline.Server/Dockerfile` for `linux/amd64` and `linux/arm64` (QEMU + Buildx) and pushes it to `ghcr.io/<owner>/ww-online-server` with the tags `<version>`, `<major>.<minor>` and `latest`. A pre-release only gets its exact version tag. The image reports the tag's version and commit in `/health`. A dry run builds both architectures and pushes nothing. Players and admins use it as described in [self-hosting.md](self-hosting.md).
 
 The release's assets are:
 - `WWOnline-win-Setup.exe`, the installer players download.
@@ -40,7 +41,20 @@ The release's assets are:
 - `releases.win.json` and `RELEASES`, the update feed.
 - `WW-Online-Server-<v>-*.zip`.
 
-The windows job uses `GITHUB_TOKEN` (`contents: write`); the patchdata job, which runs repo code in a third-party image, only gets `contents: read`. No secrets need setting up.
+The server image `ghcr.io/<owner>/ww-online-server:<v>` is pushed next to the release (step 4).
+
+The windows job uses `GITHUB_TOKEN` (`contents: write`); the patchdata job, which runs repo code in a third-party image, only gets `contents: read`; the docker job gets `contents: read` and `packages: write`. No secrets need setting up.
+
+CI (`ci.yml`) also builds the image for amd64 on every push and PR and smoke-tests it (`/health`, SignalR negotiate, the `HEALTHCHECK` turns healthy, a clean stop), so a broken Dockerfile shows up before a release.
+
+### The GHCR package: make it public once
+
+The first release push creates the `ww-online-server` package under the repo owner's account. GitHub links it to this repo by itself (the workflow pushes with this repo's `GITHUB_TOKEN`, and the image's `org.opencontainers.image.source` label names the repo), so it shows on the repo page and this repo's workflows can push to it. But a linked package inherits the repo's *access permissions*, not its *visibility*: **a new package is private**, and `docker pull` fails for everyone else until you change it. Once, after the first release:
+
+1. Open the package: the repo page → **Packages** → `ww-online-server` (or `https://github.com/users/<owner>/packages/container/package/ww-online-server`).
+2. **Package settings** → **Danger Zone** → **Change visibility** → **Public**. This can't be undone.
+
+Later pushes keep the visibility.
 
 ## PatchData
 
@@ -133,4 +147,4 @@ CI runs it on every push. The release workflow runs it on PatchData, the publish
 
 ## Renaming or moving the repo
 
-The GitHub owner/repo lives in one place: `WwoRepositoryUrl` in `Directory.Build.props`. It's the default update source for local and dev builds. Release builds use the repo the workflow runs in. The `README.md` badges and links name the repo too, so update them by hand.
+The GitHub owner/repo lives in one place: `WwoRepositoryUrl` in `Directory.Build.props`. It's the default update source for local and dev builds. Release builds use the repo the workflow runs in. The `README.md` badges and links name the repo too, and so do the image name in `docs/self-hosting.md`, `deploy/docker-compose.yml` and the OCI labels in `WWOnline.Server/Dockerfile`, so update them by hand. (The release workflow names the image after the repo owner and sets the image's labels from the repo it runs in, so released images are right either way.)

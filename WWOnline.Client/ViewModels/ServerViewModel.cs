@@ -45,6 +45,13 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     private string _serverPort = "6969";
 
+    /// <summary>
+    /// Optional, for joining a dedicated server that has an owner key (WWO_OWNER_KEY): entering it
+    /// makes this player the room owner. Not saved to disk.
+    /// </summary>
+    [ObservableProperty]
+    private string _ownerKey = "";
+
     [ObservableProperty]
     private ConnectionState _connectionState = ConnectionState.Disconnected;
 
@@ -65,10 +72,13 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     public string ConnectionInfoText => ConnectionState switch
     {
         ConnectionState.Hosting => $"Hosting on port {ServerPort}",
-        ConnectionState.Connected => $"Connected to {ServerHost}:{ServerPort}",
-        ConnectionState.Connecting => $"Connecting to {ServerHost}:{ServerPort}...",
+        ConnectionState.Connected => $"Connected to {ServerAddress}",
+        ConnectionState.Connecting => $"Connecting to {ServerAddress}...",
         _ => "Not connected"
     };
+
+    /// <summary>"host:port", or the URL as typed when the host field holds a full URL (reverse proxy).</summary>
+    public string ServerAddress => ServerHost.Contains("://", StringComparison.Ordinal) ? ServerHost.Trim() : $"{ServerHost}:{ServerPort}";
 
     public string DolphinStatusText => DolphinConnected ? "Connected" : "Not connected";
 
@@ -505,7 +515,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
             SavePlayerName();
             ConnectionState = ConnectionState.Connecting;
 
-            var (success, message) = await _signalRClient.ConnectAsync(ServerHost, port, PlayerName);
+            var (success, message) = await _signalRClient.ConnectAsync(ServerHost, port, PlayerName, OwnerKey);
             if (success)
             {
                 ConnectionState = ConnectionState.Connected;
