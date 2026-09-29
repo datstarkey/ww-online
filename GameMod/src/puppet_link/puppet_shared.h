@@ -40,7 +40,7 @@
  * Per-slot data — PUPPET_MAX_SLOTS × PUPPET_SLOT_SIZE bytes from PUPPET_SLOT_0.
  * Stride MUST cover every field or adjacent slots overlap (checked below).
  * ============================================================================ */
-#define PUPPET_SLOT_SIZE     0x48
+#define PUPPET_SLOT_SIZE     0x50
 #define PUPPET_SLOT_0        0x803FD010
 #define PUPPET_SLOT_BASE(i)  (PUPPET_SLOT_0 + ((i) * PUPPET_SLOT_SIZE))
 
@@ -76,9 +76,19 @@
 #define PUPPET_SLOT_OFF_STICK_DISTANCE    0x38  /* f32  (Link +0x35B0) */
 #define PUPPET_SLOT_OFF_MODE_FLG          0x3C  /* u32  (Link +0x3618) */
 #define PUPPET_SLOT_OFF_NO_RESET_FLG0     0x40  /* u32  (Link +0x29C)  */
-#define PUPPET_SLOT_OFF_NO_RESET_FLG1     0x44  /* u32  (Link +0x2A0) — last field */
-/* Adding a field past 0x47 means bumping PUPPET_SLOT_SIZE; the checks below and the
- * C# layout tests will fail until the tracking arrays are moved out of the way. */
+#define PUPPET_SLOT_OFF_NO_RESET_FLG1     0x44  /* u32  (Link +0x2A0)  */
+
+/* v3 held items (0x48..0x4F, puppet_held.c). 3 x 0x50 slots end exactly at PUPPET_PROC_IDS_ADDR,
+ * so the slot can't grow again without moving the tracking arrays (checked below). */
+#define PUPPET_SLOT_OFF_BODY_ANGLE_X      0x48  /* s16  mBodyAngle.x (Link +0x2B4): aim pitch */
+#define PUPPET_SLOT_OFF_BODY_ANGLE_Y      0x4A  /* s16  mBodyAngle.y (Link +0x2B6): aim yaw, relative to shape_angle.y */
+#define PUPPET_SLOT_OFF_GRAB_KIND         0x4C  /* u8   PUPPET_GRAB_KIND_*: what the peer carries (mActorKeepGrab) — last field */
+/* 0x4D..0x4F: padding, written as 0 */
+
+/* PUPPET_SLOT_OFF_GRAB_KIND values */
+#define PUPPET_GRAB_KIND_NONE             0     /* nothing carried, or something the puppet doesn't draw (pot, barrel...) */
+#define PUPPET_GRAB_KIND_BOMB             1     /* a bomb (fpcNm_BOMB_e): the REL draws one between the puppet's hands */
+#define PUPPET_GRAB_KIND_MAX              1
 
 /* Slot region end — tracking arrays below MUST start past this. */
 #define PUPPET_SLOT_REGION_END  (PUPPET_SLOT_0 + (PUPPET_SLOT_SIZE * PUPPET_MAX_SLOTS))
@@ -292,6 +302,17 @@
 #define DAPY_OFF_CUT_COMBO        0x34C4  /* u8  — m34C4 combo step (changeCutProc ++) */
 #define DAPY_OFF_NEXT_EQUIP_ITEM  0x3562  /* u16 — m3562: item held once the REST (draw/sheathe) anim finishes */
 #define DAPY_UPPER_ANM_REST       0xD7    /* draw/sheathe upper anim */
+/* Item take-out / put-away upper anims (dRes_INDEX_LKANM_BCK_*, GZLE01 LkAnm.h; setAnimeUnequipItem,
+ * d_a_player_main.cpp:3498). Like REST, m3562 holds the item Link will hold after the swap frame. */
+#define DAPY_UPPER_ANM_TAKE       0x103
+#define DAPY_UPPER_ANM_TAKEBOTH   0x104
+#define DAPY_UPPER_ANM_TAKEL      0x105
+#define DAPY_UPPER_ANM_TAKER      0x106
+#define DAPY_OFF_BODY_ANGLE_X     0x2B4   /* s16 — daPy_py_c::mBodyAngle.x (d_a_player.h:491) */
+#define DAPY_OFF_BODY_ANGLE_Y     0x2B6   /* s16 — mBodyAngle.y */
+#define DAPY_OFF_GRAB_ACTOR       0x3190  /* fopAc_ac_c* — mActorKeepGrab (0x318C, d_a_player_main.h:2088) .mActor (+0x4, :86) */
+#define FPC_OFF_PROC_NAME         0x08    /* s16 — base_process_class::mProcName (f_pc_base.h:16) */
+#define FPC_NAME_BOMB             0x128   /* fpcNm_BOMB_e (f_pc_name.h:308) */
 
 /* Guard detection (C# sets PUPPET_ACTION_FLAG_GUARD from the local Link's state) */
 #define DAPY_PROC_GUARD_0         0x0C
@@ -304,7 +325,10 @@
  * Compile-time layout checks (typedefs only — emit no code).
  * ============================================================================ */
 typedef char puppet_check_slot_fits[
-    (PUPPET_SLOT_OFF_NO_RESET_FLG1 + 4 <= PUPPET_SLOT_SIZE) ? 1 : -1];
+    (PUPPET_SLOT_OFF_NO_RESET_FLG1 + 4 <= PUPPET_SLOT_OFF_BODY_ANGLE_X &&
+     PUPPET_SLOT_OFF_BODY_ANGLE_X + 2 <= PUPPET_SLOT_OFF_BODY_ANGLE_Y &&
+     PUPPET_SLOT_OFF_BODY_ANGLE_Y + 2 <= PUPPET_SLOT_OFF_GRAB_KIND &&
+     PUPPET_SLOT_OFF_GRAB_KIND + 1 <= PUPPET_SLOT_SIZE && (PUPPET_SLOT_SIZE % 4) == 0) ? 1 : -1];
 typedef char puppet_check_slots_before_tracking[
     (PUPPET_SLOT_REGION_END <= PUPPET_PROC_IDS_ADDR) ? 1 : -1];
 typedef char puppet_check_header_before_slots[

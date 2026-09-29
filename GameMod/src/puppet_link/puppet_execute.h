@@ -12,6 +12,7 @@
 #include "../../include/ww_inlines.h"
 #include "puppet_shared.h"
 #include "puppet_boat.h"
+#include "puppet_held.h"
 
 // Forward declaration
 typedef struct PUPPET_class PUPPET_class;

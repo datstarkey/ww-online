@@ -807,8 +807,14 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
     daPy_lk_c__drawMirrorLightModel(link);
     dComIfGd_setListP1();
 
-    // Bottle contents model
+    // The held item's / bottle contents' btk and brk are registered on SHARED model data: use this
+    // puppet's for its entries below, the local Link's again after (puppet_held.c).
     J3DModel *mpBottleContentsModel = DAPY_LK_MPBOTTLECONTENTSMODEL(link);
+    J3DModelData *heldItemData = DAPY_LK_MPHELDITEMMODEL(link) ? J3DMODEL_MPMODELDATA(DAPY_LK_MPHELDITEMMODEL(link)) : NULL;
+    J3DModelData *contentsData = mpBottleContentsModel ? J3DMODEL_MPMODELDATA(mpBottleContentsModel) : NULL;
+    puppet_heldEntryItemAnms(link, heldItemData, contentsData);
+
+    // Bottle contents model
     if (mpBottleContentsModel)
     {
       daPy_lk_c__updateDLSetLight(link, mpBottleContentsModel, 0);
@@ -891,6 +897,7 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
     {
       daPy_lk_c__updateDLSetLight(link, mpBottleCapModel, 0);
     }
+    puppet_heldEntryItemAnms(realPlayer, heldItemData, contentsData);
 
     // Magic armor aura (6 models, daPy_aura_c = {J3DModel*, f32 frame})
     void *auraBrkAnm = DAPY_LK_MYAURA00RBRK_ANM(link);

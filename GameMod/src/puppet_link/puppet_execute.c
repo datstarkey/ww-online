@@ -43,6 +43,8 @@
 #define DVIBRATION_WORDS             (0x84 / 4)
 #define GAMEINFO_OFF_ITEM_LIFE_COUNT  0x5B5C // play.mItemLifeCount  f32 (play+0x48BC) - pending heart delta
 #define GAMEINFO_OFF_ITEM_MAGIC_COUNT 0x5B78 // play.mItemMagicCount s16 (play+0x48D8) - pending magic delta
+#define GAMEINFO_OFF_ITEM_ARROW_COUNT 0x5B80 // play.mItemArrowNumCount s16 (play+0x48E0) - pending arrow delta
+#define GAMEINFO_OFF_ITEM_BOMB_COUNT  0x5B84 // play.mItemBombNumCount s16 (play+0x48E4) - pending bomb delta
 #define GAMEINFO_OFF_ACT_STATUS       0x5BCD // play.mRStatus..mDoStatusForce, 6 x u8 (play+0x492D..0x4932)
 #define GAMEINFO_OFF_RSTATUS          0x5BCD // play.mRStatus (u8)
 #define DACTSTTS_DEFEND               0x36   // dActStts_DEFEND_e
@@ -314,6 +316,8 @@ typedef struct
   u32 vibration[DVIBRATION_WORDS];
   f32 itemLifeCount;
   s16 itemMagicCount;
+  s16 itemArrowCount; // makeItemType's bomb / the bow shot spend the LOCAL counts; no puppet path
+  s16 itemBombCount;  // should reach them (puppet_held.c), this makes sure (d_a_player_main.cpp:3700, d_a_player_bow.inc:144)
   u8 actStatus[6];
   u8 swordUsing;
   u8 *zelBasic;
@@ -335,6 +339,8 @@ static void puppet_guardBegin(daPy_lk_c *link, PuppetGlobalGuard *g)
     g->vibration[i] = vib[i];
   g->itemLifeCount = *(f32 *)(gameInfo + GAMEINFO_OFF_ITEM_LIFE_COUNT);
   g->itemMagicCount = *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_MAGIC_COUNT);
+  g->itemArrowCount = *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_ARROW_COUNT);
+  g->itemBombCount = *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_BOMB_COUNT);
   for (i = 0; i < 6; i++)
     g->actStatus[i] = *(gameInfo + GAMEINFO_OFF_ACT_STATUS + i);
 
@@ -375,6 +381,8 @@ static void puppet_guardEnd(PuppetGlobalGuard *g)
     vib[i] = g->vibration[i];
   *(f32 *)(gameInfo + GAMEINFO_OFF_ITEM_LIFE_COUNT) = g->itemLifeCount;
   *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_MAGIC_COUNT) = g->itemMagicCount;
+  *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_ARROW_COUNT) = g->itemArrowCount;
+  *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_BOMB_COUNT) = g->itemBombCount;
   for (i = 0; i < 6; i++)
     *(gameInfo + GAMEINFO_OFF_ACT_STATUS + i) = g->actStatus[i];
   if (g->zelBasic != NULL)
@@ -426,7 +434,8 @@ static int puppet_isRestartableProc(int proc)
          proc == 0x55 || proc == 0x56 || proc == 0x5B ||          // CUT_TURN, CUT_ROLL, JUMP_CUT
          proc == 0x1E || proc == 0x21 || proc == 0x22 ||          // FRONT_ROLL, SIDE_ROLL, BACK_JUMP
          proc == 0x24 || proc == 0x66 ||                          // AUTO_JUMP, DAMAGE
-         proc == 0x0D || proc == 0x6D || proc == 0x65;            // CROUCH_DEFENSE_SLIP, GUARD_SLIP, GUARD_CRASH
+         proc == 0x0D || proc == 0x6D || proc == 0x65 ||          // CROUCH_DEFENSE_SLIP, GUARD_SLIP, GUARD_CRASH
+         proc == 0x51 || proc == 0x92 || proc == 0xA5;            // HAMMER_SIDE_SWING, FAN_SWING, BOTTLE_SWING
 }
 
 /**
@@ -612,8 +621,17 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
     if (!puppet_swordReady(puppet))
       proc = PROC_WAIT;
   }
+  // Item procs get the item they use first (puppet_held.c); bow/hammer inits assert without it.
+  else if (!puppet_heldForProc(puppet, proc))
+  {
+    proc = PROC_WAIT;
+  }
+
+  // Item procs (puppet_held.c): real inits, or relabelled poses where the init is unsafe.
+  ok = puppet_heldInitProc(puppet, proc);
 
   // Extra parameters: 0 / current facing = the common "no special setup" default.
+  if (ok < 0)
   switch (proc)
   {
   // Locomotion
@@ -721,7 +739,7 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
   case 0x5B: ok = daPy_lk_c__procJumpCut_init(puppet, 0); break;
   case 0x5C: ok = daPy_lk_c__procJumpCutLand_init(puppet); break;
   // Not supported -> WAIT: 0x5A CUT_REVERSE (needs the daPy_ANM of the interrupted cut),
-  // 0x4B-0x54 Boko weapon / hammer (need the weapon actor / hammer model),
+  // 0x4B-0x50 Boko weapon (needs the weapon actor; the hammer 0x51-0x54 is in puppet_held.c),
   // 0x5D-0x64 parry BT_* (need the target enemy actor).
 
   // Damage
@@ -1035,8 +1053,10 @@ static int puppet_executeBody(daPy_lk_c *link)
     {
       daPy_lk_c__setBlendMoveAnime(link, -1.0f);
     }
-    else if (curProcNow == PROC_ATN_MOVE)
+    else if (curProcNow == PROC_ATN_MOVE || puppet_heldIsAtnMoveProc(curProcNow))
     {
+      // (BOOMERANG_MOVE / HOOKSHOT_MOVE / BOW_MOVE strafe the same way: procBoomerangMove,
+      // procBowMove -> setBlendAtnMoveAnime, d_a_player_boomerang.inc:233, d_a_player_bow.inc:313.)
       // procAtnMove(): setSpeedAndAngleAtn() then setBlendAtnMoveAnime(-1.0f). The strafe
       // direction comes from current.angle.y (move dir) vs shape_angle.y (facing); use the
       // network stick angle (STICK_ANGLE = the peer's m34E8, Link +0x34E8) as the move direction.
@@ -1070,7 +1090,12 @@ static int puppet_executeBody(daPy_lk_c *link)
   // REST upper-body anim started in puppet_readNetworkState and swaps mEquipItem = m3562 at
   // frame 7 (deleteEquipItem, + setSwordModel when drawing), then drops the upper anim
   // when it finishes. Side effects are puppet-local apart from what the execute guard undoes.
-  daPy_lk_c__checkItemAction(link);
+  // Skipped while a mirrored item anim holds UPPER_MOVE2 (puppet_held.c): its only branches for
+  // those are BOOMTHROW -> throwBoomerang() on a NULL actor and the BOOMCATCH reset. Then build
+  // an item a take-out anim just swapped in (mEquipItem = m3562 at the swap frame).
+  if (!puppet_heldUpperMirrored(link))
+    daPy_lk_c__checkItemAction(link);
+  puppet_heldFinishSwap(link);
 
   // Shield guard (R held). Vanilla execute calls setShieldGuard() every frame
   // (d_a_player_main.cpp:11382); it raises the ATNG upper-body anim while
@@ -1435,6 +1460,9 @@ static int puppet_executeBody(daPy_lk_c *link)
       cLib_addCalcAngleS(&DAPY_PY_BODY_ANGLE_Y(link), 0, 4, 0xC00, 0x180);
     }
   }
+
+  // Held item's bck frame and the peer's aim angles (puppet_held.c), before the model calc.
+  puppet_heldPose(link);
 
   // Neck and hat angles. Make the puppet look at the local PLAYER's face: setNeckAngle
   // targets mpAttnActorLockOn->eyePos, so point it at the player and temporarily raise the
@@ -1951,7 +1979,7 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
     puppet_setStickData(puppet, stick, targetStickAngle);
   }
   else if (targetProc == PROC_MOVE || targetProc == PROC_ATN_MOVE || targetProc == PROC_MOVE_TURN ||
-           targetProc == PROC_SWIM_MOVE)
+           targetProc == PROC_SWIM_MOVE || puppet_heldIsAtnMoveProc(targetProc))
   {
     f32 stick = netStickDistance;
     if (!(stick > 0.05f))
@@ -1973,34 +2001,12 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
     if (wantProc == PROC_FREE_WAIT)
       wantProc = PROC_WAIT;
 
-    // Sword in hand: mirror the peer's mEquipItem (slot EQUIP_ITEM; 0 = not written by an
-    // older client -> treated as "no sword", so it's sheathed after each cut). Sword procs
-    // always force it out instantly (puppet_applyProcInit). Outside cuts, draw/sheathe the
-    // way the real Link does: REST upper-body anim, item swap at frame 7 in checkItemAction
-    // (called every frame from puppet_execute).
-    if (!puppet_isSwordProc(wantProc) && !puppet_isSwordProc(DAPY_LK_MCURPROC(puppet)))
-    {
-      u16 netEquip = *(volatile u16 *)(slotBase + PUPPET_SLOT_OFF_EQUIP_ITEM);
-      int wantSword = (netEquip == DAPY_ITEM_SWORD);
-      u16 equip = PUPPET_DAPY_MEQUIPITEM(puppet);
-      int restAnim = (PUPPET_DAPY_UPPER2_ANM(puppet) == LKANM_BCK_REST);
-      u16 pending = PUPPET_DAPY_M3562(puppet);
-
-      if (wantSword && equip != DAPY_ITEM_SWORD &&
-          !(restAnim && pending == DAPY_ITEM_SWORD))
-      {
-        // setAnimeEquipSword returns early if !checkSwordEquip() (LOCAL save has no sword);
-        // in that case just draw it instantly.
-        daPy_lk_c__setAnimeEquipSword(puppet, 1);
-        if (PUPPET_DAPY_UPPER2_ANM(puppet) != LKANM_BCK_REST)
-          puppet_setSwordOut(puppet, 1);
-      }
-      else if (!wantSword && equip == DAPY_ITEM_SWORD &&
-               !(restAnim && pending == DAPY_ITEM_NONE))
-      {
-        daPy_lk_c__setAnimeUnequip(puppet); // REST anim, m3562 = NONE
-      }
-    }
+    // Item in hand: mirror the peer's mEquipItem (slot EQUIP_ITEM; 0 = not written by an
+    // older client -> treated as "nothing", so the sword is sheathed after each cut). Sword
+    // procs force the sword out instantly (puppet_applyProcInit), item procs their item.
+    // Otherwise draw / put away / swap the way the real Link does (REST or TAKE* upper anim,
+    // item swap in checkItemAction, called every frame from puppet_execute): puppet_held.c.
+    puppet_heldMirror(puppet, slotBase, wantProc);
 
     // One-shot procs carry the peer's (re)start sequence so a repeated swing re-inits.
     {
@@ -2017,6 +2023,10 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
       }
       puppet_requestProc(puppet, key, slotIndex);
     }
+
+    // The peer's upper-body item anim (aim hold, throw, catch, bow draw, carry), after the proc
+    // init so an init's own upper anim is what gets compared (puppet_held.c).
+    puppet_heldMirrorUpper(puppet, slotBase);
   }
 
   // mNormalSpeed LAST — after any proc_init above that may have reset it. The walk/run

@@ -61,6 +61,9 @@ public class PuppetSyncService : IDisposable
     private float _lastUnderFrame;
     private byte _lastCombo;
 
+    // Last local held item / carried kind written to the log ("[held]" line on change).
+    private (ushort Item, byte Grab) _lastLoggedHeld = (0, 0);
+
     // Pre-allocated buffers for the 20Hz write path to avoid GC pressure
     private readonly byte[] _headerBuf = new byte[GameMemoryAddresses.PuppetSync.HeaderSize];
     private readonly byte[][] _slotBufs = new byte[GameMemoryAddresses.PuppetSync.MaxSlots][];
@@ -892,6 +895,11 @@ public class PuppetSyncService : IDisposable
                         WriteBigEndianU32  (slotData, GameMemoryAddresses.PuppetSync.SlotOffset_NoResetFlg0,    puppet.Action.NoResetFlg0);
                         WriteBigEndianU32  (slotData, GameMemoryAddresses.PuppetSync.SlotOffset_NoResetFlg1,    puppet.Action.NoResetFlg1);
 
+                        // v3 held items: aim angles and what they carry (puppet_held.c).
+                        WriteBigEndianS16(slotData, GameMemoryAddresses.PuppetSync.SlotOffset_BodyAngleX, puppet.Action.BodyAngleX);
+                        WriteBigEndianS16(slotData, GameMemoryAddresses.PuppetSync.SlotOffset_BodyAngleY, puppet.Action.BodyAngleY);
+                        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_GrabKind] = HeldItemState.SanitizeGrabKind(puppet.Equipment.GrabKind);
+
                         slotBoat = puppet.Boat;
                     }
                 }
@@ -1003,10 +1011,20 @@ public class PuppetSyncService : IDisposable
                 curProc = (byte)(procId & 0xFF);
             }
 
-            // While the draw/sheathe (REST) anim plays, report the item Link WILL hold, so the puppet
-            // starts its own draw/sheathe at the same time instead of ~7 frames + a tick late.
-            if (upperAnmIdx == PuppetLayout.DAPY_UPPER_ANM_REST)
-                mEquipItem = ReadBigEndianU16FromAddress(actorBase + PuppetLayout.DAPY_OFF_NEXT_EQUIP_ITEM);
+            // While a draw / put-away anim (REST, TAKE*) plays, report the item Link WILL hold, so the
+            // puppet starts its own draw / put-away at the same time instead of a whole anim + a tick late.
+            if (HeldItemState.IsEquipAnim(upperAnmIdx))
+                mEquipItem = HeldItemState.ReportedItem(mEquipItem,
+                    ReadBigEndianU16FromAddress(actorBase + PuppetLayout.DAPY_OFF_NEXT_EQUIP_ITEM), upperAnmIdx);
+            short bodyAngleX = (short)ReadBigEndianU16FromAddress(actorBase + PuppetLayout.DAPY_OFF_BODY_ANGLE_X);
+            short bodyAngleY = (short)ReadBigEndianU16FromAddress(actorBase + PuppetLayout.DAPY_OFF_BODY_ANGLE_Y);
+            byte grabKind = HeldItemState.ReadGrabKind(_dolphin, actorBase);
+            if (_lastLoggedHeld != (mEquipItem, grabKind))
+            {
+                Logger.Information("[held] local item 0x{Old:X} -> 0x{New:X} carry {OldGrab} -> {NewGrab} (upper anim 0x{Upper:X}, proc 0x{Proc:X2})",
+                    _lastLoggedHeld.Item, mEquipItem, _lastLoggedHeld.Grab, grabKind, upperAnmIdx, curProc);
+                _lastLoggedHeld = (mEquipItem, grabKind);
+            }
 
             // Proc (re)start detection → ProcSeq. Combo swings re-init the SAME proc, which is only
             // visible as the lower-body anim frame jumping back or the combo counter ticking.
@@ -1050,6 +1068,9 @@ public class PuppetSyncService : IDisposable
                 Animation = new AnimationState
                 {
                     AnimationSpeed = speedF > 0.5f ? 1.0f : 0.0f,
+                    // m_anm_heap_upper[UPPER_MOVE2].mIdx (0xFFFF = none): the puppet mirrors the
+                    // item ones (aim holds, throws, bow draw, carry) and the draw / put-away timing.
+                    UpperBodyAnimation = upperAnmIdx,
                 },
                 Action = new ActionState
                 {
@@ -1064,6 +1085,8 @@ public class PuppetSyncService : IDisposable
                     NoResetFlg1 = mNoResetFlg1,
                     StickAngle = mStickAngle,
                     ProcSeq = _procSeq,
+                    BodyAngleX = bodyAngleX,
+                    BodyAngleY = bodyAngleY,
                     ActionFlags = guarding ? (byte)PuppetLayout.PUPPET_ACTION_FLAG_GUARD : (byte)0,
                 },
                 Equipment = new EquipmentState
@@ -1071,6 +1094,7 @@ public class PuppetSyncService : IDisposable
                     SwordId = _lastSword,
                     ShieldId = _lastShield,
                     ItemInHand = mEquipItem,
+                    GrabKind = grabKind,
                 },
                 Appearance = new AppearanceState
                 {
