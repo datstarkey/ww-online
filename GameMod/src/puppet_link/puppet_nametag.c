@@ -42,53 +42,65 @@ static void nametag_noop(PuppetNameTag *tag) { (void)tag; }
 /* dDlst_base_c vtable: {RTTI, this-offset, dtor, draw} (main.dol __vt__12dDlst_base_c 0x80375900). */
 static const void *const l_nametagVtbl[4] = {NULL, NULL, (const void *)nametag_noop, (const void *)nametag_draw};
 
-static int nametag_isBlockPtr(u32 a)
-{
-  return a >= 0x80000000 && a <= 0x83000000 - PUPPET_NAMES_BLOCK_SIZE && (a & 3) == 0; /* MEM1, 48MB */
-}
+/* ---- Boot-stamped game-heap blocks (names here, live world in puppet_liveworld.c) ----
+ * A small block the REL allocates once and never frees, so C# can write it at any time without racing
+ * a free; each REL instance adopts it by its magic (+0) and boot stamp (+8, __OSStartTime). A block from
+ * before a soft reset is not ours any more: its pointer and bytes survive, the game heap does not
+ * (puppet_shared.h PUPPET_NAMES_*). */
 
 /* __OSStartTime (u64, dolphin/os/OS.c:39): set once per boot by OSInit (:230). */
-static const volatile u32 *nametag_bootTime(void)
+static const volatile u32 *puppet_bootTime(void)
 {
   return (const volatile u32 *)&os____OSStartTime;
 }
 
-/* The published names block, or NULL. Only a block made in THIS boot: the pointer word and the old
- * block's bytes survive a soft reset, the game heap they pointed into does not (puppet_shared.h). */
-static u8 *nametag_block(void)
+/* The block published at ptrAddr, or NULL: MEM1 (48MB), aligned, magic set and made in THIS boot. */
+static u8 *puppet_bootBlock(u32 ptrAddr, u32 magic, u32 size)
 {
-  u32 a = *(volatile u32 *)PUPPET_NAMES_PTR_ADDR;
-  if (!nametag_isBlockPtr(a) || *(volatile u32 *)(a + PUPPET_NAMES_OFF_MAGIC) != PUPPET_NAMES_MAGIC)
+  u32 a = *(volatile u32 *)ptrAddr;
+  if (a < 0x80000000 || a > 0x83000000 - size || (a & 3) != 0 || *(volatile u32 *)a != magic)
     return NULL;
   const volatile u32 *stamp = (const volatile u32 *)(a + PUPPET_NAMES_OFF_BOOT);
-  const volatile u32 *boot = nametag_bootTime();
+  const volatile u32 *boot = puppet_bootTime();
   if (stamp[0] != boot[0] || stamp[1] != boot[1])
     return NULL;
   return (u8 *)a;
 }
 
-void puppet_nametag_onCreate(void)
+/* Adopt the block at ptrAddr, or allocate a zeroed one, stamp it and publish it there. */
+static void puppet_bootBlockCreate(u32 ptrAddr, u32 magic, u32 size)
 {
-  if (nametag_block())
+  if (puppet_bootBlock(ptrAddr, magic, size))
     return;
   /* None, or one from an earlier boot (never touch it: that memory is someone else's now). */
-  *(volatile u32 *)PUPPET_NAMES_PTR_ADDR = 0;
+  *(volatile u32 *)ptrAddr = 0;
   /* From the heap's tail (negative alignment, JKRExpHeap::do_alloc JKRExpHeap.cpp:110) so the
    * permanent block doesn't split the free space the stage allocates from. */
   AppAllocFn alloc = (AppAllocFn)(u32)JKRHeap__alloc; /* JKRHeap::alloc(u32, int, JKRHeap*) returns void* */
-  u8 *block = (u8 *)alloc(PUPPET_NAMES_BLOCK_SIZE, -4, mDoExt_getGameHeap());
+  u8 *block = (u8 *)alloc(size, -4, mDoExt_getGameHeap());
   if (!block)
     return;
   /* Magic last, then the pointer: C# reads the block concurrently and needs magic + stamp to use it
    * (after a reboot the new block often lands where the stale one was). */
   volatile u32 *words = (volatile u32 *)block;
-  for (u32 i = 0; i < PUPPET_NAMES_BLOCK_SIZE / 4; i++)
+  for (u32 i = 0; i < size / 4; i++)
     words[i] = 0;
-  const volatile u32 *boot = nametag_bootTime();
+  const volatile u32 *boot = puppet_bootTime();
   words[PUPPET_NAMES_OFF_BOOT / 4] = boot[0];
   words[PUPPET_NAMES_OFF_BOOT / 4 + 1] = boot[1];
-  words[PUPPET_NAMES_OFF_MAGIC / 4] = PUPPET_NAMES_MAGIC;
-  *(volatile u32 *)PUPPET_NAMES_PTR_ADDR = (u32)block;
+  words[0] = magic;
+  *(volatile u32 *)ptrAddr = (u32)block;
+}
+
+/* The published names block, or NULL. */
+static u8 *nametag_block(void)
+{
+  return puppet_bootBlock(PUPPET_NAMES_PTR_ADDR, PUPPET_NAMES_MAGIC, PUPPET_NAMES_BLOCK_SIZE);
+}
+
+void puppet_nametag_onCreate(void)
+{
+  puppet_bootBlockCreate(PUPPET_NAMES_PTR_ADDR, PUPPET_NAMES_MAGIC, PUPPET_NAMES_BLOCK_SIZE);
 }
 
 /* Would the game show its HUD now? The conditions dMeter_statusCheck hides it for (d_meter.cpp:746,

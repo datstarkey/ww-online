@@ -20,6 +20,8 @@
 #include "puppet_boat.c"
 // The peer's name above the puppet
 #include "puppet_nametag.c"
+// Create-only actors follow bits other players set (chests, walls, crystals, key locks)
+#include "puppet_liveworld.c"
 
 /* Process condition flags */
 #define PROC_CONDITION_INIT 0x08
@@ -213,6 +215,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   puppet_boatInit(&this->boat);
   puppet_nametag_onCreate();
   puppet_heldInit(&this->held);
+  puppet_liveworld_onCreate();
 
   // Setup actor in stage layer system
   fopAcM_setStageLayer(base);

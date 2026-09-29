@@ -23,6 +23,8 @@ namespace WWOnline.Services;
 ///
 /// Layer 2: item bits applied to the CURRENT stage are also ORed into the remote-item mask
 /// (scratch memory) so the puppet REL can despawn those placed items live.
+/// Live world: chest and switch bits applied to the current stage go to <see cref="LiveWorldPoke"/>,
+/// which hands them to the REL so actors that read their flag only at create catch up live.
 /// </summary>
 public class WorldFlagSyncService : IDisposable
 {
@@ -35,6 +37,7 @@ public class WorldFlagSyncService : IDisposable
     private readonly SignalRClientService _signalR;
     private readonly RoomSettingsService _room;
     private readonly DespawnWorker _despawnWorker;
+    private readonly LiveWorldPoke _liveWorld;
 
     // Guarded by _tickLock. _sent / _received / _sending are per connection (reset on Connected).
     private StageFlags[] _sent = NewSlots();
@@ -51,12 +54,13 @@ public class WorldFlagSyncService : IDisposable
     private uint _remoteItemMask;
 
     public WorldFlagSyncService(IDolphinService dolphin, SignalRClientService signalR, RoomSettingsService room,
-        DespawnWorker despawnWorker)
+        DespawnWorker despawnWorker, LiveWorldPoke liveWorld)
     {
         _dolphin = dolphin;
         _signalR = signalR;
         _room = room;
         _despawnWorker = despawnWorker;
+        _liveWorld = liveWorld;
     }
 
     public void Start()
@@ -136,7 +140,11 @@ public class WorldFlagSyncService : IDisposable
             _received[incoming.Slot].MergeFrom(incoming);
 
         // Room rule off: neither share nor apply. Local bits set meanwhile are sent when it's back on.
-        if (!_room.Current.SharedWorld) return;
+        if (!_room.Current.SharedWorld)
+        {
+            _liveWorld.SetStage(null); // nothing for the REL to catch up with
+            return;
+        }
 
         if (!_scene.Check(_dolphin)) return;
 
@@ -151,6 +159,7 @@ public class WorldFlagSyncService : IDisposable
             Logger.Information("[world] current stage slot {Old} -> {New}", _lastSlot, slot);
             _lastSlot = slot;
         }
+        _liveWorld.SetStage(slot);
 
         var savedBytes = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.SavedMemoryBase,
             StageFlags.SlotCount * GameMemoryAddresses.WorldFlags.MemorySize);
@@ -189,6 +198,9 @@ public class WorldFlagSyncService : IDisposable
                     _remoteItemMask |= missing.Item;
                     WriteRemoteItemMask(_remoteItemMask, slot.Value);
                 }
+                // Chests / switches that read their flag only at create: the REL catches them up
+                // once the next tick reads these bits back from the live copy.
+                _liveWorld.AddRemote(i, LiveWorldPoke.FromMemBit(missing.Tbox, missing.Switch));
             }
             else
             {
@@ -197,6 +209,22 @@ public class WorldFlagSyncService : IDisposable
             Logger.Information("[world] applied {Bits} shared bit(s) to slot {Slot}{Live}: {Flags}",
                 missing.BitCount, i, i == slot ? " (current stage, live)" : "", missing);
         }
+
+        if (slot.HasValue && liveBytes != null)
+            TickLiveWorld(Parse(liveBytes, 0, slot.Value));
+    }
+
+    /// <summary>
+    /// Hand the REL the chest / switch bits other players set here that the live copy now has (read back
+    /// this tick, before this tick's writes), and log what it acknowledged.
+    /// </summary>
+    private void TickLiveWorld(StageFlags live)
+    {
+        if (_liveWorld.Tick(_dolphin, LiveWorldPoke.FromMemBit(live.Tbox, live.Switch)) is not { } r) return;
+        if (r.Acknowledged is { IsEmpty: false } done)
+            Logger.Information("[world] live world: REL handled {Batch} ({Pokes} actor(s) updated so far)", done, r.PokeCount);
+        if (r.Published is { IsEmpty: false } batch)
+            Logger.Information("[world] live world: handing the REL {Batch}", batch);
     }
 
     /// <summary>

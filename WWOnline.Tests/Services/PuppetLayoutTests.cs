@@ -71,7 +71,7 @@ public class PuppetLayoutTests
             PuppetLayout.LOCAL_APPEARANCE_TAG_ADDR, PuppetLayout.LOCAL_APPEARANCE_WORD_ADDR,
             PuppetLayout.LOCAL_APPEARANCE_BLOCK_ADDR, PuppetLayout.LOCAL_APPEARANCE_IMAGE_ADDR,
             PuppetLayout.LOCAL_APPEARANCE_APPLIED_ADDR, PuppetLayout.LOCAL_APPEARANCE_STATUS_ADDR,
-            PuppetLayout.PUPPET_NAMES_PTR_ADDR,
+            PuppetLayout.PUPPET_NAMES_PTR_ADDR, PuppetLayout.LIVEWORLD_PTR_ADDR,
         ];
         Assert.Equal(scratch.Length, scratch.Distinct().Count());
         Assert.All(scratch, a => Assert.Equal(0u, a % 4));
@@ -319,5 +319,24 @@ public class PuppetLayoutTests
     {
         Assert.Equal(PuppetLayout.PUPPET_SLOT_SIZE, GameMemoryAddresses.PuppetSync.SlotSize);
         Assert.Equal(PuppetLayout.PUPPET_SLOT_0 + 2u * PuppetLayout.PUPPET_SLOT_SIZE, GameMemoryAddresses.PuppetSync.GetSlotBase(2));
+    }
+
+    [Fact]
+    public void LiveWorldBlock_FieldsFitAndAlign()
+    {
+        // Same boot-stamped block shape as the names block (puppet_bootBlock is shared).
+        Assert.Equal(PuppetLayout.PUPPET_NAMES_OFF_MAGIC, PuppetLayout.LIVEWORLD_OFF_MAGIC);
+        Assert.Equal(PuppetLayout.PUPPET_NAMES_OFF_BOOT, PuppetLayout.LIVEWORLD_OFF_BOOT);
+        // C# writes TAG, ZONE_ROOM and BITS in one go (LiveWorldPoke.Publish).
+        Assert.Equal(PuppetLayout.LIVEWORLD_OFF_TAG + 4, PuppetLayout.LIVEWORLD_OFF_ZONE_ROOM);
+        Assert.Equal(PuppetLayout.LIVEWORLD_OFF_ZONE_ROOM + 4, PuppetLayout.LIVEWORLD_OFF_BITS);
+        Assert.True(PuppetLayout.LIVEWORLD_OFF_BOOT + 8 <= PuppetLayout.LIVEWORLD_OFF_TAG);
+        Assert.True(PuppetLayout.LIVEWORLD_OFF_BITS + PuppetLayout.LIVEWORLD_BIT_WORDS * 4 <= PuppetLayout.LIVEWORLD_OFF_DONE_SEQ);
+        Assert.True(PuppetLayout.LIVEWORLD_OFF_WAIT + 4 <= PuppetLayout.LIVEWORLD_BLOCK_SIZE);
+        foreach (var offset in new[] { PuppetLayout.LIVEWORLD_OFF_SEQ, PuppetLayout.LIVEWORLD_OFF_TAG, PuppetLayout.LIVEWORLD_OFF_BITS,
+                     PuppetLayout.LIVEWORLD_OFF_DONE_SEQ, PuppetLayout.LIVEWORLD_OFF_POKE_COUNT, PuppetLayout.LIVEWORLD_OFF_WAIT })
+            Assert.Equal(0, offset % 4);
+        // 1 chest word + switches 0x00-0xFF.
+        Assert.Equal(1 + 0x100 / 32, PuppetLayout.LIVEWORLD_BIT_WORDS);
     }
 }

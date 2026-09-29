@@ -957,4 +957,60 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define DAITEM_STATUS_IDLE0                0
 #define DAITEM_STATUS_IDLE1                1
 
+/* ============================================================================ */
+/* LIVE WORLD (puppet_liveworld.c) — actors that read a flag only at create.    */
+/* Offsets verified in the GZLE01 DOL / the actor RELs (docs/live-world.md).    */
+/* ============================================================================ */
+
+// base_process_class::mLyTg.mpLayer (f_pc_base.h:21 + f_pc_layer_tag.h: create_tag_class is 0x14):
+// the layer the process lives in. fpcBs_Execute makes it current around every execute (DOL 0x8003C924:
+// lwz r3,0x2C(r31); bl fpcLy_SetCurrentLayer), and fopAcM_create creates in the CURRENT layer (DOL 0x80024568).
+#define BASE_LAYER(p)            (*(layer_class**)((u8*)(p) + 0x2C))
+// fopAc_Create copies the create append (DOL 0x80023CD4..): home.pos 0x1D0, home.angle 0x1DC, argument 0x1C1,
+// scale 0x214 (= append scale * 0.1; x10 -> u8 -> x0.1 round-trips every u8 exactly), home.roomNo 0x1E2.
+#define FOPAC_HOME_POS(ac)       ((cXyz*)((u8*)(ac) + 0x1D0))
+#define FOPAC_HOME_ANGLE(ac)     ((csXyz*)((u8*)(ac) + 0x1DC))
+
+// play.mEvtCtrl.mOrderCount (d_event.h:152, +0xC0; DOL dEvt_control_c::order 0x8006FF04: lbz r0,0xC0(r30)):
+// events ordered this frame, started by the next dEvt_control_c::check. An order holds ACTOR POINTERS
+// (d_event.cpp:45), so never delete an actor while one is queued.
+#define GAMEINFO_EVT_ORDER_COUNT(gameInfo) (*(volatile s8*)((u8*)(gameInfo) + 0x5298))
+
+// dStage_roomControl_c::mStatus[64] (d_stage.h:855-869, stride 0x114). mFlags +0x104: 0x01 loaded, 0x02 loading,
+// 0x04 unloading (d_stage.cpp:216-240, d_s_room.cpp:93-99); mZoneNo +0x107 (DOL checkRoomDisp 0x80040E48: lbz r3,0x104;
+// getZoneNo 0x8005DCE0: lbz r3,0x107).
+#define ROOM_STATUS(room)        ((u8*)dStage_roomControl_c__mStatus + ((room) * 0x114))
+#define ROOM_STATUS_FLAGS(room)  (*(volatile u8*)(ROOM_STATUS(room) + 0x104))
+#define ROOM_STATUS_ZONE_NO(room) (*(volatile s8*)(ROOM_STATUS(room) + 0x107))
+#define ROOM_FLAG_LOADED         0x01
+#define ROOM_FLAG_BUSY           0x06  // loading or unloading
+#define ROOM_MAX                 64
+#define ZONE_MAX                 32    // dSv_info_c::ZONE_MAX; isSwitch ASSERTS (OSPanic) on a zone switch of a room without one
+
+// Proc names, read from each REL's g_profile (+0x08) in the vanilla RELS.arc / files/rels.
+#define PROC_NAME_TBOX           0x126 // d_a_tbox
+#define PROC_NAME_WALL           0x1B1 // d_a_wall (bombable wall)
+#define PROC_NAME_FLOOR          0x062 // d_a_floor (breakable floor)
+#define PROC_NAME_OBJ_ICE        0x1D2 // d_a_obj_ice (ice block)
+#define PROC_NAME_MJDOOR         0x047 // d_a_obj_majyuu_door (FF barricade)
+#define PROC_NAME_SAKU           0x191 // d_a_saku (wooden barricade)
+#define PROC_NAME_SWHIT0         0x1C9 // d_a_swhit0 (crystal switch)
+#define PROC_NAME_DOOR10         0x12E // d_a_door10
+#define PROC_NAME_DOOR12         0x12F // d_a_door12
+
+// daTbox_c (d_a_tbox.h:35-36, d_a_tbox.cpp:23-31): tbox no. = (prm >> 7) & 0x1F, swNo = (prm >> 12) & 0xFF,
+// funcType = prm & 0x7F. checkOpen (REL .text 0xCD8) reads STAGE_SEA2's tbox for funcs 7/8, else the live one.
+#define TBOX_FUNC(prm)           ((prm) & 0x7F)
+#define TBOX_FUNC_ENEMIES        2     // appears when your enemies are dead; its switch is read only at create
+#define TBOX_FUNC_EXTRA_SAVE     7     // 7 and 8 read another stage's chest bits
+
+// Doors (d_door.cpp: getSwbit = prm & 0xFF, DOL 0x8006B39C). dDoor_key2_c mbEnabled at +0 (keyOn/keyOff DOL
+// 0x8006C948/0x8006C954). setKey (door10 REL .text 0xC8, door12 0xC0) gives keyOff whenever swbit < 0x80 and it is
+// set, for every door type. The action byte selects l_action[] (1 = Wait); only actionInit (0) re-runs setKey.
+#define DOOR10_KEYLOCK_OFF       0x308 // door10 setKey: addi r3,r31,0x308 before keyOn/keyOff
+#define DOOR10_ACTION_OFF        0x354 // door10 actionInit: li r0,1; stb r0,0x354(r31)
+#define DOOR12_KEYLOCK_OFF       0x2E4 // door12 setKey: addi r3,r31,0x2E4
+#define DOOR12_ACTION_OFF        0x314 // door12 actionInit: stb r0,0x314(r31)
+#define DOOR_ACTION_WAIT         1
+
 #endif /* WW_INLINES_H */

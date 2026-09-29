@@ -126,6 +126,34 @@ public static class PuppetLayout
     public const uint PUPPET_EQUIP_SWAP_ACTIVE_ADDR = 0x803FD144;
     /// <summary>u32 C: ++ at swap start and end (odd = in progress)</summary>
     public const uint PUPPET_EQUIP_SWAP_SEQ_ADDR = 0x803FD148;
+    /// <summary>u32 C: live-world block (game heap), 0 = none yet</summary>
+    public const uint LIVEWORLD_PTR_ADDR = 0x803FD14C;
+    /// <summary>"LIVE"</summary>
+    public const int LIVEWORLD_MAGIC = 0x4C495645;
+    /// <summary>"LW" | saveTbl</summary>
+    public const int LIVEWORLD_TAG_MAGIC = 0x4C570000;
+    public const int LIVEWORLD_BLOCK_SIZE = 0x48;
+    /// <summary>tbox + 8 switch words</summary>
+    public const int LIVEWORLD_BIT_WORDS = 9;
+    public const int LIVEWORLD_ZONE_ROOM_NONE = 0xFF;
+    /// <summary>u32 C: LIVEWORLD_MAGIC once set up</summary>
+    public const int LIVEWORLD_OFF_MAGIC = 0x00;
+    /// <summary>u32 C#: seqlock, odd while C# writes</summary>
+    public const int LIVEWORLD_OFF_SEQ = 0x04;
+    /// <summary>u32[2] C: __OSStartTime of the boot that allocated it</summary>
+    public const int LIVEWORLD_OFF_BOOT = 0x08;
+    /// <summary>u32 C#: LIVEWORLD_TAG_MAGIC | saveTbl the batch belongs to</summary>
+    public const int LIVEWORLD_OFF_TAG = 0x10;
+    /// <summary>u32 C#: room of the zone bits (words 7, 8), else LIVEWORLD_ZONE_ROOM_NONE</summary>
+    public const int LIVEWORLD_OFF_ZONE_ROOM = 0x14;
+    /// <summary>u32[9] C#: the batch of new bits (see above)</summary>
+    public const int LIVEWORLD_OFF_BITS = 0x18;
+    /// <summary>u32 C: SEQ of the last batch handled</summary>
+    public const int LIVEWORLD_OFF_DONE_SEQ = 0x3C;
+    /// <summary>u32 C: ++ per actor re-created or unlocked</summary>
+    public const int LIVEWORLD_OFF_POKE_COUNT = 0x40;
+    /// <summary>u32 C: passes held back for an actor still being created</summary>
+    public const int LIVEWORLD_OFF_WAIT = 0x44;
     /// <summary>u32 C#: LOCAL_APPEARANCE_MAGIC while WORD is valid (else REL uses game default + vanilla colour)</summary>
     public const uint LOCAL_APPEARANCE_TAG_ADDR = 0x803FD150;
     /// <summary>"LAPP"</summary>
