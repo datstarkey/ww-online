@@ -22,6 +22,7 @@
 #include "puppet_boat.c"
 // The peer's name above the puppet
 #include "puppet_nametag.c"
+#include "puppet_seachart.c"
 // Create-only actors follow bits other players set (chests, walls, crystals, key locks)
 #include "puppet_liveworld.c"
 // Animator pointers the puppet writes into Link's shared model data (swapped per window)
@@ -240,6 +241,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   this->appearanceCounted = 1;
   puppet_boatInit(&this->boat);
   puppet_nametag_onCreate();
+  puppet_seachart_onCreate();
   puppet_fx_onCreate();
   puppet_anmMirrorOnCreate(this->slotIndex);
   puppet_heldInit(&this->held);
@@ -567,6 +569,8 @@ int daPuppet_Delete(PUPPET_class *this)
   // the REL being unloaded. Packets live in this (about to be freed) instance.
   puppet_appearance_onDelete(&this->lookBlock, (int)this->appearanceCounted);
   this->appearanceCounted = 0;
+  if (l_appLiveCount == 0)
+    puppet_seachart_onLastDelete();
 
   puppet_boatDelete(&this->boat);
   puppet_heldDelete(&this->held);

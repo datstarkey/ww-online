@@ -360,6 +360,36 @@
 #define RESTIMG_OFF_IMAGE_OFFSET      0x1C        /* ResTIMG::imageOffset, relative to the header (JUTTexture.h:36) */
 
 /* ============================================================================
+ * Sea chart (puppet_seachart.c): the other players on the Great Sea, drawn on the sea chart screen
+ * (dMenu_Fmap_c) next to Link's own marker. Actors don't run while the menu is open, so a required DOL
+ * patch (src/patches/seachart_players.asm) calls the REL from dDlst_FMAP_c::draw, right after the
+ * chart's J2DScreen has drawn: SEACHART_FN_ADDR holds the REL's draw function while a REL is loaded (set at
+ * every puppet create, cleared when the last puppet is deleted, before the REL is unlinked). The patch
+ * puts code in @NextFreeSpace, so the scratch region is always the start of the DOL's Text2 section,
+ * zero-filled again at every boot: a stale pointer can't outlive a reset.
+ * The players come from a game-heap block made and adopted like the names block (magic, boot stamp,
+ * never freed; SEACHART_PTR_ADDR): C# writes every other player who is on the sea stage, visible
+ * as a puppet or not, and keeps a (parked) puppet around while any is, so the REL is loaded when the
+ * chart opens. Entries with SEACHART_FLAG_SHOW clear are skipped.
+ * ============================================================================ */
+#define SEACHART_FN_ADDR              0x803FD12C  /* u32 C: puppet_seachart_draw while a REL is loaded, else 0 (read by seachart_players.asm) */
+#define SEACHART_PTR_ADDR             0x803FCFAC  /* u32 C: sea chart block (game heap), 0 = none yet */
+#define SEACHART_MAGIC                0x53434854  /* "SCHT" */
+#define SEACHART_OFF_BOOT             0x08        /* u32[2] C: __OSStartTime of the allocating boot (= PUPPET_NAMES_OFF_BOOT) */
+#define SEACHART_OFF_ENTRY0           0x10        /* entries, SEACHART_ENTRY_SIZE each */
+#define SEACHART_MAX_ENTRIES          8
+#define SEACHART_ENTRY_SIZE           0x10
+#define SEACHART_BLOCK_SIZE           0x90        /* SEACHART_OFF_ENTRY0 + SEACHART_MAX_ENTRIES * SEACHART_ENTRY_SIZE */
+#define SEACHART_E_OFF_X              0x00        /* f32 C#: current.pos.x */
+#define SEACHART_E_OFF_Z              0x04        /* f32 C#: current.pos.z */
+#define SEACHART_E_OFF_ANGLE          0x08        /* s16 C#: shape_angle.y (the boat's while they sail) */
+#define SEACHART_E_OFF_FLAGS          0x0A        /* u8  C#: SEACHART_FLAG_* */
+#define SEACHART_E_OFF_R              0x0C        /* u8  C#: marker colour (their tunic colour) */
+#define SEACHART_E_OFF_G              0x0D
+#define SEACHART_E_OFF_B              0x0E
+#define SEACHART_FLAG_SHOW            0x01        /* a player on the sea: draw them */
+
+/* ============================================================================
  * Per-slot boat: the peer's King of Red Lions while they ride it. Written by C# at 20Hz with
  * the slot; FLAGS == 0 means no boat. Read by puppet_boat.c, which draws its own copy of the
  * boat (hull + head from the "Ship" archive) and seats the puppet in it. Fields mirror the
@@ -551,6 +581,11 @@ typedef char puppet_check_slot_fits[
      PUPPET_SLOT_OFF_GRAB_KIND + 1 <= PUPPET_SLOT_OFF_GRAB_FUSE &&
      PUPPET_SLOT_OFF_GRAB_FUSE + 1 <= PUPPET_SLOT_OFF_BOAT_COLOR && (PUPPET_SLOT_OFF_BOAT_COLOR % 2) == 0 &&
      PUPPET_SLOT_OFF_BOAT_COLOR + 2 <= PUPPET_SLOT_SIZE && (PUPPET_SLOT_SIZE % 4) == 0) ? 1 : -1];
+typedef char puppet_check_seachart_block[
+    (SEACHART_BLOCK_SIZE == SEACHART_OFF_ENTRY0 + SEACHART_MAX_ENTRIES * SEACHART_ENTRY_SIZE &&
+     SEACHART_OFF_BOOT == PUPPET_NAMES_OFF_BOOT && SEACHART_E_OFF_B < SEACHART_ENTRY_SIZE &&
+     SEACHART_FN_ADDR >= PUPPET_ANM_PTR_ADDR + 4 && SEACHART_FN_ADDR + 4 <= FRAME_COUNTER_ADDR &&
+     SEACHART_PTR_ADDR >= SCRATCH_REGION_START + 4 && SEACHART_PTR_ADDR + 4 <= SPAWN_FRAME_COUNTER_ADDR) ? 1 : -1];
 typedef char puppet_check_slots_before_tracking[
     (PUPPET_SLOT_REGION_END <= PUPPET_PROC_IDS_ADDR) ? 1 : -1];
 typedef char puppet_check_boat_cannon_words[

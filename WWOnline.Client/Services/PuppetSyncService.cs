@@ -996,10 +996,18 @@ public class PuppetSyncService : IDisposable
             // and placed items still to despawn, ask for slot 0 anyway — left inactive, the hook
             // spawns it PARKED (invisible, no collision) just to run the scan. Same for the local
             // Link's outfit/colour (applied by the REL), until it shows the local player's choice, and
-            // for the live world (LiveWorldPoke) while the REL has a batch of other players' bits to handle.
+            // for the live world (LiveWorldPoke) while the REL has a batch of other players' bits to handle, and for
+            // the sea chart while another player is on the sea with us.
             // (Non-short-circuit | : every check updates its own state every tick.)
+            // The other players on the sea chart (SeaChartMarkers): everyone on the sea, visible or not. The chart
+            // calls into the REL while the menu is open, so keep one loaded while they're on the sea with us.
+            var chartPlayers = _remotePuppets
+                .Where(kv => !_lastPuppetReceive.TryGetValue(kv.Key, out var rx) || (now - rx).TotalMilliseconds < StaleDataMillis)
+                .Select(kv => kv.Value).ToList();
+            bool chartNeedsRel = SeaChartMarkers.Publish(_dolphin, localStage, chartPlayers);
+
             int desiredCount = highestActiveSlot + 1;
-            if (_despawnWorker.IsNeeded(_dolphin) | _liveWorld.IsNeeded(_dolphin) | LocalLookNeedsRel(linkPtr!.Value, localLook))
+            if (_despawnWorker.IsNeeded(_dolphin) | _liveWorld.IsNeeded(_dolphin) | LocalLookNeedsRel(linkPtr!.Value, localLook) | chartNeedsRel)
                 desiredCount = Math.Max(desiredCount, 1);
             WriteSyncHeader(GameMemoryAddresses.PuppetSync.Magic, desiredCount);
 
