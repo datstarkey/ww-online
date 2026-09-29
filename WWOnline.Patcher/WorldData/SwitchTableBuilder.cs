@@ -36,7 +36,7 @@ public static class SwitchTableBuilder
     /// BUMP whenever <see cref="SettersOf"/> or <see cref="Build"/> classify differently: it is part of the
     /// build stamp's hash (BuildStamp), so games patched with older rules read as stale and get patched again.
     /// </summary>
-    public const int RulesVersion = 2;
+    public const int RulesVersion = 3; // 3: boulders (Stone2), light walls (MkieK), normal warp jars
 
     /// <summary>l_objectName (d_stage.cpp:437, symbols.txt .data 0x80372818 size 0x26AC): dStage_objectNameInf
     /// {char name[8]; s16 procname; s8 argument; s8 gbaName;}, 0xC bytes each.</summary>
@@ -46,9 +46,9 @@ public static class SwitchTableBuilder
 
     // Proc names, each read from its REL's g_profile (+0x08) in the vanilla RELS.arc / files/rels.
     public const short ProcAlldie = 0x016, ProcSwpush = 0x01D, ProcSwheavy = 0x01E, ProcMovebox = 0x02D,
-        ProcMjDoor = 0x047, ProcFloor = 0x062, ProcEp = 0x0BA, ProcTbox = 0x126, ProcSwc00 = 0x12C,
+        ProcWarpt = 0x043, ProcMjDoor = 0x047, ProcMkiek = 0x04E, ProcFloor = 0x062, ProcEp = 0x0BA, ProcTbox = 0x126, ProcSwc00 = 0x12C,
         ProcDoor10 = 0x12E, ProcDoor12 = 0x12F, ProcAndsw0 = 0x135, ProcAndsw2 = 0x136, ProcSaku = 0x191,
-        ProcWall = 0x1B1, ProcSwhit0 = 0x1C9, ProcIce = 0x1D2, ProcTimer = 0x1E1;
+        ProcWall = 0x1B1, ProcSwhit0 = 0x1C9, ProcStone2 = 0x1CD, ProcIce = 0x1D2, ProcTimer = 0x1E1;
 
     /// <summary>Object name → process name, from main.dol's l_objectName.</summary>
     public static Dictionary<string, short> ReadObjectNames(DolPatcher dol)
@@ -89,11 +89,26 @@ public static class SwitchTableBuilder
             }
             // Broken for good: d_a_wall.cpp:303, d_a_floor.cpp:86, d_a_obj_ice.cpp:388 (param_on_swSave),
             // d_a_obj_majyuu_door.cpp:219, d_a_saku.cpp:371-392 (two halves).
+            // Light-dissolved wall MkieK (d_a_obj_mkiek.cpp:174, sw = prm & 0xFF) too.
             case ProcWall:
             case ProcFloor:
             case ProcIce:
             case ProcMjDoor:
+            case ProcMkiek:
                 yield return new((int)p & 0xFF, room, SwitchUse.Latching);
+                break;
+            // Black boulder / Ekao (daStone2, sw = (prm >> 8) & 0xFF): set when it breaks or is lifted
+            // (d_a_stone2.cpp:273, :513). The ones on DRC's and ET's warp jars uncover them.
+            case ProcStone2:
+                yield return new((int)(p >> 8) & 0xFF, room, SwitchUse.Latching);
+                break;
+            case ProcWarpt:
+                // Warp jar (d_a_obj_warpt.cpp:705-764): type = prm & 0xF. A normal jar (not 2-4) sets its lid switch
+                // angle.x & 0xFF when the lid breaks (openHuta, :396), type 1 at create (:718); its partner reads
+                // it live when you warp (normalWarp). The three-way dungeon jars (types 2-4) keep their lids in an
+                // event register and only read angle.x & 0xFF (the switch of whatever covers them).
+                if ((p & 0xF) is not (2 or 3 or 4))
+                    yield return new(a.AngleX & 0xFF, room, SwitchUse.Latching);
                 break;
             case ProcSaku:
                 yield return new((int)(p >> 8) & 0xFF, room, SwitchUse.Latching);

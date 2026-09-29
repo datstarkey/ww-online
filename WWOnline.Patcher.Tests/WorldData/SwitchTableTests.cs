@@ -36,6 +36,9 @@ public class SwitchTableTests : IDisposable
         ["and2"] = SwitchTableBuilder.ProcAndsw2,
         ["bars"] = SwitchTableBuilder.ProcDoor10,
         ["wall"] = SwitchTableBuilder.ProcWall,
+        ["boulder"] = SwitchTableBuilder.ProcStone2,
+        ["lightwall"] = SwitchTableBuilder.ProcMkiek,
+        ["jar"] = SwitchTableBuilder.ProcWarpt,
     };
 
     private static PlacedActor A(string name, uint prm, int room = 0, short ax = 0, short az = 0, string stage = "Dun") =>
@@ -95,6 +98,48 @@ public class SwitchTableTests : IDisposable
         Assert.False(t.Zone.ContainsKey("DunBoss"));
         Assert.Equal([0x81], t.Dan["Dun"]);           // the same slot's other stage is another visit
         Assert.False(t.Dan.ContainsKey("DunBoss"));  // (where it's timed)
+    }
+
+    [Fact]
+    public void WarpJars_BouldersAndLightWalls_Latch()
+    {
+        // WarpD-style normal jars (type 0 lidded, type 1 open at create): lid switch angle.x & 0xFF, the partner's
+        // in angle.x >> 8 is only read. A three-way dungeon jar (types 2-4) only reads angle.x & 0xFF (the switch of
+        // the boulder / light wall on it). Boulder: (prm >> 8) & 0xFF; light wall: prm & 0xFF.
+        var t = Table(
+            A("jar", 0x00001040, room: 0, ax: unchecked((short)0x8184)),
+            A("jar", 0x00002011, room: 0, ax: unchecked((short)0x8281)),
+            A("jar", 0x02010003, room: 0, ax: unchecked((short)0xFF88)),
+            A("jar", 0x03020143, room: 2, ax: unchecked((short)0xFFE1)),
+            A("boulder", 0xF47FE23F, room: 2),
+            A("lightwall", 0x000000E3, room: 2));
+        Assert.Equal([0x81, 0x84], t.Dan["Dun"]);    // not 0x82 (a partner) nor 0x88 (read by a three-way jar)
+        Assert.Equal([0xE2, 0xE3], t.Zone["Dun"][2]); // not 0xE1 (read by a three-way jar)
+    }
+
+    [Fact]
+    public void Rel_ProcNames_MatchTheTable()
+    {
+        // puppet_liveworld.c re-creates these; both sides must name the same processes.
+        var inl = File.ReadAllText(Path.Combine(TestRepo.GameMod, "include", "ww_inlines.h"));
+        short Proc(string name)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(inl, @"#define\s+PROC_NAME_" + name + @"\s+0x([0-9A-Fa-f]+)");
+            Assert.True(m.Success, "PROC_NAME_" + name + " not in ww_inlines.h");
+            return Convert.ToInt16(m.Groups[1].Value, 16);
+        }
+        Assert.Equal(SwitchTableBuilder.ProcTbox, Proc("TBOX"));
+        Assert.Equal(SwitchTableBuilder.ProcWall, Proc("WALL"));
+        Assert.Equal(SwitchTableBuilder.ProcFloor, Proc("FLOOR"));
+        Assert.Equal(SwitchTableBuilder.ProcIce, Proc("OBJ_ICE"));
+        Assert.Equal(SwitchTableBuilder.ProcMjDoor, Proc("MJDOOR"));
+        Assert.Equal(SwitchTableBuilder.ProcSaku, Proc("SAKU"));
+        Assert.Equal(SwitchTableBuilder.ProcSwhit0, Proc("SWHIT0"));
+        Assert.Equal(SwitchTableBuilder.ProcDoor10, Proc("DOOR10"));
+        Assert.Equal(SwitchTableBuilder.ProcDoor12, Proc("DOOR12"));
+        Assert.Equal(SwitchTableBuilder.ProcStone2, Proc("STONE2"));
+        Assert.Equal(SwitchTableBuilder.ProcMkiek, Proc("MKIEK"));
+        Assert.Equal(SwitchTableBuilder.ProcWarpt, Proc("OBJ_WARPT"));
     }
 
     [Fact]
