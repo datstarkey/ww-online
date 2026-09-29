@@ -61,6 +61,12 @@ public class PuppetSyncService : IDisposable
     private float _lastUnderFrame;
     private byte _lastCombo;
 
+    // The local WarpInfo broadcast to peers (entrance + busy), rebuilt every tick.
+    private readonly LocalWarpReader _warpReader = new();
+
+    /// <summary>The local <see cref="WarpInfo"/> as last broadcast (null before the first tick).</summary>
+    public WarpInfo? LocalWarp { get; private set; }
+
     // Last local held item / carried kind written to the log ("[held]" line on change).
     private (ushort Item, byte Grab) _lastLoggedHeld = (0, 0);
 
@@ -585,6 +591,17 @@ public class PuppetSyncService : IDisposable
 
         _remotePuppets[playerId] = data;
         _lastPuppetReceive[playerId] = DateTime.UtcNow;
+    }
+
+    /// <summary>A peer's last puppet data and how long ago it arrived (WarpService).</summary>
+    public bool TryGetRemotePuppet(string playerId, out PuppetData data, out TimeSpan age)
+    {
+        age = TimeSpan.MaxValue;
+        if (!_remotePuppets.TryGetValue(playerId, out data!))
+            return false;
+        if (_lastPuppetReceive.TryGetValue(playerId, out var at))
+            age = DateTime.UtcNow - at;
+        return true;
     }
 
     /// <summary>
@@ -1141,6 +1158,7 @@ public class PuppetSyncService : IDisposable
                 return null;
 
             var appearance = LocalAppearance;
+            LocalWarp = _warpReader.Read(_dolphin, stageName);
 
             var data = new PuppetData
             {
@@ -1189,6 +1207,7 @@ public class PuppetSyncService : IDisposable
                 RoomNumber = roomNumber ?? 0,
                 Timestamp = DateTime.UtcNow,
                 Boat = ReadLocalBoat(curProc),
+                Warp = LocalWarp,
             };
             // Body / face anims for the procs other players' RELs have no init for (puppet_anmmirror.c).
             AnimMirror.ReadLocal(_dolphin, actorBase, data.Animation);

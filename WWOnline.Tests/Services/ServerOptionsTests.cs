@@ -20,6 +20,7 @@ public class ServerOptionsTests
         Assert.Equal(HubConstants.DefaultPort, r.Options.Port);
         Assert.True(r.Options.SharedWallet && r.Options.SharedWorld && r.Options.SharedItems && r.Options.SharedStory);
         Assert.True(r.Options.SharedProjectiles);
+        Assert.True(r.Options.AllowWarping);
         Assert.Null(r.Options.OwnerKey);
         Assert.Null(r.Options.LogFile);
     }
@@ -95,9 +96,30 @@ public class ServerOptionsTests
     public void AllNoSharedFlags_TurnTheRulesOff()
     {
         var o = Parse(["--no-shared-wallet", "--no-shared-world", "--no-shared-items", "--no-shared-story",
-                       "--no-shared-projectiles", "--no-shared-bait", "--no-shared-spoils"]).Options;
+                       "--no-shared-projectiles", "--no-shared-bait", "--no-shared-spoils", "--no-warping"]).Options;
         Assert.False(o.SharedWallet || o.SharedWorld || o.SharedItems || o.SharedStory || o.SharedProjectiles || o.SharedBait ||
-                     o.SharedSpoils);
+                     o.SharedSpoils || o.AllowWarping);
+    }
+
+    [Theory]
+    [InlineData("false", false)]
+    [InlineData("0", false)]
+    [InlineData("true", true)]
+    public void AllowWarpingVariable_IsRead(string value, bool expected)
+    {
+        var r = Parse([], new() { [ServerOptions.AllowWarpingVar] = value });
+        Assert.True(r.IsValid, string.Join("; ", r.Errors));
+        Assert.Equal(expected, r.Options.AllowWarping);
+        Assert.True(r.Options.SharedWallet && r.Options.SharedProjectiles); // the other rules keep their defaults
+    }
+
+    [Fact]
+    public void NoWarpingFlag_WinsOverTheVariable()
+    {
+        var r = Parse(["--no-warping"], new() { ["WWO_ALLOW_WARPING"] = "true" });
+        Assert.True(r.IsValid);
+        Assert.False(r.Options.AllowWarping);
+        Assert.True(r.Options.SharedStory);
     }
 
     [Theory]

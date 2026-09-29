@@ -64,15 +64,16 @@ if (logFileError != null)
 // Log.Logger is on first use (before this line that's Serilog's silent default, and every
 // [room]/[world]/[wallet]/[bait]/[spoils]/[items]/[story] line from the hub would be lost for the whole session).
 GameHub.ConfigureRoomDefaults(options.SharedWallet, options.SharedWorld, options.SharedItems, options.SharedStory,
-                              options.SharedProjectiles, options.SharedBait, options.SharedSpoils);
+                              options.SharedProjectiles, options.SharedBait, options.SharedSpoils, options.AllowWarping);
 GameHub.ConfigureHostToken(options.OwnerKey);
 
 try
 {
-    Log.Information("Starting {AppName} {Version} server (protocol {Protocol}) on port {Port} (shared wallet {Wallet}, shared world {World}, shared items {Items}, shared story {Story}, shared bait bag {Bait}, shared spoils bag {Spoils}, other players' projectiles {Projectiles})",
+    Log.Information("Starting {AppName} {Version} server (protocol {Protocol}) on port {Port} (shared wallet {Wallet}, shared world {World}, shared items {Items}, shared story {Story}, shared bait bag {Bait}, shared spoils bag {Spoils}, other players' projectiles {Projectiles}, warping {Warping})",
         AppInfo.DisplayName, AppInfo.Version, HubConstants.ProtocolVersion, options.Port,
         options.SharedWallet ? "ON" : "OFF", options.SharedWorld ? "ON" : "OFF", options.SharedItems ? "ON" : "OFF", options.SharedStory ? "ON" : "OFF",
-        options.SharedBait ? "ON" : "OFF", options.SharedSpoils ? "ON" : "OFF", options.SharedProjectiles ? "ON" : "OFF");
+        options.SharedBait ? "ON" : "OFF", options.SharedSpoils ? "ON" : "OFF", options.SharedProjectiles ? "ON" : "OFF",
+        options.AllowWarping ? "ON" : "OFF");
     Log.Information(options.OwnerKey != null
         ? "[room] An owner key is set: the player who enters it becomes the room owner"
         : "[room] No owner key: the earliest-joined player is the room owner");

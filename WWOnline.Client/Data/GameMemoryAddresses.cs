@@ -428,6 +428,75 @@ public static class GameMemoryAddresses
     }
 
     /// <summary>
+    /// Warp to player (WarpService, docs/softlocks.md): where the current stage was entered, the
+    /// stage-change request, and the local Link's position.
+    /// </summary>
+    public static class Warp
+    {
+        /// <summary>play.mCurStage (d_com_inf_game.h "/* 0x3E94 */ dStage_startStage_c mCurStage"): the stage,
+        /// spawn point, room and layer the current stage was entered with. dStage_playerInit rewrites its room
+        /// with the spawn's own room (d_stage.cpp:1477). Point -1 / -2 / -3 = a restart (void-out, a ship
+        /// interior's exit, Song of Passing), not a spawn point.</summary>
+        public const uint StartStage = Play + 0x3E94;
+
+        /// <summary>play.mNextStage (d_com_inf_game.h "/* 0x3EA0 */ dStage_nextStage_c mNextStage"). dScnPly_Draw
+        /// (d_s_play.cpp:291) starts the scene change while mEnable != 0; the next play scene's phase_1 copies it into
+        /// mCurStage and clears mEnable (d_s_play.cpp:1277-1278).</summary>
+        public const uint NextStage = Play + 0x3EA0;
+
+        // dStage_startStage_c / dStage_nextStage_c fields (d_stage.h:949-952, 966-967). DOL
+        // set__19dStage_startStage_c (0x80040BA8): strcpy name, stb room 0xA, sth point 0x8, stb layer 0xB;
+        // set__18dStage_nextStage_c (0x80040900): lbz/stb enable 0xC, stb wipe 0xD.
+        public const int StageOffName = 0x0;       // char mName[8]
+        public const int StageNameSize = 8;
+        public const int StageOffPoint = 0x8;      // s16 mPoint
+        public const int StageOffRoom = 0xA;       // s8 mRoomNo
+        public const int StageOffLayer = 0xB;      // s8 mLayer
+        public const int NextStageOffEnable = 0xC; // s8 mEnable
+        public const int NextStageOffWipe = 0xD;   // s8 mWipe (an index into dScnPly_Draw's l_wipeType[12]; 0 = the usual fade)
+
+        /// <summary>dSv_info_c /* 0x1128 */ mRestart (dSv_restart_c, d_save.h:826-837). dComIfGp_setNextStage
+        /// (DOL 0x800537C8) writes mLastSpeedF (stfs 0x1150(gameInfo)), mLastMode (stw 0x1154) and, with
+        /// i_setPoint, mStartCode (sth 0x113C); playerInit reads the last two to pick how Link arrives.</summary>
+        public const uint Restart = GameInfo + 0x1128;
+        public const int RestartOffStartCode = 0x14;  // s16 mStartCode
+        public const int RestartOffLastSpeedF = 0x28; // f32 mLastSpeedF
+        public const int RestartOffLastMode = 0x2C;   // u32 mLastMode
+
+        /// <summary>play.mPlayerInfo[0].mpPlayer (d_com_inf_game.h "/* 0x48A4 */", dComIfGp_getPlayer(0)): the
+        /// character the player controls, an NPC while they control Medli, Makar, a seagull or Hyoi.</summary>
+        public const uint ControlledActorPtr = Play + 0x48A4;
+        /// <summary>play.mpPlayerPtr[0] (d_com_inf_game.h "/* 0x48AC */"): the local Link
+        /// (daPy_getPlayerLinkActorClass; DOL 0x80053820: lwz r3,0x5B4C(gameInfo)).</summary>
+        public const uint LinkActorPtr = Play + 0x48AC;
+
+        // fopAc_ac_c (f_op_actor.h:288-302). fopAc_Execute copies current into old before each execute
+        // (f_op_actor.cpp:196); Link's Acch checks the move from old.pos to current.pos (d_a_player_main.cpp:12182).
+        public const uint ActorOffOldPos = 0x1E4;          // old.pos (cXyz)
+        public const uint ActorOffPos = 0x1F8;             // current.pos (cXyz)
+        public const uint ActorOffAngleY = 0x206;          // current.angle.y (s16, the movement direction)
+        public const uint ActorOffRoomNo = 0x20A;          // current.roomNo (s8)
+        public const uint ActorOffShapeAngleY = 0x20E;     // shape_angle.y (s16, the facing)
+        public const uint ActorOffSpeed = 0x220;           // speed (cXyz)
+        public const uint ActorOffSpeedF = 0x254;          // speedF (f32)
+
+        /// <summary>daPy_lk_c mTinkleShieldTimer (d_a_player_main.h:2230 "/* 0x354E */ s16"). With mNoResetFlg1's
+        /// EQUIP_DRAGON_SHIELD (0x1) and SOUP_POWER_UP (0x8000) bits (d_a_player.h:199, 213) it is what
+        /// dComIfGp_setNextStage folds into mLastMode (DOL 0x8005382C-0x80053850: 0x8000, timer &lt;&lt; 16, 0x4000),
+        /// so the Magic Armor, a timed shield and the soup's power-up survive the stage change.</summary>
+        public const uint LinkOffTinkleShieldTimer = 0x354E;
+        public const uint NoResetFlg1DragonShield = 0x00000001;
+        public const uint NoResetFlg1SoupPowerUp = 0x00008000;
+        public const uint LastModeDragonShield = 0x8000;
+        public const uint LastModeSoupPowerUp = 0x4000;
+
+        /// <summary>mModeFlg bits that tie Link to something (d_a_player_main.h:896-927: HANG, HOOKSHOT, ROPE,
+        /// IN_SHIP, CLIMB, GRAB, PUSHPULL, LADDER, CRAWL, CAUGHT): his proc would pull him back after a move.</summary>
+        public const uint ModeFlgAttached = 0x00000020 | 0x00000200 | 0x00000800 | 0x00002000 | 0x00010000 |
+                                            0x00100000 | 0x00200000 | 0x00400000 | 0x01000000 | 0x10000000;
+    }
+
+    /// <summary>
     /// Sea and sailing addresses
     /// </summary>
     public static class Sea

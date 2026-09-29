@@ -1,7 +1,7 @@
 namespace WWOnline.Shared.Models;
 
 /// <summary>
-/// Room rules (shared wallet / world / items / story / bait bag / spoils bag, other players' projectiles), owned by the server. Defaults come from the server's command line; the room owner (the
+/// Room rules (shared wallet / world / items / story / bait bag / spoils bag, other players' projectiles, warping), owned by the server. Defaults come from the server's command line; the room owner (the
 /// player who started the server, else the earliest-joined player still connected) can change them at runtime. Clients pause the matching
 /// sync while a rule is off, and the server ignores that sync's messages.
 /// </summary>
@@ -40,6 +40,14 @@ public class RoomSettings
     /// </summary>
     public bool SharedProjectiles { get; set; } = true;
 
+    /// <summary>
+    /// Players can warp to each other ("Warp to" on the Room page). With shared story / world a player
+    /// who is behind can lose their way forward (someone else's progress closed it), so Full sync
+    /// turns it on. Co-op turns it off: nothing syncs there, so nobody gets stuck. When off, the server
+    /// strips everyone's <see cref="PuppetData.Warp"/> and clients refuse to warp.
+    /// </summary>
+    public bool AllowWarping { get; set; } = true;
+
     /// <summary>Connection id of the current room owner (read-only for clients; set by the server).</summary>
     public string OwnerConnectionId { get; set; } = "";
 
@@ -48,32 +56,35 @@ public class RoomSettings
     public RoomSettings Clone() => (RoomSettings)MemberwiseClone();
 
     /// <summary>
-    /// "Full sync" = every rule on; "Co-op" = the progress rules (wallet, world, items, story, bait bag, spoils bag) off and
-    /// other players' projectiles on (players see each other and fight together, progress stays per save).
+    /// "Full sync" = every rule on; "Co-op" = the progress rules (wallet, world, items, story, bait bag, spoils bag) and
+    /// warping off, other players' projectiles on (players see each other and fight together, progress stays per save).
     /// </summary>
-    public RoomPreset MatchingPreset() => (SharedWallet, SharedWorld, SharedItems, SharedStory, SharedBait, SharedSpoils, SharedProjectiles) switch
+    public RoomPreset MatchingPreset() =>
+        (SharedWallet, SharedWorld, SharedItems, SharedStory, SharedBait, SharedSpoils, SharedProjectiles, AllowWarping) switch
     {
-        (true, true, true, true, true, true, true) => RoomPreset.FullSync,
-        (false, false, false, false, false, false, true) => RoomPreset.Coop,
+        (true, true, true, true, true, true, true, true) => RoomPreset.FullSync,
+        (false, false, false, false, false, false, true, false) => RoomPreset.Coop,
         _ => RoomPreset.Custom,
     };
 
     /// <summary>
-    /// Full sync: every rule on. Co-op: the progress rules off, projectiles on. Custom leaves the rules
-    /// alone. Returns this.
+    /// Full sync: every rule on. Co-op: the progress rules and warping off, projectiles on. Custom leaves
+    /// the rules alone. Returns this.
     /// </summary>
     public RoomSettings ApplyPreset(RoomPreset preset)
     {
         if (preset == RoomPreset.Custom) return this;
         bool on = preset == RoomPreset.FullSync;
         SharedWallet = SharedWorld = SharedItems = SharedStory = SharedBait = SharedSpoils = on;
+        AllowWarping = on;
         SharedProjectiles = true;
         return this;
     }
 
     public string RulesSummary() =>
         $"shared wallet {OnOff(SharedWallet)}, shared world {OnOff(SharedWorld)}, shared items {OnOff(SharedItems)}, " +
-        $"shared story {OnOff(SharedStory)}, shared bait bag {OnOff(SharedBait)}, shared spoils bag {OnOff(SharedSpoils)}, other players' projectiles {OnOff(SharedProjectiles)}";
+        $"shared story {OnOff(SharedStory)}, shared bait bag {OnOff(SharedBait)}, shared spoils bag {OnOff(SharedSpoils)}, other players' projectiles {OnOff(SharedProjectiles)}, " +
+        $"warping {OnOff(AllowWarping)}";
 
     private static string OnOff(bool b) => b ? "ON" : "OFF";
 }
@@ -84,10 +95,10 @@ public enum RoomPreset
     /// <summary>Any other mix of rules.</summary>
     Custom,
 
-    /// <summary>Wallet, world, items, story, bait bag and spoils bag all shared; other players' projectiles on.</summary>
+    /// <summary>Wallet, world, items, story, bait bag and spoils bag all shared; other players' projectiles and warping on.</summary>
     FullSync,
 
-    /// <summary>No progress shared (wallet, world, items, story, bait bag, spoils bag off): players see each other, and
-    /// other players' projectiles stay on.</summary>
+    /// <summary>No progress shared (wallet, world, items, story, bait bag, spoils bag off) and no warping: players see
+    /// each other, and other players' projectiles stay on.</summary>
     Coop,
 }
