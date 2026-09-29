@@ -12,11 +12,15 @@
  *   - wooden barricades (d_a_saku.cpp:709-725) and crystal switches (d_a_swhit0.cpp:166-173: shows
  *     "off" while the switch is on);
  *   - small-key locks (door setKey only in actionInit, docs/small-keys.md §3: the lock stays and
- *     using it spends a second key).
+ *     using it spends a second key);
+ *   - the boulders and light walls on the dungeon warp jars (d_a_stone2.cpp:171-193,
+ *     d_a_obj_mkiek.cpp:89-92: create fails once the switch is set; the jar under them polls it),
+ *     and a normal warp jar's lid (daObj_Warpt_c::getArg, d_a_obj_warpt.cpp:721: a lidded jar only
+ *     reacts to hits, modeClose :455-470).
  * C# publishes the bits it applied from other players in the live-world block (puppet_shared.h
  * LIVEWORLD_*). Each new bit is handled once: every matching actor is re-created from its own params
  * in its own layer (the new instance's create reads the flag and comes up in the end state, with no
- * animation and no event), or the stale lock byte is cleared (what setKey would do).
+ * animation and no event). A door's lock byte is never written (docs/live-world.md 0.1).
  *
  * Never while an event runs or is queued (an event order holds actor pointers), never mid stage
  * change, never for an actor still being created or deleted, never for a room that is loading or

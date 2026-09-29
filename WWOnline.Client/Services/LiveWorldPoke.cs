@@ -8,7 +8,8 @@ namespace WWOnline.Services;
 /// that read their flag only when they are created catch up while you are in the room
 /// (GameMod/src/puppet_link/puppet_liveworld.c): a chest another player opened opens (empty) instead
 /// of giving its item again, bombable walls / breakable floors / ice blocks / barricades vanish,
-/// crystal switches show on and small-key locks clear. Objects that poll their switch need nothing:
+/// crystal switches show on, small-key locks clear, the boulders / light walls on dungeon warp jars
+/// vanish and a lidded warp jar opens. Objects that poll their switch need nothing:
 /// the world sync's write to the live save data is enough.
 ///
 /// Bits live in one word array, <see cref="Words"/> long: word 0 = chests (dSv_memBit_c::mTbox),
