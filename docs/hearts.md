@@ -36,6 +36,8 @@ All 50 sources are shared this way, whatever Shared world and Shared story say. 
 
 **Room items page** (`RoomItemsViewModel`, "Hearts and magic" card): the max hearts shown are the derived value while it applies, the − / + buttons are disabled (there is nothing to edit: the flags are the state), and a line reads **"Hearts: X of 6 containers, Y of 44 pieces"** (the room's count while it applies, else this game's own flags).
 
+**Magic** follows the same idea, without a catalogue: max magic is 0, 16 with the Deku Leaf, 32 once the Great Fairy who doubles it has (event 0x3180, set when her event ends: daBigelf type 6's `getEventFlag`) (`RoomInventory.MagicFromFlags`). `RoomInventoryMemory.Read` reports that instead of the game's byte, so it is what joins, gains and the max-merge see; `Apply` compares the room's value with the game's own byte. The game **adds** 16 on every Deku Leaf pickup (`item_func_deku_leaf`, `d_item.cpp:810-815`), so a player who picked one up after the room had shared the meter went to 32 (2026-09-29). `RoomInventorySyncService.ClampMaxMagic` puts the game's byte back to the larger of the flags' and the room's value every tick (idle, no event, no gain queued for the meter). A room that already holds 32 from that bug keeps it until the owner sets magic back to Normal on the Room items page.
+
 **Log lines:** `[hearts]` (client log). The table's summary when it is built (`44 piece(s), 6 container(s): 12 Chest, 2 PlacedItem, 14 Salvage, 6 Boss, 16 Reward`), a warning if a table doesn't have 44 and 6, and every untracked heart.
 
 ## 1. The catalogue (vanilla GZLE01)
