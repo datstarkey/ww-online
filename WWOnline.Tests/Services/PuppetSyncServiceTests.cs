@@ -15,17 +15,23 @@ public class PuppetSyncServiceTests : IDisposable
     private readonly Mock<IDolphinService> _dolphin;
     private readonly GameSettingsService _settings;
     private readonly PuppetSyncService _sut;
+    // A temp folder, never the real %AppData%\WWOnline settings.
+    private readonly string _settingsDir = Path.Combine(Path.GetTempPath(), "wwo-puppetsync-" + Guid.NewGuid().ToString("N"));
 
     public PuppetSyncServiceTests()
     {
         _dolphin = new Mock<IDolphinService>();
         _dolphin.Setup(d => d.IsConnected).Returns(false);
         _dolphin.Setup(d => d.WriteMemory(It.IsAny<uint>(), It.IsAny<byte[]>())).Returns(true);
-        _settings = new GameSettingsService();
+        _settings = new GameSettingsService(_settingsDir);
         _sut = new PuppetSyncService(_dolphin.Object, _settings, new DespawnWorker());
     }
 
-    public void Dispose() => _sut.Dispose();
+    public void Dispose()
+    {
+        _sut.Dispose();
+        try { Directory.Delete(_settingsDir, recursive: true); } catch (IOException) { }
+    }
 
     // ── Slot assignment ────────────────────────────────────────────────────────
 
