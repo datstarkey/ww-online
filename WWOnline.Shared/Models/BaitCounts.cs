@@ -12,7 +12,7 @@ namespace WWOnline.Shared.Models;
 /// As a room total both are &gt;= 0 and fit the bag together (<see cref="FitsTheBag"/>); as a delta
 /// (SendBaitDelta) they are signed.
 /// </summary>
-public sealed class BaitCounts : IEquatable<BaitCounts>
+public sealed class BaitCounts : IBagCounts<BaitCounts>
 {
     public const int SlotCount = 8;
     public const int UsesPerSlot = 3;
@@ -52,6 +52,8 @@ public sealed class BaitCounts : IEquatable<BaitCounts>
     public BaitCounts Clone() => new(Bait, Pears);
 
     public static BaitCounts operator -(BaitCounts a, BaitCounts b) => new(a.Bait - b.Bait, a.Pears - b.Pears);
+
+    public BaitCounts Minus(BaitCounts other) => this - other;
 
     public bool Equals(BaitCounts? other) => other is not null && Bait == other.Bait && Pears == other.Pears;
     public override bool Equals(object? obj) => Equals(obj as BaitCounts);

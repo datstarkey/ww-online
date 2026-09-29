@@ -479,7 +479,7 @@
                                         <Grid ColumnDefinitions="*,4,*,4,*">
                                             <Button Grid.Column="0" Classes="ww-seg" Classes.active="{Binding IsFullSyncPreset}" Content="Full sync"
                                                     MinHeight="44" HorizontalAlignment="Stretch" Command="{Binding ApplyFullSyncPresetCommand}"
-                                                    ToolTip.Tip="Share everything: wallet, world, items, story and bait bag, and other players' projectiles are real." />
+                                                    ToolTip.Tip="Share everything: wallet, world, items, story and both bags, and other players' projectiles are real." />
                                             <Button Grid.Column="2" Classes="ww-seg" Classes.active="{Binding IsCoopPreset}" Content="Co-op"
                                                     MinHeight="44" HorizontalAlignment="Stretch" Command="{Binding ApplyCoopPresetCommand}"
                                                     ToolTip.Tip="Share no progress: each player keeps their own game. You see each other, and other players' projectiles stay on." />
@@ -598,6 +598,28 @@
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
                                         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                                             <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconBag}" Stroke="{StaticResource StoryBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Shared spoils bag" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="One stock of Joy Pendants, Skull Necklaces, Chu Jellies and the other spoils. Anyone's pickup, sale or trade counts for everyone." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding SharedSpoilsOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding SharedSpoilsOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !SharedSpoilsOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding SharedSpoilsOn}"
+                                                          ToolTip.Tip="The spoils bag's counts (Joy Pendants, Skull Necklaces, Chu Jellies...) are one room total. Off: each player keeps their own."
+                                                          AutomationProperties.Name="Shared spoils bag" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
                                                 <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSwords}" Stroke="{StaticResource HeartBrush}" /></Viewbox>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
@@ -703,6 +725,15 @@
                                             <TextBlock Grid.Column="1" Text="Shared bait bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedBaitOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedBaitOn}" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44"
+                                            ToolTip.Tip="The spoils bag's counts (Joy Pendants, Chu Jellies...) are one room total.">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconBag}" Stroke="{StaticResource StoryBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="Shared spoils bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedSpoilsOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedSpoilsOn}" />
                                         </Grid>
                                     </Border>
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44"

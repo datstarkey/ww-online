@@ -141,6 +141,20 @@ public static class GameMemoryAddresses
         public const uint BaitGetFlags = GameInfo + 0x90 + 0x5;
         public const uint BaitNums = GameInfo + 0x9C + 0x08;
 
+        // The spoils bag, in the same structs: mBagItem /* 0x00 */ mBeast[8] (item numbers in menu order, 0xFF =
+        // empty; setBeastItem puts a new type in the first free slot, DOL item_func_skull_necklace 0x800C3D14:
+        // gameInfo + 0x76), mGetBagItem /* 0x4 */ mBeastFlags (bit = dBeastIndex_e, onGetItemBeast) and
+        // mBagItemRecord /* 0x00 */ mBeastNum[8] (the count per TYPE, indexed by dBeastIndex_e, 0-99).
+        public const uint SpoilsItems = GameInfo + 0x76 + 0x00;
+        public const uint SpoilsGetFlags = GameInfo + 0x90 + 0x4;
+        public const uint SpoilsNums = GameInfo + 0x9C + 0x00;
+
+        // play.mItemBeastNumCounts[8] (d_com_inf_game.h "/* 0x48E8 */ s16", indexed by dBeastIndex_e;
+        // DOL item_func_skull_necklace 0x800C3D3C: lha/sth 0x5B88(gameInfo)). What dComIfGp_setItemBeastNumCount
+        // adds to, for every pickup, sale and trade; d_meter applies it next frame: count clamped to 0-99, and a
+        // type at 0 leaves its slot (setBeastItemEmpty, which also clears X/Y/Z).
+        public const uint PendingSpoilsDeltas = Play + 0x48E8;
+
         // Capacities (dSv_player_c /* 0x06E */ mItemMax: +1 arrows, +2 bombs) — the COUNTS are
         // Player.CurrentArrowCount / CurrentBombCount (mItemRecord).
         public static readonly MemoryAddress<byte> MaxArrows = new(GameInfo + 0x6E + 0x1, "MaxArrows", "Quiver capacity");

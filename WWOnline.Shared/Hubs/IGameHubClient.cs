@@ -23,6 +23,9 @@ public interface IGameHubClient
     /// <summary>The shared bait bag's new counts (someone used, bought or picked up bait or a Hyoi Pear).</summary>
     Task ReceiveBaitTotal(BaitCounts total);
 
+    /// <summary>The shared spoils bag's new counts (someone picked up, sold or traded spoils).</summary>
+    Task ReceiveSpoilsTotal(SpoilsCounts total);
+
     /// <summary>Room rules or the room owner changed.</summary>
     Task ReceiveRoomSettings(RoomSettings settings);
 

@@ -13,10 +13,11 @@ public static class HubConstants
     /// masks...). Pure app changes that don't touch the wire keep it.
     /// 2: held items + boat parts. 3: live-world room switches. 4: player events / projectiles
     /// (SendPlayerEvent, ReceivePlayerEvent, RoomSettings.SharedProjectiles). 5 (v0.2.0): body / face
-    /// anim mirror (AnimationState.Tracks and face / hand fields) and the shared bait bag (JoinBait,
-    /// SendBaitDelta, ReceiveBaitTotal, BaitCounts, RoomSettings.SharedBait).
+    /// anim mirror (AnimationState.Tracks and face / hand fields), the shared bait bag (JoinBait,
+    /// SendBaitDelta, ReceiveBaitTotal, BaitCounts, RoomSettings.SharedBait) and the shared spoils bag
+    /// (JoinSpoils, SendSpoilsDelta, ReceiveSpoilsTotal, SpoilsCounts, RoomSettings.SharedSpoils).
     /// </summary>
-    public const int ProtocolVersion = 5; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait bag (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait)
+    public const int ProtocolVersion = 5; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait + spoils bags (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait; JoinSpoils / SendSpoilsDelta / ReceiveSpoilsTotal, SharedSpoils)
 
     // Hub method names (server-side methods invoked by clients)
 
@@ -39,6 +40,13 @@ public static class HubConstants
 
     /// <summary>A signed <see cref="Models.BaitCounts"/> change (bait used / bought / picked up), while SharedBait is on.</summary>
     public const string SendBaitDelta = "SendBaitDelta";
+
+    /// <summary>Join the shared spoils bag with this game's <see cref="Models.SpoilsCounts"/>; returns the room's
+    /// counts to adopt (null: rule off, or waiting for the room owner to seed it).</summary>
+    public const string JoinSpoils = "JoinSpoils";
+
+    /// <summary>A signed <see cref="Models.SpoilsCounts"/> change (spoils picked up / sold / traded), while SharedSpoils is on.</summary>
+    public const string SendSpoilsDelta = "SendSpoilsDelta";
     public const string GetRoomSettings = "GetRoomSettings";
     public const string SetRoomSettings = "SetRoomSettings";
     public const string ClaimRoomOwner = "ClaimRoomOwner";
@@ -59,6 +67,7 @@ public static class HubConstants
     public const string ReceiveStageFlags = "ReceiveStageFlags";
     public const string ReceiveRupeeTotal = "ReceiveRupeeTotal";
     public const string ReceiveBaitTotal = "ReceiveBaitTotal";
+    public const string ReceiveSpoilsTotal = "ReceiveSpoilsTotal";
     public const string ReceiveRoomSettings = "ReceiveRoomSettings";
     public const string ReceiveRoomInventory = "ReceiveRoomInventory";
     public const string ReceiveStoryFlags = "ReceiveStoryFlags";

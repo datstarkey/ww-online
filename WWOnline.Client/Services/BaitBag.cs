@@ -241,11 +241,6 @@ public static class BaitBagMemory
     public static bool OwnsBag(IDolphinService dolphin) =>
         dolphin.Read(GameMemoryAddresses.Inventory.BaitBag) == ItemIDs.MainItems.BaitBag;
 
-    /// <summary>No event running (shops, feeding, cutscenes) and the pause menu is closed: safe to rewrite the bag.</summary>
-    public static bool IsIdle(IDolphinService dolphin) =>
-        dolphin.ReadMemory(GameMemoryAddresses.Events.EventMode, 1) is [0] &&
-        dolphin.ReadMemory(GameMemoryAddresses.Events.MenuPause, 1) is [0];
-
     /// <summary>Both arrays in one read (so a pickup can't land between them), or null.</summary>
     public static BaitBagSlots? Read(IDolphinService dolphin)
     {
@@ -258,31 +253,21 @@ public static class BaitBagMemory
     public static byte[]? ReadSelectSlots(IDolphinService dolphin) =>
         dolphin.ReadMemory(GameMemoryAddresses.Player.SelectItemSlots, BaitBag.ButtonCount);
 
-    public enum WriteResult
-    {
-        /// <summary>Written (plus the buttons and get flags).</summary>
-        Written,
-        /// <summary>The bag changed since <c>expected</c> was read: nothing written; the caller re-reads.</summary>
-        Raced,
-        /// <summary>A write failed: the bag may be partly written; the caller re-reads it.</summary>
-        Failed,
-    }
-
     /// <summary>
     /// Write <paramref name="next"/> over <paramref name="expected"/>, but only if the bag still is
     /// <paramref name="expected"/> right now (the game may have used or added bait since it was read).
     /// Only the changed bytes are written. Then the X/Y/Z buttons are fixed up (<see cref="BaitBag.FixButtons"/>)
     /// and the "ever obtained" flags set for any type that arrived.
     /// </summary>
-    public static WriteResult Write(IDolphinService dolphin, BaitBagSlots expected, BaitBagSlots next)
+    public static BagWriteResult Write(IDolphinService dolphin, BaitBagSlots expected, BaitBagSlots next)
     {
-        if (Read(dolphin) is not { } now || !now.SameAs(expected)) return WriteResult.Raced;
+        if (Read(dolphin) is not { } now || !now.SameAs(expected)) return BagWriteResult.Raced;
         var saveSelect = ReadSelectSlots(dolphin);
         var playSelect = dolphin.ReadMemory(GameMemoryAddresses.Player.PlaySelectItems, BaitBag.ButtonCount);
 
-        bool ok = WriteChanged(dolphin, GameMemoryAddresses.Inventory.BaitItems, expected.Items, next.Items) &&
-                  WriteChanged(dolphin, GameMemoryAddresses.Inventory.BaitNums, expected.Nums, next.Nums);
-        if (!ok) return WriteResult.Failed;
+        bool ok = BagMemory.WriteChanged(dolphin, GameMemoryAddresses.Inventory.BaitItems, expected.Items, next.Items) &&
+                  BagMemory.WriteChanged(dolphin, GameMemoryAddresses.Inventory.BaitNums, expected.Nums, next.Nums);
+        if (!ok) return BagWriteResult.Failed;
 
         if (saveSelect != null && playSelect != null)
         {
@@ -297,19 +282,6 @@ public static class BaitBagMemory
         byte flags = BaitBag.GetFlagsFor(next);
         if (flags != 0 && dolphin.ReadMemory(GameMemoryAddresses.Inventory.BaitGetFlags, 1) is [var got] && (got | flags) != got)
             dolphin.WriteMemory(GameMemoryAddresses.Inventory.BaitGetFlags, [(byte)(got | flags)]);
-        return WriteResult.Written;
-    }
-
-    /// <summary>Write the span of <paramref name="next"/> that differs from <paramref name="old"/>, if any.</summary>
-    private static bool WriteChanged(IDolphinService dolphin, uint address, byte[] old, byte[] next)
-    {
-        int first = -1, last = -1;
-        for (int i = 0; i < next.Length; i++)
-        {
-            if (old[i] == next[i]) continue;
-            if (first < 0) first = i;
-            last = i;
-        }
-        return first < 0 || dolphin.WriteMemory(address + (uint)first, next[first..(last + 1)]);
+        return BagWriteResult.Written;
     }
 }
