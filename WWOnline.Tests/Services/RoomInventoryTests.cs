@@ -318,3 +318,69 @@ public class RoomInventoryMemoryTests
         Assert.Equal(RoomInventory.ShieldBit(RoomInventory.MirrorShield), inv.Shields);
     }
 }
+
+/// <summary>The sea chart menu's save data (charts owned / opened / completed, sea squares, Triforce charts) up-merges.</summary>
+public class RoomInventorySeaMapTests
+{
+    [Fact]
+    public void SeaMap_Addresses_AreDSvPlayerMap()
+    {
+        // dSv_player_c /* 0x0C4 */ mMap at g_dComIfG_gameInfo 0x803C4C08: field_0x0[1] at +0x10, field_0x81 at +0x81.
+        Assert.Equal(0x803C4CDCu, GameMemoryAddresses.Inventory.SeaMapCharts);
+        Assert.Equal(0x803C4D4Du, GameMemoryAddresses.Inventory.SeaMapTriforce);
+        Assert.Equal(RoomInventory.SeaMapLength - 1, GameMemoryAddresses.Inventory.SeaMapChartsAndSquaresLength);
+    }
+
+    [Fact]
+    public void SeaMap_MergesUp_AndGainsAreOnlyNewBits()
+    {
+        var room = new RoomInventory();
+        var peer = new RoomInventory();
+        peer.SeaMap[0] = 0x05;                                        // two charts owned
+        peer.SeaMap[RoomInventory.SeaMapChartBytes + 10] = 0x01;       // a square visited
+        peer.SeaMap[RoomInventory.SeaMapLength - 1] = 0x80;            // a Triforce chart deciphered
+        Assert.True(room.MergeGainsFrom(peer));
+        Assert.False(room.MergeGainsFrom(peer));
+        Assert.Equal(2, room.ChartsOwned);
+        Assert.Equal(1, room.SquaresVisited);
+
+        var mine = room.Clone();
+        mine.SeaMap[0] |= 0x02;
+        var gains = mine.GainsOver(room);
+        Assert.Equal(0x02, gains.SeaMap[0]);
+        Assert.Equal(0, gains.SeaMap[RoomInventory.SeaMapLength - 1]);
+        Assert.False(gains.IsEmpty);
+    }
+
+    [Fact]
+    public void SeaMap_WrongLength_IsInvalid()
+    {
+        Assert.False(new RoomInventory { SeaMap = new byte[3] }.IsValid());
+        Assert.True(new RoomInventory().IsValid());
+    }
+
+    [Fact]
+    public void SeaMap_ReadAndApply_OrIntoTheSave()
+    {
+        var game = new FakeDolphin();
+        game.Set(GameMemoryAddresses.Inventory.ItemSlots.Address, RoomInventory.NewEmptySlots());
+        game.Set(GameMemoryAddresses.Player.CurrentSword.Address, RoomInventory.NoItem, RoomInventory.NoItem);
+        game.Set(GameMemoryAddresses.Inventory.SeaMapCharts, 0x01);          // we own chart 0
+        game.Set(GameMemoryAddresses.Inventory.SeaMapCharts + 0x30, 0x03);   // Forsaken Fortress square seen
+
+        var local = RoomInventoryMemory.Read(game)!;
+        Assert.Equal(1, local.ChartsOwned);
+
+        var room = local.Clone();
+        room.SeaMap[0] = 0x02;                                               // the room has chart 1 (not 0)
+        room.SeaMap[RoomInventory.SeaMapChartBytes + 20] = 0x01;
+        room.SeaMap[RoomInventory.SeaMapLength - 1] = 0x01;
+        var after = RoomInventoryMemory.Apply(game, room, local, applySword: false, applyShield: false, []);
+
+        Assert.Equal(0x03, game.Get(GameMemoryAddresses.Inventory.SeaMapCharts));          // OR, ours kept
+        Assert.Equal(0x01, game.Get(GameMemoryAddresses.Inventory.SeaMapCharts + 0x30 + 20 - 0));
+        Assert.Equal(0x01, game.Get(GameMemoryAddresses.Inventory.SeaMapTriforce));
+        Assert.Equal(0x03, game.Get(GameMemoryAddresses.Inventory.SeaMapCharts + 0x30));   // untouched square bits
+        Assert.Equal(2, after.ChartsOwned);
+    }
+}
