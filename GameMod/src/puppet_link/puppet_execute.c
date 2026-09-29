@@ -219,11 +219,14 @@
  * switching between up/down and sideways, which the network proc change handles.
  *
  * @param hand   the hand param (m3570 while climbing, 1 on the first rung like every vanilla entry)
- * @param force  nonzero: without a usable stick direction still init (up, or left); else return 0.
+ * @param force  nonzero: without a usable stick direction still init (up, or left) but hold the
+ *               rung still, as vanilla's stick-less grabs from the air / water do (setRate(0),
+ *               d_a_player_main.cpp:4808-4809, :4826); else return 0.
  */
 static int puppet_climbRung(daPy_lk_c *link, int proc, int hand, int force)
 {
   int dir = -1;
+  int ok;
 
   if (DAPY_LK_MSTICKDISTANCE(link) > 0.05f)
   {
@@ -248,14 +251,22 @@ static int puppet_climbRung(daPy_lk_c *link, int proc, int hand, int force)
       return 0;
     dir = proc == PROC_CLIMB_MOVE_SIDE ? DAPY_DIR_LEFT : DAPY_DIR_FORWARD;
   }
+  else
+  {
+    force = 0; // a real direction: play the rung
+  }
   // The anchor only feeds m370C, which only the per-frame procs read (vanilla passes
   // &current.pos too, d_a_player_main.cpp:4808).
+  DAPY_LK_MDIRECTION(link) = (u8)dir; // changeClimbMoveProc sets it before the init; procLadderMove_init sets it anyway
   if (proc == PROC_LADDER_MOVE)
-    return daPy_lk_c__procLadderMove_init(link, hand, dir, FOPAC_CURRENT_POS((fopAc_ac_c *)link));
-  DAPY_LK_MDIRECTION(link) = (u8)dir; // changeClimbMoveProc sets it before the init
-  if (proc == PROC_CLIMB_MOVE_UP_DOWN)
-    return daPy_lk_c__procClimbMoveUpDown_init(link, hand);
-  return daPy_lk_c__procClimbMoveSide_init(link, hand);
+    ok = daPy_lk_c__procLadderMove_init(link, hand, dir, FOPAC_CURRENT_POS((fopAc_ac_c *)link));
+  else if (proc == PROC_CLIMB_MOVE_UP_DOWN)
+    ok = daPy_lk_c__procClimbMoveUpDown_init(link, hand);
+  else
+    ok = daPy_lk_c__procClimbMoveSide_init(link, hand);
+  if (force)
+    PUPPET_DAPY_UNDER0_RATE(link) = 0.0f;
+  return ok;
 }
 
 /**
@@ -263,12 +274,27 @@ static int puppet_climbRung(daPy_lk_c *link, int proc, int hand, int force)
  * for the rung procs follow the stick's speed while a rung plays (procLadderMove ladder.inc:378-392,
  * procClimbMoveUpDown climb.inc:376-389, procClimbMoveSide :445-458), wait the rung-end frame, then
  * start the next rung; for all of them pin the root joint (m34C2 = 5, see above).
+ *
+ * A start init with an item in hand only puts it away (mProcVar6.m3570 = 0, ladder.inc:107-118,
+ * :225-236, climb.inc:226-237); its per-frame proc starts the anim once the upper-body anim is
+ * done (checkNoUpperAnime, ladder.inc:138-141, :253-256, climb.inc:253-256; the wall one calls the
+ * ladder's _init_sub too), and pins the root only after that.
  */
 static void puppet_climbStep(daPy_lk_c *link, int proc)
 {
   f32 rate = PUPPET_DAPY_UNDER0_RATE(link);
 
-  if (proc == PROC_LADDER_MOVE || proc == PROC_CLIMB_MOVE_UP_DOWN || proc == PROC_CLIMB_MOVE_SIDE)
+  if ((proc == PROC_LADDER_UP_START || proc == PROC_LADDER_DOWN_START || proc == PROC_CLIMB_UP_START) &&
+      DAPY_LK_M3570(link) == 0)
+  {
+    if (PUPPET_DAPY_UPPER2_ANM(link) != 0xFFFF)
+      return;
+    if (proc == PROC_LADDER_DOWN_START)
+      daPy_lk_c__procLadderDownStart_init_sub(link); // turns Link to the ladder (shape_angle.y += 0x8000)
+    else
+      daPy_lk_c__procLadderUpStart_init_sub(link);
+  }
+  else if (proc == PROC_LADDER_MOVE || proc == PROC_CLIMB_MOVE_UP_DOWN || proc == PROC_CLIMB_MOVE_SIDE)
   {
     if (rate > 0.01f || rate < -0.01f)
     {
@@ -823,24 +849,11 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
 
   // Ladders and vine walls (d_a_player_ladder.inc, d_a_player_climb.inc; see LADDERS AND VINE
   // WALLS). The anchor fields m3724/m352C are stale for the puppet; the inits only use them to
-  // place/aim Link, which is restored below. With an item in hand the start inits only sheathe
-  // it (mProcVar6.m3570 = 0) and leave the start anim to their per-frame proc (ladder.inc:107-118,
-  // :225-236, climb.inc:226-237), which never runs for a puppet: start it here.
-  case PROC_LADDER_UP_START:
-    ok = daPy_lk_c__procLadderUpStart_init(puppet);
-    if (DAPY_LK_M3570(puppet) == 0)
-      daPy_lk_c__procLadderUpStart_init_sub(puppet);
-    break;
-  case PROC_LADDER_DOWN_START:
-    ok = daPy_lk_c__procLadderDownStart_init(puppet);
-    if (DAPY_LK_M3570(puppet) == 0)
-      daPy_lk_c__procLadderDownStart_init_sub(puppet);
-    break;
-  case PROC_CLIMB_UP_START:
-    ok = daPy_lk_c__procClimbUpStart_init(puppet);
-    if (DAPY_LK_M3570(puppet) == 0)
-      daPy_lk_c__procClimbUpStart_init_sub(puppet);
-    break;
+  // place/aim Link, which is restored below. With an item in hand the start anim waits for the
+  // item to be put away (puppet_climbStep).
+  case PROC_LADDER_UP_START:   ok = daPy_lk_c__procLadderUpStart_init(puppet); break;
+  case PROC_LADDER_DOWN_START: ok = daPy_lk_c__procLadderDownStart_init(puppet); break;
+  case PROC_CLIMB_UP_START:    ok = daPy_lk_c__procClimbUpStart_init(puppet); break;
   // Param = the wall's normal angle; the init faces Link at it + 0x8000 (climb.inc:281-299).
   case PROC_CLIMB_DOWN_START: ok = daPy_lk_c__procClimbDownStart_init(puppet, (s16)(savedShapeY + 0x8000)); break;
   case PROC_LADDER_UP_END:    ok = daPy_lk_c__procLadderUpEnd_init(puppet, climbHand); break;
