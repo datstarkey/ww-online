@@ -22,8 +22,16 @@ public static class AppPaths
     /// player's settings (paths, look, patch choices) should survive a reinstall. Settings from before
     /// the WW-Online rename are copied in by <see cref="LegacyAppDataMigration"/>.
     /// </summary>
-    public static string AppDataDirectory { get; } = Path.Combine(
+    public static string AppDataDirectory { get; } = SettingsDirectoryOverride ?? Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppDataFolderName);
+
+    /// <summary>Environment variable that moves the settings folder (a throwaway profile for trying the
+    /// first-run setup, screenshots or tests). Unset = %AppData%\WWOnline.</summary>
+    public const string SettingsDirectoryVariable = "WWO_SETTINGS_DIR";
+
+    /// <summary>The <see cref="SettingsDirectoryVariable"/> folder, or null when it isn't set.</summary>
+    public static string? SettingsDirectoryOverride =>
+        Environment.GetEnvironmentVariable(SettingsDirectoryVariable) is { Length: > 0 } dir ? Path.GetFullPath(dir) : null;
 
     /// <summary>Where an installed app keeps its logs: %LocalAppData%\WWOnline\logs (next to, not
     /// inside, Velopack's replaced-on-update <c>current</c> folder; removed on uninstall, which is fine for logs).</summary>

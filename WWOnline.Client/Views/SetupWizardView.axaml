@@ -1,0 +1,557 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             x:Class="WWOnline.Views.SetupWizardView"
+             x:DataType="vm:SetupWizardViewModel">
+
+    <UserControl.Styles>
+        <!-- Step list: a numbered dot (accent when current, a tick when done) and the step name -->
+        <Style Selector="Border.step-dot">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+        <Style Selector="Border.step-dot TextBlock">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Text3Brush}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Border.step-dot.done">
+            <Setter Property="Background" Value="{StaticResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentLineBrush}" />
+        </Style>
+        <Style Selector="Border.step-dot.current">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        </Style>
+        <Style Selector="Border.step-dot.current TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}" />
+        </Style>
+        <Style Selector="TextBlock.step-name">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{StaticResource Text3Brush}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.step-name.done">
+            <Setter Property="Foreground" Value="{StaticResource TextNavBrush}" />
+        </Style>
+        <Style Selector="TextBlock.step-name.current">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- Step body text -->
+        <Style Selector="TextBlock.lead">
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="LineHeight" Value="22" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        </Style>
+        <Style Selector="TextBlock.hint">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        </Style>
+        <Style Selector="TextBlock.field">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- Small tunic swatches -->
+        <Style Selector="Border.swatch-ring">
+            <Setter Property="Width" Value="48" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="3" />
+            <Setter Property="BorderThickness" Value="2" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+        </Style>
+        <Style Selector="Button:pointerover Border.swatch-ring">
+            <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}" />
+        </Style>
+        <Style Selector="Border.swatch-ring.selected, Button:pointerover Border.swatch-ring.selected">
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+        </Style>
+        <!-- A Dolphin.exe found on this PC -->
+        <Style Selector="Button.candidate">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="272,*" Background="{StaticResource GroundBrush}">
+
+        <!-- ═══ Step rail ═══ -->
+        <Border Grid.Column="0" Background="{StaticResource SidebarBrush}"
+                BorderBrush="{StaticResource SidebarBorderBrush}" BorderThickness="0,0,1,0" Padding="26,26,22,22">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,26">
+                    <Image Source="avares://WWOnline.Client/Assets/Branding/logo.png" Width="112" Height="112"
+                           HorizontalAlignment="Left" Margin="-6,-6,0,10"
+                           RenderOptions.BitmapInterpolationMode="HighQuality" AutomationProperties.Name="WW-Online" />
+                    <TextBlock Text="Set up WW-Online" Classes="ww-heading" FontSize="20" />
+                    <TextBlock Text="A few minutes, once." Classes="hint" />
+                </StackPanel>
+
+                <Button DockPanel.Dock="Bottom" Classes="ww-ghost" HorizontalAlignment="Left"
+                        Content="Skip setup" Command="{Binding SkipSetupCommand}" IsEnabled="{Binding !IsPatching}"
+                        ToolTip.Tip="Close the setup. You can run it again from Settings." />
+
+                <ItemsControl ItemsSource="{Binding Steps}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:SetupStepItem">
+                            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,14">
+                                <Border Classes="step-dot" Classes.current="{Binding IsCurrent}" Classes.done="{Binding IsDone}">
+                                    <Panel>
+                                        <TextBlock Text="{Binding Number}" IsVisible="{Binding !IsDone}" />
+                                        <Viewbox Width="14" Height="14" IsVisible="{Binding IsDone}">
+                                            <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource AccentBrush}" />
+                                        </Viewbox>
+                                    </Panel>
+                                </Border>
+                                <TextBlock Grid.Column="1" Text="{Binding Title}" Margin="12,0,0,0" Classes="step-name"
+                                           Classes.current="{Binding IsCurrent}" Classes.done="{Binding IsDone}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </DockPanel>
+        </Border>
+
+        <!-- ═══ Step content + footer ═══ -->
+        <Grid Grid.Column="1" RowDefinitions="*,Auto">
+            <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="52,40,52,32" MaxWidth="880" HorizontalAlignment="Stretch" Spacing="0">
+                    <TextBlock Text="{Binding StepCaption}" Classes="ww-section-header" Margin="0,0,0,10" />
+
+                    <!-- ── 1. Welcome ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding IsWelcome}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Welcome to WW-Online" Classes="ww-title" />
+                            <TextBlock Classes="lead"
+                                       Text="Play The Wind Waker online with your friends. You see each other as Links on the Great Sea, and a room can share its world, items, story and rupees." />
+                        </StackPanel>
+
+                        <Border Classes="ww-edit-banner">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Viewbox Width="20" Height="20" VerticalAlignment="Top" Margin="0,1,12,0">
+                                    <Path Classes="icon" Data="{StaticResource IconInfo}" Stroke="{StaticResource GoldCBrush}" />
+                                </Viewbox>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="You need your own copy of the game" FontWeight="SemiBold" Foreground="{StaticResource GoldTextBrush}" />
+                                    <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource GoldTextSoftBrush}"
+                                               Text="The US GameCube version of The Legend of Zelda: The Wind Waker (game ID GZLE01), dumped from a disc you own. WW-Online contains no Nintendo files and never downloads any." />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Classes="ww-card" Padding="22,18">
+                            <StackPanel Spacing="14">
+                                <TextBlock Text="THIS SETUP WILL" Classes="ww-label" />
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                                    <Border Grid.Row="0" Classes="ww-icon-tile" Margin="0,0,14,12">
+                                        <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconMonitor}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                    </Border>
+                                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2" VerticalAlignment="Center" Margin="0,0,0,12">
+                                        <TextBlock Text="Find Dolphin" FontWeight="SemiBold" />
+                                        <TextBlock Classes="hint" Text="To extract your game, then to start it and link up with it." />
+                                    </StackPanel>
+                                    <Border Grid.Row="1" Classes="ww-icon-tile" Margin="0,0,14,12">
+                                        <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconChest}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                    </Border>
+                                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2" VerticalAlignment="Center" Margin="0,0,0,12">
+                                        <TextBlock Text="Find your game" FontWeight="SemiBold" />
+                                        <TextBlock Classes="hint" Text="Extract your ISO or RVZ, and choose a folder for the patched copy. The original is never changed." />
+                                    </StackPanel>
+                                    <Border Grid.Row="2" Classes="ww-icon-tile" Margin="0,0,14,12">
+                                        <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSliders}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                    </Border>
+                                    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2" VerticalAlignment="Center" Margin="0,0,0,12">
+                                        <TextBlock Text="Pick your game patches and your look" FontWeight="SemiBold" />
+                                        <TextBlock Classes="hint" Text="Optional extras like skipping the intro or Swift Sail, then your name and tunic colour." />
+                                    </StackPanel>
+                                    <Border Grid.Row="3" Classes="ww-icon-tile" Margin="0,0,14,0">
+                                        <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                    </Border>
+                                    <StackPanel Grid.Row="3" Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Patch your game" FontWeight="SemiBold" />
+                                        <TextBlock Classes="hint" Text="Builds the online-ready copy you play." />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Classes="hint" Text="Everything here can be changed later in Settings." />
+                    </StackPanel>
+
+                    <!-- ── 3. Your game (after Dolphin: its DolphinTool extracts the disc) ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding IsGame}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Your game" Classes="ww-title" />
+                            <TextBlock Classes="lead"
+                                       Text="WW-Online patches an extracted copy of your game: a folder with sys and files inside. If you have a disc image (ISO, RVZ, GCM…), extract it first." />
+                        </StackPanel>
+
+                        <!-- DolphinTool can extract: pick the disc image, extract, done -->
+                        <Border Classes="ww-card" Padding="22,18" IsVisible="{Binding CanExtract}">
+                            <StackPanel Spacing="12">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Have an ISO or RVZ? Extract it here" Classes="ww-card-title" />
+                                    <TextBlock Classes="hint" Text="Uses DolphinTool, which comes with your Dolphin. Skip this if you've already extracted the game." />
+                                </StackPanel>
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="DISC IMAGE" Classes="ww-label" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBox Text="{Binding DiscImagePath}" Classes="mono" Watermark="e.g. C:\Games\The Wind Waker (USA).iso"
+                                                 AutomationProperties.Name="Disc image" IsEnabled="{Binding !IsExtracting}" />
+                                        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDiscImageCommand}" Classes="ww-secondary"
+                                                Margin="10,0,0,0" IsEnabled="{Binding !IsExtracting}" />
+                                    </Grid>
+                                </StackPanel>
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="EXTRACT INTO" Classes="ww-label" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBox Text="{Binding ExtractFolder}" Classes="mono" Watermark="An empty folder"
+                                                 AutomationProperties.Name="Extract into" IsEnabled="{Binding !IsExtracting}" />
+                                        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseExtractFolderCommand}" Classes="ww-secondary"
+                                                Margin="10,0,0,0" IsEnabled="{Binding !IsExtracting}" />
+                                    </Grid>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Button Content="Extract" Classes="ww-accent" Command="{Binding ExtractDiscCommand}"
+                                            IsEnabled="{Binding CanExtractNow}" IsVisible="{Binding !IsExtracting}" />
+                                    <Button Content="Cancel" Classes="ww-ghost" Command="{Binding CancelExtractCommand}" IsVisible="{Binding IsExtracting}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ExtractSucceeded}" VerticalAlignment="Center">
+                                        <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                                            <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
+                                        </Viewbox>
+                                        <TextBlock Text="Extracted. It's filled in below." FontSize="13" Foreground="{StaticResource RupeeLightBrush}"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </StackPanel>
+                                <StackPanel Spacing="6" IsVisible="{Binding IsExtracting}">
+                                    <ProgressBar IsIndeterminate="True" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="{Binding ExtractProgress}" FontSize="12" Foreground="{StaticResource Text2Brush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <Border Classes="ww-error-banner" IsVisible="{Binding ExtractError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding ExtractError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap" />
+                                </Border>
+                                <TextBlock Classes="hint" Foreground="{StaticResource Text3Brush}"
+                                           Text="Or in Dolphin's window: right-click the game → Properties → Filesystem, right-click the disc → Extract Entire Disc…" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- No DolphinTool that can extract: Dolphin's own window -->
+                        <Border Classes="ww-terminal" IsVisible="{Binding ShowManualExtractSteps}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="EXTRACTING YOUR ISO IN DOLPHIN" Classes="ww-label" />
+                                <TextBlock Classes="hint" Text="1.  Add the ISO to Dolphin's game list (Config → Paths, or drag it in)." />
+                                <TextBlock Classes="hint" Text="2.  Right-click the game → Properties → Filesystem." />
+                                <TextBlock Classes="hint" Text="3.  Right-click the disc at the top → Extract Entire Disc…, and choose an empty folder." />
+                                <TextBlock Classes="hint" Text="4.  Choose that folder below." />
+                            </StackPanel>
+                        </Border>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Original game folder" Classes="field" />
+                            <TextBlock Classes="hint" Text="The folder you extracted to. Only read, never changed." />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Text="{Binding VanillaGamePath}" Classes="mono" Watermark="e.g. C:\Games\WindWaker"
+                                         AutomationProperties.Name="Original game folder" />
+                                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseVanillaCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding DetectedGameText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                                    <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
+                                </Viewbox>
+                                <TextBlock Text="{Binding DetectedGameText}" FontSize="13" Foreground="{StaticResource RupeeLightBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Text="{Binding VanillaNote}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource GoldTextBrush}"
+                                       IsVisible="{Binding VanillaNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <Border Classes="ww-error-banner" IsVisible="{Binding VanillaError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="{Binding VanillaError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap" />
+                                    <Button Content="Use that folder" Classes="ww-secondary" HorizontalAlignment="Left"
+                                            Command="{Binding UseSuggestedVanillaPathCommand}"
+                                            IsVisible="{Binding SuggestedVanillaPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Patched game folder" Classes="field" />
+                            <TextBlock Classes="hint" Text="WW-Online copies the game here (about 1.5 GB) and patches the copy. This is the game you play." />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBox Text="{Binding GamePath}" Classes="mono" Watermark="e.g. C:\Games\WindWaker-WWOnline"
+                                         AutomationProperties.Name="Patched game folder" />
+                                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseGamePathCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+                            </Grid>
+                            <Border Classes="ww-error-banner" IsVisible="{Binding GamePathError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding GamePathError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap" />
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ── 2. Dolphin ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding IsDolphin}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Dolphin" Classes="ww-title" />
+                            <TextBlock Classes="lead"
+                                       Text="WW-Online plays through Dolphin, the GameCube emulator, and uses it to extract your game in the next step. Use a recent development build from dolphin-emu.org." />
+                        </StackPanel>
+
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Dolphin.exe" Classes="field" />
+                            <Grid ColumnDefinitions="*,Auto,Auto">
+                                <TextBox Text="{Binding DolphinPath}" Classes="mono" Watermark="e.g. C:\Dolphin-x64\Dolphin.exe"
+                                         AutomationProperties.Name="Dolphin.exe" />
+                                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDolphinCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+                                <Button Grid.Column="2" Content="Search again" Command="{Binding FindDolphinCommand}" Classes="ww-ghost" Margin="6,0,0,0" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding DolphinOk}">
+                                <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                                    <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
+                                </Viewbox>
+                                <TextBlock Text="Found Dolphin" FontSize="13" Foreground="{StaticResource RupeeLightBrush}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Border Classes="ww-error-banner" IsVisible="{Binding DolphinError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding DolphinError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap" />
+                            </Border>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8" IsVisible="{Binding HasDolphinCandidates}">
+                            <TextBlock Text="FOUND ON THIS PC" Classes="ww-label" />
+                            <ItemsControl ItemsSource="{Binding DolphinCandidates}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Button Classes="ww-secondary candidate" CommandParameter="{Binding}"
+                                                Command="{Binding $parent[UserControl].((vm:SetupWizardViewModel)DataContext).UseDolphinCandidateCommand}">
+                                            <TextBlock Text="{Binding}" FontFamily="{StaticResource FontMono}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <TextBlock Classes="hint" IsVisible="{Binding NoDolphinFound}"
+                                   Text="Couldn't find Dolphin on this PC. Download it from dolphin-emu.org, unzip it anywhere, then Browse to Dolphin.exe." />
+
+                        <ToggleSwitch IsChecked="{Binding AutoLaunchDolphin}" Content="Start Dolphin and attach when I host or join a room" />
+
+                        <Border Classes="ww-info-banner">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="What WW-Online does with Dolphin" FontWeight="SemiBold" Foreground="{StaticResource AccentHoverBrush}" />
+                                <TextBlock Classes="hint" Foreground="{StaticResource TextSoftBrush}"
+                                           Text="It starts your patched game in Dolphin with the 48 MB memory setting the patch needs (for that session only), then links up with the running game to show the other players. It only does this while your patched game is up to date." />
+                                <TextBlock Classes="hint"
+                                           Text="Starting Dolphin yourself? Turn on Config → Advanced → Enable Emulated Memory Size Override with MEM1 at 48 MB, boot the patched game, and attach on the Dolphin page." />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ── 4. Game patches ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding IsPatches}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Game patches" Classes="ww-title" />
+                            <TextBlock Classes="lead"
+                                       Text="Optional extras from Better Wind Waker and the Wind Waker Randomizer. The defaults are a good start. Patches marked “All players should match” change the world, so agree on those with your room." />
+                            <TextBlock Classes="hint" Text="Your picks save straight away. Change them any time in Settings; they go in the next time you patch." />
+                        </StackPanel>
+                        <ContentControl Content="{Binding PatchOptions}" />
+                    </StackPanel>
+
+                    <!-- ── 5. You ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding IsPlayer}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="You" Classes="ww-title" />
+                            <TextBlock Classes="lead" Text="How the other players see you." />
+                        </StackPanel>
+
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Border Width="64" Height="64" CornerRadius="32" Background="{Binding Appearance.PreviewBrush}"
+                                    VerticalAlignment="Top" Margin="0,22,20,0">
+                                <TextBlock Text="{Binding PlayerInitials}" FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
+                                           FontSize="22" Foreground="{StaticResource TextBrush}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Text="PLAYER NAME" Classes="ww-label" />
+                                <TextBox Text="{Binding PlayerName}" Watermark="Link" MaxLength="{Binding MaxPlayerNameLength}"
+                                         AutomationProperties.Name="Player name" />
+                                <TextBlock Text="{Binding PlayerNameError}" FontSize="13" Foreground="{StaticResource DangerBrush}"
+                                           IsVisible="{Binding PlayerNameError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <TextBlock Classes="hint" Text="Shown above your Link and in the room's player list." />
+                            </StackPanel>
+                        </Grid>
+
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="TUNIC COLOUR" Classes="ww-label" />
+                            <ItemsControl ItemsSource="{Binding Appearance.Swatches}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:TunicSwatchViewModel">
+                                        <Button Classes="ww-bare" Margin="0,0,8,8" ToolTip.Tip="{Binding Name}"
+                                                AutomationProperties.Name="{Binding Name}"
+                                                Command="{Binding $parent[UserControl].((vm:SetupWizardViewModel)DataContext).Appearance.SelectColorCommand}"
+                                                CommandParameter="{Binding}">
+                                            <Border Classes="swatch-ring" Classes.selected="{Binding IsSelected}">
+                                                <Border CornerRadius="10" Background="{Binding Brush}" BorderBrush="#33FFFFFF" BorderThickness="1">
+                                                    <Viewbox Width="18" Height="18" IsVisible="{Binding IsSelected}">
+                                                        <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{Binding CheckBrush}" />
+                                                    </Viewbox>
+                                                </Border>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Classes="hint" Text="{Binding Appearance.LookText, StringFormat='{}{0}. Clothes and name tags are on the Appearance page.'}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ── 6. Patch ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding IsPatch}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Patch your game" Classes="ww-title" />
+                            <TextBlock Classes="lead"
+                                       Text="WW-Online builds the copy you play: the online code plus the patches you picked. Until your game is patched, WW-Online won't start Dolphin or attach to it." />
+                        </StackPanel>
+
+                        <Border Classes="ww-card" Padding="22,18">
+                            <StackPanel Spacing="12">
+                                <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto">
+                                    <TextBlock Grid.Row="0" Text="FROM" Classes="ww-label" VerticalAlignment="Center" Margin="0,0,0,8" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding VanillaGamePath}" Classes="ww-mono" FontSize="12"
+                                               TextTrimming="CharacterEllipsis" Margin="0,0,0,8" />
+                                    <TextBlock Grid.Row="1" Text="INTO" Classes="ww-label" VerticalAlignment="Center" Margin="0,0,0,8" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding GamePath}" Classes="ww-mono" FontSize="12"
+                                               TextTrimming="CharacterEllipsis" Margin="0,0,0,8" />
+                                    <TextBlock Grid.Row="2" Text="PATCHES" Classes="ww-label" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding PatchOptions.SelectionSummary}" FontSize="13"
+                                               Foreground="{StaticResource Text2Brush}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding ShowAlreadyUpToDate}">
+                            <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0">
+                                <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
+                            </Viewbox>
+                            <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource RupeeLightBrush}"
+                                       Text="Your patched game is already up to date with these patches. Patch again if you like, or carry on." />
+                        </Grid>
+
+                        <Border Classes="ww-terminal">
+                            <StackPanel Spacing="12">
+                                <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding ShowPatchButton}">
+                                    <Button Content="{Binding PatchButtonText}" Classes="ww-accent" Command="{Binding PatchGameCommand}"
+                                            IsEnabled="{Binding CanPatch}" />
+                                    <TextBlock Classes="hint" VerticalAlignment="Center"
+                                               Text="The first patch copies the whole game, so it can take a minute." />
+                                </StackPanel>
+                                <StackPanel Spacing="8" IsVisible="{Binding IsPatching}">
+                                    <ProgressBar IsIndeterminate="True" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+                                    <TextBlock Text="{Binding PatchProgress}" FontSize="12" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding PatchSucceeded}">
+                                    <Viewbox Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,10,0">
+                                        <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
+                                    </Viewbox>
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Text="Your game is patched and ready" FontWeight="SemiBold" Foreground="{StaticResource RupeeLightBrush}" />
+                                        <TextBlock Classes="hint" Text="Patch again from Settings whenever you change your patches or WW-Online asks you to." />
+                                    </StackPanel>
+                                </Grid>
+                                <Border Classes="ww-error-banner" IsVisible="{Binding PatchError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Patching didn't work" FontWeight="SemiBold" Foreground="{StaticResource DangerBrush}" />
+                                        <TextBlock Text="{Binding PatchError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ── 7. Play ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding IsDone}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Ready to set sail" Classes="ww-title" />
+                            <TextBlock Classes="lead" Text="{Binding DolphinHint}" />
+                        </StackPanel>
+
+                        <Border Classes="ww-warn-banner" IsVisible="{Binding !IsGameReady}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Viewbox Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,10,0">
+                                    <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />
+                                </Viewbox>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="Your game isn't patched yet" FontWeight="SemiBold" Foreground="{StaticResource GoldTextBrush}" />
+                                    <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource GoldTextSoftBrush}"
+                                               Text="WW-Online won't start Dolphin or attach to it until it is. Use Patch now at the top of the app, or Settings → Patch game." />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Grid ColumnDefinitions="*,16,*">
+                            <Border Grid.Column="0" Classes="ww-card" Padding="22,18">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <Viewbox Width="18" Height="18" VerticalAlignment="Center">
+                                            <Path Classes="icon" Data="{StaticResource IconCrown}" Stroke="{StaticResource GoldCBrush}" />
+                                        </Viewbox>
+                                        <TextBlock Text="Host a room" Classes="ww-card-title" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Classes="hint"
+                                               Text="On the Room page, choose Host a room. You're the room owner: press Edit room to pick what the room shares. Friends join with your address on port 6969 (Tailscale is the easiest way over the internet)." />
+                                </StackPanel>
+                            </Border>
+                            <Border Grid.Column="2" Classes="ww-card" Padding="22,18">
+                                <StackPanel Spacing="8">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <Viewbox Width="18" Height="18" VerticalAlignment="Center">
+                                            <Path Classes="icon" Data="{StaticResource IconPeople}" Stroke="{StaticResource AccentBrush}" />
+                                        </Viewbox>
+                                        <TextBlock Text="Join a room" Classes="ww-card-title" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Classes="hint"
+                                               Text="On the Room page, enter the host's address and choose Join. Everyone in a room needs the same WW-Online version." />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Footer: Back · Skip · Next -->
+            <Border Grid.Row="1" BorderBrush="{StaticResource CardLineBrush}" BorderThickness="0,1,0,0" Padding="52,14">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto" MaxWidth="880">
+                    <Button Grid.Column="0" Classes="ww-ghost" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}"
+                            AutomationProperties.Name="Back">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                                <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconArrowLeft}" Stroke="{Binding $parent[Button].Foreground}" />
+                            </Viewbox>
+                            <TextBlock Text="Back" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" Classes="ww-ghost" Content="{Binding SkipStepText}" Command="{Binding SkipStepCommand}"
+                            IsVisible="{Binding CanSkipStep}" Margin="0,0,10,0" />
+                    <Button Grid.Column="3" Classes="ww-accent" Command="{Binding NextCommand}" IsEnabled="{Binding CanGoNext}"
+                            MinWidth="140" HorizontalContentAlignment="Center" AutomationProperties.Name="{Binding NextText}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding NextText}" VerticalAlignment="Center" />
+                            <Viewbox Width="14" Height="14" VerticalAlignment="Center" IsVisible="{Binding !IsDone}">
+                                <Path Classes="icon" StrokeThickness="2" Data="{StaticResource IconArrowRight}" Stroke="{Binding $parent[Button].Foreground}" />
+                            </Viewbox>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

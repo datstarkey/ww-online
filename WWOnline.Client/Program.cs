@@ -35,9 +35,12 @@ internal class Program
         Log.Information("Startup options: {Options}", StartupOptions);
 
         // Before anything reads settings: bring them over from the pre-rename folder, once.
-        // (--build-patchdata is a build tool: it reads no settings.)
-        if (StartupOptions.BuildPatchData == null)
+        // (--build-patchdata is a build tool: it reads no settings. A WWO_SETTINGS_DIR profile is a
+        // deliberately separate one, so it never receives the old settings.)
+        if (StartupOptions.BuildPatchData == null && AppPaths.SettingsDirectoryOverride == null)
             LegacyAppDataMigration.Run();
+        else if (AppPaths.SettingsDirectoryOverride != null)
+            Log.Information("Settings folder: {Dir} ({Variable})", AppPaths.AppDataDirectory, AppPaths.SettingsDirectoryVariable);
 
         try
         {

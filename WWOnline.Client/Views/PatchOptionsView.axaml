@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             x:Class="WWOnline.Views.PatchOptionsView"
+             x:DataType="vm:PatchOptionsViewModel">
+
+    <!-- The optional game patch checklist: Settings → Game patches and the setup's Game patches step. -->
+    <UserControl.Styles>
+        <!-- One optional patch: accent outline when ticked -->
+        <Style Selector="Border.patch">
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Padding" Value="12,10,14,12" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{StaticResource CardLineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.patch.on">
+            <Setter Property="Background" Value="{StaticResource AccentTintBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentLineBrush}" />
+        </Style>
+        <Style Selector="Border.patch CheckBox">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <!-- "Default" / "All players should match" chips -->
+        <Style Selector="Border.tag">
+            <Setter Property="CornerRadius" Value="{StaticResource PillRadius}" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+        </Style>
+        <Style Selector="Border.tag TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        </Style>
+        <Style Selector="Border.tag.match">
+            <Setter Property="Background" Value="{StaticResource GoldTintBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GoldLineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.tag.match TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource GoldTextBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <StackPanel Spacing="16">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="{Binding SelectionSummary}" Classes="ww-faint" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" Margin="16,0,0,0">
+                <Button Content="Reset to defaults" Classes="ww-ghost" Command="{Binding ResetToDefaultsCommand}" />
+                <Button Content="Select none" Classes="ww-ghost" Command="{Binding SelectNoneCommand}"
+                        IsEnabled="{Binding HasOptions}" />
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Text="No optional patches were found next to the app (PatchData/optional)."
+                   Classes="ww-muted" IsVisible="{Binding !HasOptions}" />
+
+        <ItemsControl ItemsSource="{Binding Groups}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PatchOptionGroup">
+                    <StackPanel Spacing="10" Margin="0,0,0,18">
+                        <TextBlock Text="{Binding Category}" Classes="ww-heading" FontSize="16" />
+                        <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PatchOptionItemViewModel">
+                                    <Border Classes="patch" Classes.on="{Binding IsSelected}" Margin="0,0,10,10">
+                                        <CheckBox IsChecked="{Binding IsSelected}" VerticalAlignment="Top"
+                                                  AutomationProperties.Name="{Binding Name}">
+                                            <StackPanel Spacing="4">
+                                                <WrapPanel>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"
+                                                               VerticalAlignment="Center" Margin="0,0,8,2" />
+                                                    <Border Classes="tag" IsVisible="{Binding IsDefault}"
+                                                            ToolTip.Tip="On unless you turn it off">
+                                                        <TextBlock Text="Default" />
+                                                    </Border>
+                                                    <Border Classes="tag match" IsVisible="{Binding AllPlayersShouldMatch}"
+                                                            ToolTip.Tip="{Binding MatchTip}">
+                                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                                            <Viewbox Width="11" Height="11" VerticalAlignment="Center">
+                                                                <Path Classes="icon bold" Data="{StaticResource IconPeople}" Stroke="{StaticResource GoldTextBrush}" />
+                                                            </Viewbox>
+                                                            <TextBlock Text="All players should match" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <Border Background="Transparent" VerticalAlignment="Center"
+                                                            IsVisible="{Binding ShowNoteIcon}" ToolTip.Tip="{Binding MultiplayerNote}">
+                                                        <Viewbox Width="15" Height="15">
+                                                            <Path Classes="icon" Data="{StaticResource IconInfo}" Stroke="{StaticResource Text2Brush}" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </WrapPanel>
+                                                <TextBlock Text="{Binding Description}" FontSize="13" TextWrapping="Wrap"
+                                                           Foreground="{StaticResource Text2Brush}" />
+                                                <TextBlock Text="{Binding ConflictsText, StringFormat='Can’t be combined with {0}'}" FontSize="12"
+                                                           TextWrapping="Wrap" Foreground="{StaticResource Text3Brush}"
+                                                           IsVisible="{Binding HasConflicts}" />
+                                            </StackPanel>
+                                        </CheckBox>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

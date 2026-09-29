@@ -67,6 +67,7 @@ public partial class App : Application
         services.AddSingleton<PatchOptionsViewModel>();
         services.AddSingleton<AppearanceViewModel>();
         services.AddSingleton<UpdateViewModel>();
+        services.AddSingleton<SetupWizardViewModel>();
 
         _serviceProvider = services.BuildServiceProvider();
 
@@ -121,7 +122,6 @@ public partial class App : Application
 
             var opts = services.GetRequiredService<Services.StartupOptions>();
             var serverVm = services.GetRequiredService<ViewModels.ServerViewModel>();
-            var gameStateVm = services.GetRequiredService<ViewModels.GameStateViewModel>();
 
             // Populate name/host/port from CLI before connecting so the form reflects
             // the actual target and the "connect" button's handler uses the right values.
@@ -160,40 +160,28 @@ public partial class App : Application
 
             if (opts.AutoAttach)
             {
-                // Dolphin's window appears well before the game has booted and mapped its
-                // emulated memory, so keep trying (and awaiting the real result) until the
-                // attach actually succeeds: up to ~3 minutes, one attempt every 2s.
-                Log.Information("[startup] --auto-attach: waiting for Dolphin{Pid} to boot the game...",
-                    opts.DolphinPid is int p ? $" (PID {p})" : "");
-                const int maxAttempts = 90;
-                bool attached = false;
-                for (int attempt = 1; attempt <= maxAttempts && !attached; attempt++)
+                // Never onto a stale or unpatched game (the C# and in-game code would disagree about
+                // the memory layout) unless dev-test.ps1 -AllowStale passed --allow-stale.
+                var readiness = LaunchReadiness.EvaluateAutoAttach(build, opts.AllowStale);
+                if (!readiness.CanLaunch)
                 {
-                    await System.Threading.Tasks.Task.Delay(2000);
-                    attached = await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(async () =>
-                    {
-                        if (gameStateVm.IsDolphinConnected) return true;
-
-                        gameStateVm.RefreshDolphinsCommand.Execute(null);
-                        // Prefer the PID the user asked for. Otherwise take the first.
-                        var target = opts.DolphinPid is int wanted
-                            ? gameStateVm.AvailableDolphins.FirstOrDefault(d => d.ProcessId == wanted)
-                            : gameStateVm.AvailableDolphins.FirstOrDefault();
-                        if (target == null) return false;
-
-                        gameStateVm.SelectedDolphin = target;
-                        await gameStateVm.ConnectDolphinCommand.ExecuteAsync(null);
-                        return gameStateVm.IsDolphinConnected;
-                    });
-
-                    if (attached)
-                        Log.Information("[startup] --auto-attach: attached on attempt {Attempt}", attempt);
-                    else if (attempt % 10 == 0)
-                        Log.Information("[startup] --auto-attach: still waiting for the game (attempt {Attempt}/{Max})",
-                            attempt, maxAttempts);
+                    Log.Error("[startup] --auto-attach: not attaching: {Reason}. Patch the game (or pass --allow-stale).", readiness.Problem);
                 }
-                if (!attached)
-                    Log.Warning("[startup] --auto-attach: gave up after {Max} attempts; attach from the Dolphin page", maxAttempts);
+                else
+                {
+                    if (build?.Status != Patcher.Pipeline.BuildStamp.Status.Fresh)
+                        Log.Warning("[startup] --auto-attach: the game build isn't up to date; attaching anyway (--allow-stale)");
+
+                    // Dolphin's window appears well before the game has booted and mapped its emulated
+                    // memory, so keep trying until the attach actually succeeds: up to ~3 minutes.
+                    Log.Information("[startup] --auto-attach: waiting for Dolphin{Pid} to boot the game...",
+                        opts.DolphinPid is int p ? $" (PID {p})" : "");
+                    var launch = services.GetRequiredService<GameLaunchService>();
+                    if (await launch.WaitAndAttachAsync(opts.DolphinPid))
+                        Log.Information("[startup] --auto-attach: attached");
+                    else
+                        Log.Warning("[startup] --auto-attach: gave up; attach from the Dolphin page");
+                }
             }
         }
         catch (Exception ex)
@@ -245,6 +233,9 @@ public partial class App : Application
             _serviceProvider.GetRequiredService<PatchOptionsViewModel>().Dispose();
             _serviceProvider.GetRequiredService<UpdateViewModel>().Dispose();
             _serviceProvider.GetRequiredService<UpdateService>().Dispose();
+            _serviceProvider.GetRequiredService<SetupWizardViewModel>().Dispose();
+            _serviceProvider.GetRequiredService<SettingsViewModel>().Dispose();
+            _serviceProvider.GetRequiredService<GameLaunchService>().Dispose();
 
             // Stops the hosted server process if this client was hosting.
             _serviceProvider.GetRequiredService<ServerViewModel>().Dispose();

@@ -4,7 +4,7 @@ using WWOnline.Services;
 
 namespace WWOnline.ViewModels;
 
-public partial class SettingsViewModel : ViewModelBase
+public partial class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly GameSettingsService _gameSettingsService;
     private readonly GamePatcherService _gamePatcherService;
@@ -47,6 +47,12 @@ public partial class SettingsViewModel : ViewModelBase
 
     public event Action? SettingsSaved;
 
+    /// <summary>"Run setup again": MainViewModel opens the first-run setup.</summary>
+    public event Action? SetupRequested;
+
+    /// <summary>Both game folders are filled in, so Patch game can run.</summary>
+    public bool HasGamePaths => !string.IsNullOrWhiteSpace(VanillaGamePath) && !string.IsNullOrWhiteSpace(GamePath);
+
     /// <summary>
     /// Set by the View to provide file/folder browse capability.
     /// </summary>
@@ -62,13 +68,33 @@ public partial class SettingsViewModel : ViewModelBase
         PatchOptions = patchOptions;
         Updates = updates;
 
-        // Load existing settings
+        ReloadFromSettings();
+        _gamePatcherService.IsPatchingChanged += OnPatcherBusyChanged;
+    }
+
+    /// <summary>Show the saved paths again (after the setup wizard changed them).</summary>
+    public void ReloadFromSettings()
+    {
         var settings = _gameSettingsService.Load();
         DolphinPath = settings.DolphinPath;
         GamePath = settings.GamePath;
         VanillaGamePath = settings.VanillaGamePath;
         AutoLaunchDolphin = settings.AutoLaunchDolphin;
+        ValidationError = null;
+        IsSaved = false;
     }
+
+    /// <summary>A patch is running anywhere (this page, the banner or the setup): no second one, no setup.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunSetupCommand), nameof(PatchGameCommand))]
+    private bool _isAnyPatchRunning;
+
+    [RelayCommand(CanExecute = nameof(CanRunSetup))]
+    private void RunSetup() => SetupRequested?.Invoke();
+
+    private bool CanRunSetup() => !IsAnyPatchRunning;
+
+    private void OnPatcherBusyChanged(bool busy) => Avalonia.Threading.Dispatcher.UIThread.Post(() => IsAnyPatchRunning = busy);
 
     [RelayCommand]
     private async Task BrowseDolphinPath()
@@ -127,15 +153,21 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    private bool CanPatchGame() => !IsPatching
+    private bool CanPatchGame() => !IsPatching && !IsAnyPatchRunning
         && !string.IsNullOrWhiteSpace(VanillaGamePath)
         && !string.IsNullOrWhiteSpace(GamePath);
 
     partial void OnIsPatchingChanged(bool value) => PatchGameCommand.NotifyCanExecuteChanged();
-    partial void OnVanillaGamePathChanged(string value) => PatchGameCommand.NotifyCanExecuteChanged();
+    partial void OnVanillaGamePathChanged(string value)
+    {
+        PatchGameCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasGamePaths));
+    }
+
     partial void OnGamePathChanged(string value)
     {
         PatchGameCommand.NotifyCanExecuteChanged();
+        OnPropertyChanged(nameof(HasGamePaths));
         // The build status beside Patch game follows the folder being edited, saved or not.
         PatchOptions.SetGamePath(value);
     }
@@ -164,4 +196,6 @@ public partial class SettingsViewModel : ViewModelBase
         IsSaved = true;
         SettingsSaved?.Invoke();
     }
+
+    public void Dispose() => _gamePatcherService.IsPatchingChanged -= OnPatcherBusyChanged;
 }

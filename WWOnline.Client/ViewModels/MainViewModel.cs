@@ -28,6 +28,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private readonly DebugToolsViewModel _debugToolsViewModel;
     private bool _disposed;
 
+    /// <summary>The first-run setup, shown over the whole window while <see cref="IsWizardOpen"/>.</summary>
+    public SetupWizardViewModel Wizard { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowPatchBanner))]
+    private bool _isWizardOpen;
+
+    /// <summary>The Settings page: its Patch game command and progress, for the "patch your game" banner.</summary>
+    public SettingsViewModel SettingsPage => _settingsViewModel;
+
     [ObservableProperty]
     private ViewModelBase _currentView;
 
@@ -68,11 +78,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public PatchOptionsViewModel PatchOptions => _settingsViewModel.PatchOptions;
 
     /// <summary>
-    /// A gentle "patch the game again" prompt in the sidebar: the patched game doesn't match what this
-    /// app would patch in (e.g. an update shipped new game code). Never shown on the Settings page,
-    /// which has its own banner, and the app never patches by itself.
+    /// The "patch your game" banner above every page: the patched game is missing, or doesn't match what
+    /// this app would patch in (a changed selection, or an update that shipped new game code). Until it
+    /// does, WW-Online won't start Dolphin or attach to it by itself (GameLaunchService). Not shown on
+    /// the Settings page, which has its own, or over the setup. The app never patches by itself: the
+    /// banner's Patch now is the player's click.
     /// </summary>
-    public bool ShowPatchBanner => SettingsConfigured && PatchOptions.NeedsRepatch && !PatchOptions.IsCheckingBuild && !IsSettingsActive;
+    public bool ShowPatchBanner => PatchOptions.NeedsRepatch && !PatchOptions.IsCheckingBuild && !IsSettingsActive && !IsWizardOpen;
 
     public MainViewModel(
         GameSettingsService gameSettingsService,
@@ -83,8 +95,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         GameStateViewModel gameStateViewModel,
         GameLogViewModel gameLogViewModel,
         DebugToolsViewModel debugToolsViewModel,
-        UpdateViewModel updateViewModel)
+        UpdateViewModel updateViewModel,
+        SetupWizardViewModel wizard,
+        StartupOptions startupOptions)
     {
+        Wizard = wizard;
         _gameSettingsService = gameSettingsService;
         _settingsViewModel = settingsViewModel;
         _appearanceViewModel = appearanceViewModel;
@@ -112,6 +127,34 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         PatchOptions.PropertyChanged += OnPatchOptionsPropertyChanged;
         _serverViewModel.SetLocalTunicColor(_appearanceViewModel.SelectedColor.HexDisplay);
+
+        // First run (or settings from before the setup existed without a patched game): the setup.
+        _settingsViewModel.SetupRequested += OpenSetup;
+        Wizard.Closed += OnWizardClosed;
+        if (FirstRun.Resolve(_gameSettingsService, startupOptions) == FirstRun.Decision.ShowSetup)
+            OpenSetup();
+    }
+
+    /// <summary>Show the setup from the start (first run, Settings → Run setup, the banner's Run setup).</summary>
+    [RelayCommand]
+    private void OpenSetup()
+    {
+        if (_settingsViewModel.IsAnyPatchRunning) return; // the setup patches too: one at a time
+        Wizard.Open();
+        IsWizardOpen = true;
+    }
+
+    /// <summary>The setup saved its steps: show them everywhere, then the Room page.</summary>
+    private void OnWizardClosed()
+    {
+        IsWizardOpen = false;
+        _settingsViewModel.ReloadFromSettings();
+        PatchOptions.SetGamePath(_settingsViewModel.GamePath);
+        _ = PatchOptions.RefreshBuildStatusAsync();
+        var settings = _gameSettingsService.Load();
+        if (!string.IsNullOrWhiteSpace(settings.PlayerName)) _serverViewModel.PlayerName = settings.PlayerName;
+        SettingsConfigured = _gameSettingsService.IsConfigured(settings);
+        ShowDashboard();
     }
 
     private void OnAppearancePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -201,5 +244,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _dashboardViewModel.NavigateRequested -= OnDashboardNavigateRequested;
         _appearanceViewModel.PropertyChanged -= OnAppearancePropertyChanged;
         PatchOptions.PropertyChanged -= OnPatchOptionsPropertyChanged;
+        _settingsViewModel.SetupRequested -= OpenSetup;
+        Wizard.Closed -= OnWizardClosed;
     }
 }

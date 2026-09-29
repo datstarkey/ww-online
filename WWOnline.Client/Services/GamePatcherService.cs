@@ -47,27 +47,9 @@ public class GamePatcherService
     public string PatchDataPath { get; }
 
     /// <summary>
-    /// Validate that the vanilla game path contains the required files.
+    /// Validate that the vanilla game path is the extracted US game (<see cref="GameFolderCheck.CheckVanilla"/>).
     /// </summary>
-    public string? ValidateVanillaPath(string vanillaPath)
-    {
-        if (string.IsNullOrWhiteSpace(vanillaPath))
-            return "Vanilla game path is required";
-
-        if (!Directory.Exists(vanillaPath))
-            return $"Vanilla game folder not found: {vanillaPath}";
-
-        if (!File.Exists(Path.Combine(vanillaPath, "sys", "main.dol")))
-            return $"main.dol not found in {vanillaPath}/sys/";
-
-        if (!File.Exists(Path.Combine(vanillaPath, "files", "RELS.arc")))
-            return $"RELS.arc not found in {vanillaPath}/files/";
-
-        if (!File.Exists(Path.Combine(vanillaPath, "sys", "bi2.bin")))
-            return $"bi2.bin not found in {vanillaPath}/sys/";
-
-        return null;
-    }
+    public string? ValidateVanillaPath(string vanillaPath) => GameFolderCheck.CheckVanilla(vanillaPath).Error;
 
     /// <summary>
     /// Copy vanilla game files to the output folder and apply all patches. Prefers a live
@@ -85,12 +67,25 @@ public class GamePatcherService
     /// </summary>
     public event Action<string, string?>? PatchFinished;
 
+    private int _patching;
+
+    /// <summary>A patch is running (any caller). <see cref="IsPatchingChanged"/> fires on any thread.</summary>
+    public bool IsPatching => Volatile.Read(ref _patching) != 0;
+
+    public event Action<bool>? IsPatchingChanged;
+
     /// <summary>
     /// As above with an explicit optional patch selection (ids from OptionalPatchCatalogService).
     /// </summary>
     public async Task<string?> PatchGameAsync(string vanillaPath, string outputPath,
         IReadOnlyCollection<string> optionalPatchIds, IProgress<string>? progress = null)
     {
+        // One patch at a time (Settings' Patch game, the banner's Patch now and the setup's Patch step
+        // all come here): two runs would write the same files at once.
+        if (Interlocked.CompareExchange(ref _patching, 1, 0) != 0)
+            return "A patch is already running. Wait for it to finish.";
+        IsPatchingChanged?.Invoke(true);
+
         string? error = "Patching did not finish."; // until the core returns (it may throw)
         try
         {
@@ -99,6 +94,9 @@ public class GamePatcherService
         }
         finally
         {
+            Interlocked.Exchange(ref _patching, 0);
+            try { IsPatchingChanged?.Invoke(false); }
+            catch (Exception ex) { Logger.Error(ex, "[patches] an IsPatchingChanged handler failed"); }
             try { PatchFinished?.Invoke(outputPath, error); }
             catch (Exception ex) { Logger.Error(ex, "[patches] a PatchFinished handler failed"); }
         }
@@ -109,8 +107,20 @@ public class GamePatcherService
     {
         // Both paths read the vanilla files from the UI's vanilla game folder (the live pipeline
         // overrides config.json's vanilla_game_path with it), so validate it up front.
-        var validationError = ValidateVanillaPath(vanillaPath);
+        var validationError = ValidateVanillaPath(vanillaPath) ?? GameFolderCheck.CheckPatchedFolder(vanillaPath, outputPath);
         if (validationError != null) return validationError;
+
+        // The patch steps only rewrite the files they change, so a new (empty) output folder first
+        // gets the rest of the game: Dolphin boots sys/main.dol only from a complete extracted disc.
+        try
+        {
+            await Task.Run(() => CopyMissingGameFiles(vanillaPath, outputPath, progress));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.Error(ex, "Copying the game into {OutputPath} failed", outputPath);
+            return $"Couldn't copy the game into {outputPath}: {ex.Message}";
+        }
 
         PatchSelection selection;
         try
@@ -310,6 +320,56 @@ public class GamePatcherService
             dir = dir.Parent;
         }
         return null;
+    }
+
+    /// <summary>The extracted game's two folders: all a disc extraction holds, and all Dolphin boots from.</summary>
+    private static readonly string[] GameTrees = ["sys", "files"];
+
+    /// <summary>Always copied fresh from the original by both patch paths, so never copied here.</summary>
+    private static readonly string[] ResetByPatch =
+        [Path.Combine("sys", "main.dol"), Path.Combine("sys", "bi2.bin"), Path.Combine("files", "RELS.arc")];
+
+    /// <summary>
+    /// Give <paramref name="outputPath"/> every file of the extracted game's sys/ and files/ that it
+    /// lacks, or has with a different size (a copy cut short last time): all of it the first time,
+    /// almost nothing after that. Only those two trees, never anything else lying next to them (an
+    /// ISO, notes). Each file goes to <c>name.partial</c> first and is then moved into place, so an
+    /// interrupted copy never leaves a truncated file under the real name. main.dol, bi2.bin and
+    /// RELS.arc are skipped: the patch steps copy those from the original every time.
+    /// </summary>
+    /// <returns>How many files were copied.</returns>
+    public static int CopyMissingGameFiles(string vanillaPath, string outputPath, IProgress<string>? progress = null)
+    {
+        var vanilla = Path.GetFullPath(vanillaPath);
+        var todo = new List<string>();
+        foreach (var tree in GameTrees)
+        {
+            var dir = Path.Combine(vanilla, tree);
+            if (!Directory.Exists(dir)) continue;
+            foreach (var source in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+            {
+                var rel = Path.GetRelativePath(vanilla, source);
+                if (ResetByPatch.Contains(rel, StringComparer.OrdinalIgnoreCase)) continue;
+                var target = new FileInfo(Path.Combine(outputPath, rel));
+                if (target.Exists && target.Length == new FileInfo(source).Length) continue;
+                todo.Add(rel);
+            }
+        }
+        if (todo.Count == 0) return 0;
+
+        Logger.Information("Copying {Count} game files from {Vanilla} into {Output}", todo.Count, vanilla, outputPath);
+        progress?.Report($"Copying the game into the patched folder: {todo.Count} files...");
+        for (int i = 0; i < todo.Count; i++)
+        {
+            var target = Path.Combine(outputPath, todo[i]);
+            var partial = target + ".partial";
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(Path.Combine(vanilla, todo[i]), partial, overwrite: true);
+            File.Move(partial, target, overwrite: true);
+            if ((i + 1) % 250 == 0)
+                progress?.Report($"Copying the game into the patched folder: {i + 1} of {todo.Count} files...");
+        }
+        return todo.Count;
     }
 
     private static async Task CopyFileAsync(string source, string destination)

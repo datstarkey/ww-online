@@ -83,7 +83,7 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 
 - **Windows 10 or 11**, 64-bit.
 - **[Dolphin](https://dolphin-emu.org/download/)**, a recent development build.
-- **Your own Wind Waker disc image**: the US version, `GZLE01`, dumped from your own disc (ISO/GCM).
+- **Your own Wind Waker disc image**: the US version, `GZLE01`, dumped from your own disc (ISO, RVZ, GCM…).
 - **Friends to play with**, and a way to reach each other over the internet (see [Playing over the internet](#playing-over-the-internet)).
 
 ## Install
@@ -92,22 +92,24 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 
 1. **Download WW-Online** from the [Releases](../../releases) page (`WWOnline-win-Setup.exe`) and run it. It installs for your user only (no admin needed), adds shortcuts, and updates itself when a new version comes out. Everything it needs, including .NET, is bundled.
    - Windows may say **"Windows protected your PC"** because the installer isn't code-signed yet. Click **More info → Run anyway**.
-2. **Extract your game in Dolphin.** Add your ISO to Dolphin's game list, then right-click the game → **Properties** → **Filesystem** → right-click the disc at the top → **Extract Entire Disc…**, and pick an empty folder. You get a folder containing `sys/` and `files/`. (A later version will read your ISO directly.)
-3. **Give Dolphin more memory.** WW-Online needs the 48 MB memory setting. In Dolphin, open **Config** → **Advanced**, tick **Enable Emulated Memory Size Override** and set **MEM1** to **48 MB**. (Only needed while playing WW-Online; untick it for other games if you like.)
-4. **Patch your game.** Open WW-Online → **Settings**:
-   - **Vanilla game folder**: the folder you extracted in step 2. It is only read, never changed.
-   - **Patched game folder**: an empty folder where WW-Online writes the patched copy.
-   - **Dolphin**: your `Dolphin.exe`.
+2. **Get [Dolphin](https://dolphin-emu.org/download/)** (a recent development build) and unzip it anywhere.
+3. **Open WW-Online.** The first time, a short setup walks you through everything (run it again any time from **Settings → Run setup again**):
+   - **Dolphin**: it looks for `Dolphin.exe` for you, or you browse to it.
+   - **Your game**: choose your disc image (ISO, RVZ, GCM…) and WW-Online extracts it with DolphinTool, which comes with Dolphin. (With an older Dolphin that has no DolphinTool, extract it yourself: add the ISO to Dolphin's game list, right-click the game → **Properties** → **Filesystem** → right-click the disc at the top → **Extract Entire Disc…**, then choose that folder.) WW-Online checks it's the US version, `GZLE01`. Then choose a folder for the patched copy: the original is only read, never changed.
+   - **Game patches**: optional extras (skip the intro, instant text, Swift Sail, faster animations, crash fixes and more, from Better Wind Waker). The defaults are a good start. Patches marked **All players should match** change the world, so agree on those with your room.
+   - **You**: your name and tunic colour.
+   - **Patch**: builds your patched game. The first time copies the whole game (about 1.5 GB), so it can take a minute.
 
-   Then pick any **optional patches** under **Game patches** (skip the intro, instant text, Swift Sail, faster animations, crash fixes and more, all from Better Wind Waker) and press **Patch game**. This takes a few seconds and only needs doing again when WW-Online asks, after an update, or when you change your patches. Patches marked **All players should match** change the world, so agree on those with your room.
+   Patch again only when WW-Online asks: after an update that changes the game code, or when you change your patches. Until the game is patched and up to date, a banner at the top says so (with **Patch now**), and WW-Online won't start Dolphin or attach to it.
+4. **Dolphin's memory setting.** WW-Online needs Dolphin's 48 MB memory setting, and turns it on by itself (for that session only) when it starts Dolphin for you. If you start Dolphin yourself, open **Config** → **Advanced**, tick **Enable Emulated Memory Size Override** and set **MEM1** to **48 MB**.
 
 ## Play
 
-- **Host a room:** on the **Room** page choose **Host**. WW-Online starts the room on your PC (port `6969`) and launches the game. You're the room owner: press **Edit room** to pick Full sync, Co-op or your own mix of rules. Rules stay locked until you press Edit, so nothing changes by accident.
-- **Join a room:** enter the host's address and your name, then **Connect**. You see the room's rules and items read-only, and anything you pick up still counts for the room.
+- **Host a room:** on the **Room** page choose **Host a room**. WW-Online starts the room on your PC (port `6969`), then starts your patched game in Dolphin and links up with it (turn that off in **Settings**). You're the room owner: press **Edit room** to pick Full sync, Co-op or your own mix of rules. Rules stay locked until you press Edit, so nothing changes by accident.
+- **Join a room:** enter the host's address and your name, then **Join**. WW-Online starts your game in Dolphin the same way. You see the room's rules and items read-only, and anything you pick up still counts for the room.
 - **Your look:** open **Appearance** to pick your clothes (game default, hero's tunic or pajamas) and your tunic colour. It changes live for everyone. **Show player names** there turns the names above the other Links on or off, for your screen only.
 - **Story flags:** on the **Room** page, see which story events the room has reached. The room owner can edit them.
-- **Dolphin** shows the connection to your game and your live stats.
+- **Dolphin** shows the connection to your game and your live stats. **Start game** starts it by hand; **Attach** links up with a Dolphin you started yourself.
 - **Tools** holds local-only helpers (warp, stats, memory). They only affect your own game.
 
 ### Playing over the internet
@@ -123,8 +125,8 @@ The host's PC must be reachable on port `6969`. The easiest options:
 
 ## Troubleshooting
 
-- **Purple screen with `d_s_play.cpp` / black screen on boot:** the 48 MB memory setting is off (install step 3), or the game folder isn't a patched `GZLE01` copy.
-- **WW-Online says your patched game is out of date:** WW-Online was updated. Go to **Settings** and press **Patch Game** again.
+- **Purple screen with `d_s_play.cpp` / black screen on boot:** the 48 MB memory setting is off (install step 4; only when you start Dolphin yourself), or the game folder isn't a patched `GZLE01` copy.
+- **WW-Online says to patch your game, and won't start Dolphin:** the game isn't patched yet, WW-Online was updated with new game code, or you changed your patches. Press **Patch now** in the banner (or **Settings → Patch game**).
 - **Players don't appear:** everyone must be on the same WW-Online version, in the same room, and past the title screen.
 - **Can't connect:** check the host address and port, and see [Playing over the internet](#playing-over-the-internet).
 

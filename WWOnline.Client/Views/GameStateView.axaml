@@ -27,7 +27,17 @@
 
             <!-- Dolphin attach bar -->
             <Border Classes="ww-card" Padding="18,14">
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                    <Button Grid.Column="4" Classes="ww-primary" Margin="10,0,0,0" Command="{Binding StartGameCommand}"
+                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding CanAttach}"
+                            ToolTip.Tip="Start your patched game in Dolphin and attach to it">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                                <Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{Binding $parent[Button].Foreground}" />
+                            </Viewbox>
+                            <TextBlock Text="Start game" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <TextBlock Grid.Column="0" Text="DOLPHIN" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
                     <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableDolphins}"
                               SelectedItem="{Binding SelectedDolphin}"
@@ -39,10 +49,29 @@
                             Command="{Binding RefreshDolphinsCommand}" IsEnabled="{Binding !IsBusy}" />
                     <Button Grid.Column="3" Content="Attach" Classes="ww-accent"
                             Command="{Binding ConnectDolphinCommand}"
-                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding !IsBusy}" />
+                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding CanAttach}" />
                     <Button Grid.Column="3" Content="Detach" Classes="ww-danger"
                             Command="{Binding DisconnectDolphinCommand}"
                             IsVisible="{Binding IsDolphinConnected}" IsEnabled="{Binding !IsBusy}" />
+                </Grid>
+            </Border>
+
+            <!-- Start game: progress, or why it was refused (e.g. the game needs patching) -->
+            <Border Classes="ww-info-banner" Padding="14,10" IsVisible="{Binding IsLaunching}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Ellipse Classes="ww-status-dot ww-pulse" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding LaunchMessage}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource AccentHoverBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="ww-warn-banner" IsVisible="{Binding LaunchProblem}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Viewbox Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,10,0">
+                        <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />
+                    </Viewbox>
+                    <TextBlock Grid.Column="1" Text="{Binding LaunchMessage}" FontSize="13" TextWrapping="Wrap"
+                               Foreground="{StaticResource GoldTextBrush}" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Content="Dismiss" Classes="ww-ghost" Margin="12,0,0,0" VerticalAlignment="Center"
+                            Command="{Binding DismissLaunchMessageCommand}" />
                 </Grid>
             </Border>
 
@@ -62,7 +91,7 @@
                     <TextBlock Text="Waiting for game data…" FontSize="18" FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
                                HorizontalAlignment="Center" />
                     <ProgressBar IsIndeterminate="True" Width="200" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
-                    <TextBlock Text="Attach to Dolphin and load a save to see your live state."
+                    <TextBlock Text="Start the game (or attach to a running Dolphin) and load a save to see your live state."
                                FontSize="13" HorizontalAlignment="Center" Foreground="{StaticResource Text2Brush}"
                                TextWrapping="Wrap" TextAlignment="Center" />
                 </StackPanel>

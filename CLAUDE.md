@@ -33,7 +33,7 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj -- --build-patchdata
 
 ## Multiplayer test cycle: `scripts\dev-test.ps1`
 - `.\scripts\dev-test.ps1` stops the old run, builds the C#, checks the game build stamp, then launches 2 Dolphins and 2 auto-connecting clients (Player1 hosts the server).
-- `-Patch` also recompiles the C code and re-patches the game. This is a compile, so only use it when asked. `-Stop` / `-Collect` stop everything / copy the live Dolphin logs. `-AllowStale` launches against a stale build. `-DedicatedServer` runs the server as a separate process.
+- `-Patch` also recompiles the C code and re-patches the game. This is a compile, so only use it when asked. `-Stop` / `-Collect` stop everything / copy the live Dolphin logs. `-AllowStale` launches against a stale build (it passes `--allow-stale`: otherwise a client's `--auto-attach` refuses a stale game). `-DedicatedServer` runs the server as a separate process.
 - **Logs** are in `logs/latest/`. Older runs are in `logs/sessions/<time>/`.
   - `session.txt`: git rev, PIDs, build-check result.
   - `client-Player<N>.log`: `[diag]` every 2s, plus `[puppet]`, `[world]`, `[items]`, `[story]`, `[wallet]` and `[build-check]` lines.
@@ -76,7 +76,7 @@ scripts/                   check-no-nintendo-files.ps1 (CI + release guard)
 - `vanilla_game_path` is an extracted vanilla game (`sys/main.dol`, `sys/bi2.bin`, `files/RELS.arc`). If it is unset, `GameMod/vanilla/` is used.
 - `devkitppc_path` defaults to `C:\devkitPro\devkitPPC`.
 
-The client's Patch Game button uses the Settings page's vanilla and game paths instead of the config's.
+The client's Patch Game button (and the setup's Patch step, the same `GamePatcherService.PatchGameAsync`) uses the Settings page's vanilla and game paths instead of the config's. It first copies any game files the patched folder lacks (all of them into a new folder), since only a complete extracted disc boots.
 
 Pipeline (`PipelineRunner`, Full = all six steps):
 1. Copy the vanilla files.
@@ -91,6 +91,11 @@ A Full build writes `<game_path>/wwo-build-stamp.json`, a hash of the GameMod C/
 Optional patches (`GameMod/src/patches/optional/*.asm`, betterww QoL + vanilla bug fixes) are chosen per player: `GameSettings.OptionalPatches` (null = each patch's `@default`), `--patches a,b|none|default` headless, `dev-test.ps1 -Patches a,b`. See `docs/optional-patches.md`. Without devkitPPC, the client falls back to the pre-built `PatchData/`.
 
 **PatchData** is what an installed app patches from (no devkitPPC, no GameMod). `--build-patchdata <dir>` builds it from the GameMod sources and devkitPPC only (no config.json, no game files, Linux or Windows): steps 2-4 into a temp folder (`PipelineRunner.BuildMode.PatchData`, `PatchDataBuilder`), plus the optional patch catalogue, assets and `patchdata-stamp.json`. The stamp holds per-file source hashes (required, and per optional patch), so it reproduces `BuildStamp`'s source hash for any selection: a pre-built patch writes a game stamp comparable with both PatchData and the sources. `GameBuildCheck` is the one build check (Settings page, startup, `--check-build`): against the sources in dev, against `PatchData/patchdata-stamp.json` when installed, so an update with new game code asks the player to patch again. Dev builds' `bin/PatchData` is copied from `GameMod/build` + `patch_diffs` (no stamp: selection-only check). See `docs/releasing.md`.
+
+## First run and starting the game
+- **Setup wizard** (`SetupWizardViewModel`, Settings → Run setup again): Welcome → Dolphin → Game (extracts an ISO/RVZ with DolphinTool when its `extract --help` shows `-i`/`-o`, else Dolphin's Extract Entire Disc steps; `GameFolderCheck` wants GZLE01) → Patches (the shared `PatchOptionsView`) → You → Patch → Play. `FirstRun` shows it once (`GameSettings.SetupCompleted`); old settings with a patched game are marked done, and scripted starts (dev-test) skip it.
+- **Gating:** `GameLaunchService` is the one start/attach path (after Host/Join when `AutoLaunchDolphin`, the Dolphin page's Start game, CLI `--auto-attach`). It never starts or attaches to a game whose build check isn't fresh (`LaunchReadiness`), and before the sync starts it checks the running game (`PatchedGameCheck`: 48 MB MEM1, and the DOL draw hook's `STATUS_ADDR` FourCC), so a vanilla/PAL game or a Dolphin without the memory override is refused. Manual Attach still attaches, with a warning. Attaches are serialised (one `ConnectAsync` at a time). It starts Dolphin with `-C` overrides for the 48 MB MEM1.
+- `WWO_SETTINGS_DIR=<dir>` runs the client on a throwaway settings folder (screenshots, trying the setup) without touching %AppData%\WWOnline.
 
 ## Room sync model
 - The **room owner** is the player who started the server, otherwise the earliest-joined player still connected. The owner can change the rules at runtime.

@@ -11,6 +11,8 @@ namespace WWOnline.Services;
 ///   --host-server           start a server from this client and join it ("Host" button)
 ///   --auto-attach           attach to Dolphin on launch (after connect)
 ///   --dolphin-pid &lt;N&gt;     specific Dolphin PID to attach to (default: first found)
+///   --allow-stale           let --auto-attach attach although the game build is stale
+///                           (dev-test.ps1 -AllowStale; otherwise it refuses)
 ///   --log-file &lt;path&gt;     write this instance's log to exactly this file
 ///
 /// Headless modes (no UI; the process exits with a status code — see <see cref="HeadlessCommands"/>):
@@ -44,7 +46,8 @@ public sealed record StartupOptions(
     bool HostServer = false,
     string? Patches = null,
     string? BuildPatchData = null,
-    string? GameModPath = null)
+    string? GameModPath = null,
+    bool AllowStale = false)
 {
     public bool IsHeadless => CheckBuild || Patch || BuildPatchData != null;
 
@@ -63,6 +66,7 @@ public sealed record StartupOptions(
         string? patches = null;
         string? buildPatchData = null;
         string? gameModPath = null;
+        bool allowStale = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -106,6 +110,9 @@ public sealed record StartupOptions(
                     // instead of starting the UI.
                     buildPatchData = i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal) ? args[++i] : "";
                     break;
+                case "--allow-stale":
+                    allowStale = true;
+                    break;
                 case "--gamemod" when i + 1 < args.Length:
                     gameModPath = args[++i];
                     break;
@@ -114,6 +121,6 @@ public sealed record StartupOptions(
 
         // Logging isn't configured yet at parse time — Program logs the result once it is.
         return new StartupOptions(playerName, host, port, autoConnect, autoAttach, dolphinPid, logFile, checkBuild, patch, hostServer, patches,
-            buildPatchData, gameModPath);
+            buildPatchData, gameModPath, allowStale);
     }
 }
