@@ -1,5 +1,6 @@
 using WWOnline.Hubs;
 using WWOnline.Server;
+using WWOnline.Server.Hubs;
 using WWOnline.Shared.Hubs;
 using Xunit;
 
@@ -108,11 +109,47 @@ public class ServerOptionsTests
         Assert.Contains(r.Errors, e => e.Contains(name) && e.Contains(value));
     }
 
-    [Fact]
-    public void BadCommandLinePort_IsAnError()
+    [Theory]
+    [InlineData("-5")]
+    [InlineData("0")]
+    [InlineData("65536")]
+    [InlineData("99999999999")] // overflows int: still a port, still an error
+    public void BadCommandLinePort_IsAnError(string port)
     {
-        Assert.False(Parse(["-5"]).IsValid);
-        Assert.False(Parse(["65536"]).IsValid);
+        var r = Parse([port]);
+        Assert.False(r.IsValid);
+        Assert.Contains(r.Errors, e => e.Contains(port));
+    }
+
+    [Theory]
+    [InlineData("--owner-key")]
+    [InlineData("--host-token")]
+    [InlineData("--log-file")]
+    public void FlagWithoutAValue_IsAnError(string flag)
+    {
+        var last = Parse(["6969", flag]);
+        Assert.False(last.IsValid);
+        Assert.Contains(last.Errors, e => e.Contains(flag) && e.Contains("needs a value"));
+
+        var beforeAnotherFlag = Parse([flag, "--no-shared-world"]);
+        Assert.False(beforeAnotherFlag.IsValid);
+        Assert.False(beforeAnotherFlag.Options.SharedWorld); // the next flag still counts
+    }
+
+    [Fact]
+    public void DevTestDedicatedServerArgs_StillWork()
+    {
+        var r = Parse(["6969", "--log-file", @"C:\repo\logs\latest\server.log"]);
+        Assert.True(r.IsValid);
+        Assert.Equal(@"C:\repo\logs\latest\server.log", r.Options.LogFile);
+    }
+
+    [Fact]
+    public void OverlongOwnerKey_IsAnError()
+    {
+        Assert.True(Parse(["--owner-key", new string('k', OwnerKeyCheck.MaxKeyLength)]).IsValid);
+        Assert.False(Parse(["--owner-key", new string('k', OwnerKeyCheck.MaxKeyLength + 1)]).IsValid);
+        Assert.False(Parse([], new() { ["WWO_OWNER_KEY"] = new string('k', OwnerKeyCheck.MaxKeyLength + 1) }).IsValid);
     }
 
     [Fact]
@@ -144,6 +181,37 @@ public class ServerOptionsTests
     [InlineData("https://wwo.example.com/", 6969, "https://wwo.example.com/gamehub")]
     [InlineData("https://example.com:8443/wwo/gamehub", 6969, "https://example.com:8443/wwo/gamehub")]
     [InlineData("http://192.168.1.20:7000", 6969, "http://192.168.1.20:7000/gamehub")]
-    public void ClientHubUrl_FromHostField(string host, int port, string expected) =>
-        Assert.Equal(expected, SignalRClientService.BuildHubUrl(host, port));
+    [InlineData("https://wwo.example.com", 0, "https://wwo.example.com/gamehub")] // URL: no Port field needed
+    public void ClientHubUrl_FromHostField(string host, int port, string expected)
+    {
+        Assert.True(SignalRClientService.TryBuildHubUrl(host, port, out var url, out var error), error);
+        Assert.Equal(expected, url);
+    }
+
+    [Theory]
+    [InlineData("ws://wwo.example.com")]
+    [InlineData("wss://wwo.example.com")]
+    [InlineData("ftp://wwo.example.com")]
+    [InlineData("https://")]
+    [InlineData("")]
+    public void ClientHubUrl_RefusesWhatItCantConnectTo(string host)
+    {
+        Assert.False(SignalRClientService.TryBuildHubUrl(host, 6969, out _, out var error));
+        Assert.False(string.IsNullOrWhiteSpace(error));
+        Assert.DoesNotContain("http://ws", error);
+    }
+
+    [Fact]
+    public void ClientHubUrl_PlainHostNeedsAValidPort() =>
+        Assert.False(SignalRClientService.TryBuildHubUrl("localhost", 0, out _, out _));
+
+    [Fact]
+    public async Task Client_UnsupportedScheme_FailsWithTheReason_WithoutConnecting()
+    {
+        await using var client = new SignalRClientService();
+        var (success, message) = await client.ConnectAsync("ws://wwo.example.com", 6969, "Alice");
+        Assert.False(success);
+        Assert.Contains("http:// or https://", message);
+        Assert.Null(client.Connection);
+    }
 }

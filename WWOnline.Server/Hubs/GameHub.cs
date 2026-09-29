@@ -56,6 +56,7 @@ public class GameHub : Hub<IGameHubClient>
         var name = GetPlayerName(connectionId);
 
         ConnectedPlayers.TryRemove(connectionId, out _);
+        OwnerKeyGate.Forget(connectionId);
         ItemsSeedGate.Forget(connectionId);
         StorySeedGate.Forget(connectionId);
         WalletSeedGate.Forget(connectionId);
@@ -171,19 +172,28 @@ public class GameHub : Hub<IGameHubClient>
     // claims the room the same way. Ownership is keyed by connection id, so the owner
     // re-claims with the same token after every reconnect (new id), which moves it over.
     // Without a claimed owner (no key set, or the owner left) the earliest-joined named
-    // player is the room owner.
-    private static string? _hostToken;
+    // player is the room owner. OwnerKeyCheck compares in constant time and stops listening to a
+    // connection after a few wrong keys.
+    private static readonly OwnerKeyCheck OwnerKeyGate = new();
     private static volatile string? _claimedOwnerId;
 
-    public static void ConfigureHostToken(string? token) => _hostToken = token;
+    public static void ConfigureHostToken(string? token) => OwnerKeyGate.Configure(token);
 
     public async Task ClaimRoomOwner(string token)
     {
         var player = GetPlayerName(Context.ConnectionId);
-        if (string.IsNullOrEmpty(_hostToken) || token != _hostToken)
+        switch (OwnerKeyGate.Check(Context.ConnectionId, token))
         {
-            Logger.Warning("ClaimRoomOwner rejected for {Player}: wrong token", player);
-            return;
+            case OwnerKeyCheck.Outcome.Ignored:
+                return;
+            case OwnerKeyCheck.Outcome.Rejected:
+                Logger.Warning("ClaimRoomOwner rejected for {Player}: {Reason}", player,
+                    OwnerKeyGate.IsConfigured ? "wrong owner key" : "this server has no owner key");
+                return;
+            case OwnerKeyCheck.Outcome.RejectedLastAttempt:
+                Logger.Warning("ClaimRoomOwner rejected for {Player}: {Reason} — {Max} failed attempts, ignoring further claims from this connection",
+                    player, OwnerKeyGate.IsConfigured ? "wrong owner key" : "this server has no owner key", OwnerKeyCheck.MaxFailedAttempts);
+                return;
         }
         var previous = _claimedOwnerId;
         _claimedOwnerId = Context.ConnectionId;

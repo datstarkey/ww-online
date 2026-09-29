@@ -110,4 +110,40 @@ public class ServerAppIntegrationTests
             GameHub.ConfigureHostToken(null);
         }
     }
+
+    [Fact]
+    public async Task AfterTooManyWrongKeys_EvenTheRightKeyIsIgnored_OnThatConnection()
+    {
+        GameHub.ConfigureHostToken("right-key");
+        try
+        {
+            var (app, port) = await StartAsync();
+            await using var _ = app;
+
+            // Someone joins first, so the guesser (joined later) could only own the room by claiming it.
+            await using var first = new SignalRClientService();
+            Assert.True((await first.ConnectAsync("127.0.0.1", port, "Early")).success);
+
+            await using var guesser = new SignalRClientService();
+            Assert.True((await guesser.ConnectAsync("127.0.0.1", port, "Guesser")).success);
+            var connection = guesser.Connection!;
+            for (int i = 0; i < OwnerKeyCheck.MaxFailedAttempts; i++)
+                await connection.InvokeAsync(HubConstants.ClaimRoomOwner, $"guess-{i}");
+            await connection.InvokeAsync(HubConstants.ClaimRoomOwner, "right-key"); // too late: ignored
+
+            var settings = await connection.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
+            Assert.NotEqual(connection.ConnectionId, settings.OwnerConnectionId);
+            Assert.NotEqual("Guesser", settings.OwnerName);
+
+            // Only that connection is locked out: a fresh one with the right key still claims the room.
+            await using var owner = new SignalRClientService();
+            Assert.True((await owner.ConnectAsync("127.0.0.1", port, "Admin", "right-key")).success);
+            var after = await owner.Connection!.InvokeAsync<RoomSettings>(HubConstants.GetRoomSettings);
+            Assert.Equal("Admin", after.OwnerName);
+        }
+        finally
+        {
+            GameHub.ConfigureHostToken(null);
+        }
+    }
 }

@@ -38,10 +38,27 @@ var logConfig = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft.AspNetCore.SignalR", Serilog.Events.LogEventLevel.Warning)
     .MinimumLevel.Override("Microsoft.AspNetCore.Http.Connections", Serilog.Events.LogEventLevel.Warning)
     .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}");
+// Serilog's file sink fails silently, so check the file can be written first and say so if not
+// (e.g. a Docker bind mount the container's non-root user can't write).
+string? logFileError = null;
 if (!string.IsNullOrWhiteSpace(options.LogFile))
-    logConfig = logConfig.WriteTo.File(options.LogFile, shared: true, flushToDiskInterval: TimeSpan.FromSeconds(1),
-        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
+{
+    try
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(options.LogFile));
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        using (new FileStream(options.LogFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { }
+        logConfig = logConfig.WriteTo.File(options.LogFile, shared: true, flushToDiskInterval: TimeSpan.FromSeconds(1),
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {Message:lj}{NewLine}{Exception}");
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+    {
+        logFileError = ex.Message;
+    }
+}
 Log.Logger = logConfig.CreateLogger();
+if (logFileError != null)
+    Log.Error("Can't write the log file {LogFile} ({Error}): logging to the console only", options.LogFile, logFileError);
 
 // Only touch GameHub AFTER the logger exists: its static Logger field binds to whatever
 // Log.Logger is on first use (before this line that's Serilog's silent default, and every

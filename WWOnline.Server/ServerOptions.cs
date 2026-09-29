@@ -1,3 +1,4 @@
+using WWOnline.Server.Hubs;
 using WWOnline.Shared.Hubs;
 
 namespace WWOnline.Server;
@@ -76,28 +77,49 @@ public sealed record ServerOptions
             var arg = args[i];
             switch (arg)
             {
-                case "--log-file" when i + 1 < args.Count:
-                    o = o with { LogFile = args[++i] };
+                case "--log-file":
+                    if (Value(args, ref i, arg, errors) is { } logFile) o = o with { LogFile = logFile };
                     break;
                 // --host-token: what a client passes to the server it hosts. --owner-key: the same,
                 // for someone running a dedicated server by hand.
-                case "--host-token" or "--owner-key" when i + 1 < args.Count:
-                    o = o with { OwnerKey = NullIfBlank(args[++i]) };
+                case "--host-token" or "--owner-key":
+                    if (Value(args, ref i, arg, errors) is { } key) o = o with { OwnerKey = NullIfBlank(key) };
                     break;
                 case "--no-shared-wallet": o = o with { SharedWallet = false }; break;
                 case "--no-shared-world": o = o with { SharedWorld = false }; break;
                 case "--no-shared-items": o = o with { SharedItems = false }; break;
                 case "--no-shared-story": o = o with { SharedStory = false }; break;
                 default:
-                    // A bare number is the port. Anything else is left for ASP.NET's own
-                    // command-line configuration (WebApplication.CreateBuilder(args)).
-                    if (int.TryParse(arg, out _))
+                    // A bare number is the port (an out-of-range or overflowing one is an error).
+                    // Anything else is left for ASP.NET's own command-line configuration
+                    // (WebApplication.CreateBuilder(args)).
+                    if (IsNumber(arg))
                         o = o with { Port = ParsePort(arg, "port", errors) ?? o.Port };
                     break;
             }
         }
 
+        if (o.OwnerKey is { Length: > OwnerKeyCheck.MaxKeyLength })
+            errors.Add($"the owner key is longer than {OwnerKeyCheck.MaxKeyLength} characters");
+
         return new Result(o, errors);
+    }
+
+    /// <summary>The value after a flag; an error when it's missing (the last argument, or another --flag).</summary>
+    private static string? Value(IReadOnlyList<string> args, ref int i, string flag, List<string> errors)
+    {
+        if (i + 1 >= args.Count || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+        {
+            errors.Add($"{flag} needs a value");
+            return null;
+        }
+        return args[++i];
+    }
+
+    private static bool IsNumber(string s)
+    {
+        var digits = s.StartsWith('-') || s.StartsWith('+') ? s[1..] : s;
+        return digits.Length > 0 && digits.All(char.IsAsciiDigit);
     }
 
     /// <summary>Accepts true/false, 1/0, yes/no and on/off, in any case.</summary>

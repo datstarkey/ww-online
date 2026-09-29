@@ -41,7 +41,11 @@ Everything is set through environment variables (`-e NAME=value`, or `environmen
 | `WWO_OWNER_KEY` | none | A secret. The player who enters it in the app's **Owner key** field becomes the room owner. See [The room owner](#the-room-owner). |
 | `WWO_LOG_FILE` | none | Also write the log to this file, e.g. `/data/server.log` (mount a volume on `/data` to keep it). The log always goes to the console, which is what `docker logs` shows. |
 
-A bad value (a port that isn't a number, a rule that isn't true or false) stops the server at start-up with a message saying which variable is wrong.
+A bad value (a port that isn't a number, a rule that isn't true or false, an owner key over 256 characters) stops the server at start-up with a message saying which variable is wrong.
+
+**In Docker, set the port with `WWO_PORT`, not a command-line argument.** The image's health check reads `WWO_PORT` to know which port to poll, so a port passed as an argument (`docker run ... ww-online-server 7000`) would leave the container marked unhealthy even though the server works.
+
+**Log file on a bind mount:** the server runs as UID 1654 (the image's `app` user). A named volume on `/data` just works; a host folder mounted there (`-v ./logs:/data`) must be writable by that UID, e.g. `sudo chown 1654 ./logs`, or the server can't create `WWO_LOG_FILE` (it logs an error and carries on with the console log).
 
 Outside Docker, the server takes the same variables, plus command-line flags, which win over the variables: `WWOnline.Server [port] [--owner-key <key>] [--log-file <path>] [--no-shared-wallet] [--no-shared-world] [--no-shared-items] [--no-shared-story]`. `--help` lists them and `--version` prints the version.
 
@@ -52,7 +56,7 @@ The room owner picks the rules (Full sync, Co-op or a mix), and their game seeds
 - **Without an owner key**, the first player to join owns the room. If they leave, the player who joined earliest after them takes over.
 - **With `WWO_OWNER_KEY`**, the player who enters that key in the app's **Owner key** field (under Server host, before pressing **Join**) owns the room, even if someone else joined first. The app sends it again after every reconnect, so the owner keeps the room. While the key holder isn't connected, the earliest joiner owns the room, and the first player to join an empty room seeds it. While the key holder is connected, their game seeds an empty room; if it hasn't within 30 seconds (say they're still in the menus), a joiner seeds it so nobody is stuck waiting.
 
-Pick a long random key (`openssl rand -hex 16`) and give it only to whoever should run the room. Everyone else leaves the field empty. A wrong key is ignored (the server logs `ClaimRoomOwner rejected`): that player just joins as a normal player. The Room page shows the owner badge to whoever owns the room.
+Pick a long random key (`openssl rand -hex 16`) and give it only to whoever should run the room. Everyone else leaves the field empty. A wrong key is ignored (the server logs `ClaimRoomOwner rejected`): that player just joins as a normal player. After 5 wrong keys on one connection the server stops listening to that connection's claims (the player has to leave and join again to retry), so guessing is slow and can't flood the log. The app forgets the key when you change the address or leave, so it's never sent to a different server. The Room page shows the owner badge to whoever owns the room.
 
 Without TLS (below), the key crosses the internet unencrypted, like everything else the app sends. It stops a friend from taking the room by accident. It is not a password for the server: anyone who knows the address can still join.
 
@@ -72,7 +76,7 @@ The server uses one port, TCP `6969` by default (SignalR over WebSockets, plus H
 
 ## TLS with a reverse proxy (optional)
 
-By default the app talks to the server over plain HTTP/WebSockets. To encrypt it (and hide the owner key), put the server behind a reverse proxy with a certificate, and players enter the **full URL** in Server host, e.g. `https://wwo.example.com`. With a URL there the app ignores the Port field. Players on older app versions can't connect through a URL: everyone in a room needs the same version anyway.
+By default the app talks to the server over plain HTTP/WebSockets. To encrypt it (and hide the owner key), put the server behind a reverse proxy with a certificate, and players enter the **full URL** in Server host, e.g. `https://wwo.example.com`. With a URL there the app ignores the Port field: the port is the URL's own, or 443 for `https://` and 80 for `http://` when it has none (`https://wwo.example.com:8443` for another). Only `http://` and `https://` URLs work; the app says so for anything else (`ws://` and so on). Players on older app versions can't connect through a URL: everyone in a room needs the same version anyway.
 
 [Caddy](https://caddyserver.com/) gets the certificate by itself and proxies WebSockets without extra settings. A `Caddyfile`:
 

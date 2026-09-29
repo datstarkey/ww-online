@@ -99,3 +99,10 @@ jobs:
           docker logs wwo
           docker logs wwo 2>&1 | grep -q "Server stopped"
           [ "$(docker inspect -f '{{.State.ExitCode}}' wwo)" = 0 ]
+
+      - name: Server log and health (on failure)
+        if: failure()
+        shell: bash
+        run: |
+          docker logs wwo || true
+          docker inspect -f '{{json .State}}' wwo || true
