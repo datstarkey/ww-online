@@ -116,6 +116,8 @@
 #define PROC_CRAWL_MOVE  0x10
 #define PROC_CRAWL_AUTO_MOVE 0x11
 #define PUPPET_DAPY_UNDER0_RATE(link) (*(f32 *)((u8 *)(link) + 0x302C + 0x0C)) // mFrameCtrlUnder[0].mRate
+#define PUPPET_DAPY_UNDER0_END(link)  (*(s16 *)((u8 *)(link) + 0x302C + 0x08)) // mFrameCtrlUnder[0].mEnd
+#define PUPPET_DAPY_UNDER0_LOOP(link) (*(s16 *)((u8 *)(link) + 0x302C + 0x0A)) // mFrameCtrlUnder[0].mLoop
 #define PROC_MOVE_TURN   0x18
 #define PROC_SWIM_MOVE   0x37
 
@@ -151,68 +153,141 @@
 
 #define PUPPET_DAPY_M352C(link) (*(s16 *)((u8 *)(link) + 0x352C))  // s16 m352C (front wall normal angle)
 
-// daPy_lk_c::DIR_FORWARD / DIR_BACKWARD (d_a_player_main.h:959-960)
-#define DAPY_DIR_FORWARD 0
+// daPy_lk_c::DIR_* (d_a_player_main.h:959-963)
+#define DAPY_DIR_FORWARD  0
 #define DAPY_DIR_BACKWARD 1
+#define DAPY_DIR_LEFT     2
+#define DAPY_DIR_RIGHT    3
+
+// Wall sidle (d_a_player_whide.inc) and block push/pull (d_a_player_pushpull.inc) procs.
+#define PROC_WHIDE_READY     0x13
+#define PROC_WHIDE_WAIT      0x14
+#define PROC_WHIDE_MOVE      0x15
+#define PROC_WHIDE_PEEP      0x16
+#define PROC_PUSH_PULL_WAIT  0x32
+#define PROC_PUSH_MOVE       0x33
+#define PROC_PULL_MOVE       0x34
+// daPyFlg0_UNK10000 (d_a_player.h:180): sidling crouched under a low wall (ANM_WALLDW variants).
+#define DAPY_FLG0_WHIDE_CROUCH 0x00010000
+// Request-key param bit (bits 16-23, next to the side direction): the peer sidles crouched.
+#define PUPPET_PARAM_WHIDE_CROUCH 0x10
+// procPushMove_init / procPullMove_init's anim (d_a_player_pushpull.inc:129/172; daPy_ANM
+// ANM_WALKPUSH 0x7F / ANM_WALKPULL 0x80, d_a_player_main.h:763-764) at mPushpull rate 1.0, morf 5.0
+// (daPy_HIO_pushpull_c0::m, d_a_player_HIO_data.inc:244; checked in the DOL at 0x8035DBA8).
+#define ANM_WALKPUSH 0x7F
+#define ANM_WALKPULL 0x80
 
 // ============================================================================
-// LADDER
+// LADDERS AND VINE WALLS
 // ============================================================================
 //
-// Vanilla climbs one rung per procLadderMove_init (d_a_player_ladder.inc:308-367): ANM_LADDERLTOR /
-// RTOL played forward (up) or backward (down) at getLadderMoveAnmSpeed(). When it ends, the
-// per-frame procLadderMove (:369-399) waits a frame (m34D0) and changeLadderMoveProc (:37-75) inits
-// the next rung with the other hand (param = mProcVar6.m3570) in the stick's direction, or stays
-// put. The peer's mCurProc stays LADDER_MOVE the whole climb, so the puppet repeats that here from
-// the peer's stick (setStickData gives it the peer's m34E8 / mStickDistance). Its line checks for the
-// top / bottom are left out: LADDER_UP_END / DOWN_END come from the network.
-#define PROC_LADDER_MOVE          0x3C
-#define PUPPET_DAPY_M3570(link)   (*(s32 *)((u8 *)(link) + 0x3570)) // mProcVar6.m3570: next rung's hand
-#define PUPPET_DAPY_M34D0(link)   (*(s16 *)((u8 *)(link) + 0x34D0)) // mProcVar0.m34D0: rung-end wait
+// Vanilla climbs one rung per init: procLadderMove_init / procClimbMoveUpDown_init /
+// procClimbMoveSide_init (d_a_player_ladder.inc:308-367, d_a_player_climb.inc:325-434) play one
+// non-looping bck at the stick's speed. When it ends, the per-frame proc waits a frame (m34D0) and
+// changeLadderMoveProc / changeClimbMoveProc (ladder.inc:37-75, climb.inc:83-96) init the next rung
+// with the other hand (param = mProcVar6.m3570) in the stick's direction, or stay put. The peer's
+// mCurProc stays the same for the whole climb, so the puppet repeats that itself from the peer's
+// stick (setStickData gives it the peer's m34E8 / mStickDistance on ladders and walls). Proc changes
+// (start, up/down <-> sideways on a wall, top / bottom, letting go) still come from the network; the
+// line checks for them are left out.
+//
+// All these per-frame procs also set m34C2 = 5 (the inits 4 or 7): the root joint is pinned at
+// (0, m35E0, 0) and the bck's root motion moves current.pos instead (jointBeforeCB,
+// d_a_player_main.cpp:336-344; posMove :2533-2552, :2609-2621). execute resets m34C2 to 0 every
+// frame (:11317-11323, puppet_executeBody too), so without it the puppet would show the root
+// motion on top of the network position (twice the climb, then a snap back each rung).
+#define PROC_LADDER_UP_START    0x38
+#define PROC_LADDER_UP_END      0x39
+#define PROC_LADDER_DOWN_START  0x3A
+#define PROC_LADDER_DOWN_END    0x3B
+#define PROC_LADDER_MOVE        0x3C
+#define PROC_CLIMB_UP_START     0x3D
+#define PROC_CLIMB_DOWN_START   0x3E
+#define PROC_CLIMB_MOVE_UP_DOWN 0x3F
+#define PROC_CLIMB_MOVE_SIDE    0x40
+#define PUPPET_IS_CLIMB_PROC(p) ((unsigned)((p) - PROC_LADDER_UP_START) <= PROC_CLIMB_MOVE_SIDE - PROC_LADDER_UP_START)
+// m35E0 for a ladder / wall grabbed without a start anim (d_a_player_main.cpp:4784/4802/4824/4848,
+// procClimbDownStart_init climb.inc:296; the DOL's sdata2 constant at 0x803FA26C). The start
+// anims set it from their root instead (m34C2 = 4).
+#define LADDER_ROOT_Y 43.67353f
 
 /**
- * puppet_ladderDir - changeLadderMoveProc's direction from the stick (:44-56): DIR_FORWARD (up),
- * DIR_BACKWARD (down), or -1 (stick released, or pushed sideways).
+ * puppet_climbRung - init one rung of LADDER_MOVE / CLIMB_MOVE_UP_DOWN / CLIMB_MOVE_SIDE in the
+ * stick's direction, as changeLadderMoveProc / changeClimbMoveProc do: on a ladder up or down by
+ * the stick vs the facing (ladder.inc:44-56, with its sideways dead zone), on a wall by
+ * getClimbDirectionFromAngle (climb.inc:69-80). A wall direction on the other axis is the peer
+ * switching between up/down and sideways, which the network proc change handles.
+ *
+ * @param hand   the hand param (m3570 while climbing, 1 on the first rung like every vanilla entry)
+ * @param force  nonzero: without a usable stick direction still init (up, or left); else return 0.
  */
-static int puppet_ladderDir(daPy_lk_c *link)
+static int puppet_climbRung(daPy_lk_c *link, int proc, int hand, int force)
 {
-  int rel;
-  if (!(DAPY_LK_MSTICKDISTANCE(link) > 0.05f))
-    return -1;
-  rel = (s16)(DAPY_LK_M34E8_EXEC(link) - FOPAC_SHAPE_ANGLE((fopAc_ac_c *)link)->y);
-  if (rel < 0)
-    rel = -rel;
-  if (rel > 0x3C72 && rel < 0x438E)
-    return -1;
-  return rel < 0x4000 ? DAPY_DIR_FORWARD : DAPY_DIR_BACKWARD;
+  int dir = -1;
+
+  if (DAPY_LK_MSTICKDISTANCE(link) > 0.05f)
+  {
+    if (proc == PROC_LADDER_MOVE)
+    {
+      int rel = (s16)(DAPY_LK_M34E8_EXEC(link) - FOPAC_SHAPE_ANGLE((fopAc_ac_c *)link)->y);
+      if (rel < 0)
+        rel = -rel;
+      if (rel <= 0x3C72 || rel >= 0x438E)
+        dir = rel < 0x4000 ? DAPY_DIR_FORWARD : DAPY_DIR_BACKWARD;
+    }
+    else
+    {
+      dir = daPy_lk_c__getClimbDirectionFromAngle(link);
+      if ((dir <= DAPY_DIR_BACKWARD) != (proc == PROC_CLIMB_MOVE_UP_DOWN))
+        dir = -1;
+    }
+  }
+  if (dir < 0)
+  {
+    if (!force)
+      return 0;
+    dir = proc == PROC_CLIMB_MOVE_SIDE ? DAPY_DIR_LEFT : DAPY_DIR_FORWARD;
+  }
+  // The anchor only feeds m370C, which only the per-frame procs read (vanilla passes
+  // &current.pos too, d_a_player_main.cpp:4808).
+  if (proc == PROC_LADDER_MOVE)
+    return daPy_lk_c__procLadderMove_init(link, hand, dir, FOPAC_CURRENT_POS((fopAc_ac_c *)link));
+  DAPY_LK_MDIRECTION(link) = (u8)dir; // changeClimbMoveProc sets it before the init
+  if (proc == PROC_CLIMB_MOVE_UP_DOWN)
+    return daPy_lk_c__procClimbMoveUpDown_init(link, hand);
+  return daPy_lk_c__procClimbMoveSide_init(link, hand);
 }
 
 /**
- * puppet_ladderStep - procLadderMove's per-frame part (inside puppet_execute's guard): follow the
- * stick's speed while a rung plays, then start the next one.
+ * puppet_climbStep - the per-frame part of every ladder / wall proc (inside puppet_execute's guard):
+ * for the rung procs follow the stick's speed while a rung plays (procLadderMove ladder.inc:378-392,
+ * procClimbMoveUpDown climb.inc:376-389, procClimbMoveSide :445-458), wait the rung-end frame, then
+ * start the next rung; for all of them pin the root joint (m34C2 = 5, see above).
  */
-static void puppet_ladderStep(daPy_lk_c *link)
+static void puppet_climbStep(daPy_lk_c *link, int proc)
 {
   f32 rate = PUPPET_DAPY_UNDER0_RATE(link);
-  int dir;
 
-  if (rate > 0.01f || rate < -0.01f)
+  if (proc == PROC_LADDER_MOVE || proc == PROC_CLIMB_MOVE_UP_DOWN || proc == PROC_CLIMB_MOVE_SIDE)
   {
-    f32 speed = daPy_lk_c__getLadderMoveAnmSpeed(link);
-    PUPPET_DAPY_UNDER0_RATE(link) = rate < 0.0f ? -speed : speed;
-    return;
+    if (rate > 0.01f || rate < -0.01f)
+    {
+      f32 speed = proc == PROC_CLIMB_MOVE_SIDE ? daPy_lk_c__getClimbMoveAnmSpeed(link)
+                                               : daPy_lk_c__getLadderMoveAnmSpeed(link);
+      PUPPET_DAPY_UNDER0_RATE(link) = rate < 0.0f ? -speed : speed;
+    }
+    else if (DAPY_LK_M34D0(link) > 0)
+    {
+      DAPY_LK_M34D0(link)--; // (setLadderFootSe skipped)
+    }
+    else
+    {
+      puppet_climbRung(link, proc, DAPY_LK_M3570(link), 0);
+    }
   }
-  if (PUPPET_DAPY_M34D0(link) > 0)
-  {
-    PUPPET_DAPY_M34D0(link)--; // (setLadderFootSe skipped)
-    return;
-  }
-  dir = puppet_ladderDir(link);
-  if (dir >= 0)
-  {
-    cXyz anchor = *FOPAC_CURRENT_POS((fopAc_ac_c *)link);
-    daPy_lk_c__procLadderMove_init(link, PUPPET_DAPY_M3570(link), dir, &anchor);
-  }
+  // After a rung init this frame it is 7 (posMove turns it into 5), after a network init 4 or 7.
+  if (DAPY_LK_M34C2(link) == 0)
+    DAPY_LK_M34C2(link) = 5;
 }
 
 // Ship procs (d_a_player_main.h daPyProc_*)
@@ -630,12 +705,14 @@ static int puppet_hangFallStartInit(daPy_lk_c *puppet)
 }
 
 /**
- * puppet_hangMoveDir - the shimmy direction for HANG_MOVE, from the peer's stick like
- * getHangDirectionFromAngle (m34E8 - shape_angle.y, d_a_player_hang.inc:23-38; the slot's
- * STICK_ANGLE is the peer's m34E8, ROTY its shape_angle.y). Without a usable stick (released,
- * or pushed toward/away from the wall) the previous direction is kept.
+ * puppet_sideDir - the side the peer moves along a wall, from its stick: the shimmy direction for
+ * HANG_MOVE like getHangDirectionFromAngle (m34E8 - shape_angle.y, d_a_player_hang.inc:23-38; the
+ * slot's STICK_ANGLE is the peer's m34E8, ROTY its shape_angle.y), and the sidle direction for
+ * WHIDE_MOVE / WHIDE_PEEP (mDirection, d_a_player_whide.inc:391-399). HANG_DIR_LEFT/RIGHT equal
+ * daPy_lk_c::DIR_LEFT/RIGHT. Without a usable stick (released, or pushed toward/away from the
+ * wall) the previous direction is kept.
  */
-static int puppet_hangMoveDir(int prevDir, f32 stickDistance, s16 stickAngle, s16 shapeY)
+static int puppet_sideDir(int prevDir, f32 stickDistance, s16 stickAngle, s16 shapeY)
 {
   s16 rel = (s16)(stickAngle - shapeY);
 
@@ -657,8 +734,9 @@ static int puppet_hangMoveDir(int prevDir, f32 stickDistance, s16 stickAngle, s1
  * The puppet's position and facing are network-authoritative, so they are restored after
  * the init (ladder/damage/cut/hang inits reposition or re-aim Link).
  *
- * @param param  extra per-proc data carried in bits 16-23 of the request key (HANG_MOVE:
- *               HANG_DIR_*); 0 otherwise.
+ * @param param  extra per-proc data carried in bits 16-23 of the request key (HANG_MOVE,
+ *               WHIDE_MOVE, WHIDE_PEEP: HANG_DIR_* in bits 0-3; WHIDE_WAIT..PEEP: +
+ *               PUPPET_PARAM_WHIDE_CROUCH); 0 otherwise.
  * @return nonzero if the puppet is now in the requested (or fallback) proc. Several
  *         _init functions return FALSE without changing proc (e.g. procWait_init,
  *         procFall_init in demo modes); callers should retry on a later frame.
@@ -670,9 +748,18 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
   cXyz savedPos = *FOPAC_CURRENT_POS(actor);
   s16 savedAngleY = FOPAC_CURRENT_ANGLE(actor)->y;
   s16 savedShapeY = FOPAC_SHAPE_ANGLE(actor)->y;
+  int climbHand = 1;
   int ok;
 
   puppet_guardBegin(puppet, &guard);
+
+  // Ladders and walls (see LADDERS AND VINE WALLS): the next rung's / the dismount's hand is
+  // m3570 while climbing, 1 on every entry (changeLadderMoveProc(1) after a start,
+  // d_a_player_main.cpp:4808/4847); the root height is set on entry.
+  if (PUPPET_IS_CLIMB_PROC(DAPY_LK_MCURPROC(puppet)))
+    climbHand = DAPY_LK_M3570(puppet);
+  else if (PUPPET_IS_CLIMB_PROC(proc))
+    DAPY_LK_M35E0(puppet) = LADDER_ROOT_Y;
 
   // Sword procs need the sword drawn first (see SWORD STATE). If it can't be drawn, fall
   // back to WAIT rather than halting on the mAnm assert.
@@ -734,20 +821,70 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
   case 0x36:           ok = daPy_lk_c__procSwimWait_init(puppet, 0); break;
   case PROC_SWIM_MOVE: ok = daPy_lk_c__procSwimMove_init(puppet, 0); break;
 
-  // Ladder (d_a_player_ladder.inc). The anchor fields m3724/m352C are stale for the puppet;
-  // the inits only use them to place/aim Link, which is restored below. LADDER_MOVE is one
-  // rung per init; puppet_ladderStep climbs the next rungs (see LADDER).
-  case 0x38:           ok = daPy_lk_c__procLadderUpStart_init(puppet); break;
-  case 0x39:           ok = daPy_lk_c__procLadderUpEnd_init(puppet, 0); break;
-  case 0x3A:           ok = daPy_lk_c__procLadderDownStart_init(puppet); break;
-  case 0x3B:           ok = daPy_lk_c__procLadderDownEnd_init(puppet, 0); break;
-  case PROC_LADDER_MOVE:
-  {
-    int dir = puppet_ladderDir(puppet);
-    cXyz anchor = savedPos;
-    ok = daPy_lk_c__procLadderMove_init(puppet, 0, dir < 0 ? DAPY_DIR_FORWARD : dir, &anchor);
+  // Ladders and vine walls (d_a_player_ladder.inc, d_a_player_climb.inc; see LADDERS AND VINE
+  // WALLS). The anchor fields m3724/m352C are stale for the puppet; the inits only use them to
+  // place/aim Link, which is restored below. With an item in hand the start inits only sheathe
+  // it (mProcVar6.m3570 = 0) and leave the start anim to their per-frame proc (ladder.inc:107-118,
+  // :225-236, climb.inc:226-237), which never runs for a puppet: start it here.
+  case PROC_LADDER_UP_START:
+    ok = daPy_lk_c__procLadderUpStart_init(puppet);
+    if (DAPY_LK_M3570(puppet) == 0)
+      daPy_lk_c__procLadderUpStart_init_sub(puppet);
     break;
-  }
+  case PROC_LADDER_DOWN_START:
+    ok = daPy_lk_c__procLadderDownStart_init(puppet);
+    if (DAPY_LK_M3570(puppet) == 0)
+      daPy_lk_c__procLadderDownStart_init_sub(puppet);
+    break;
+  case PROC_CLIMB_UP_START:
+    ok = daPy_lk_c__procClimbUpStart_init(puppet);
+    if (DAPY_LK_M3570(puppet) == 0)
+      daPy_lk_c__procClimbUpStart_init_sub(puppet);
+    break;
+  // Param = the wall's normal angle; the init faces Link at it + 0x8000 (climb.inc:281-299).
+  case PROC_CLIMB_DOWN_START: ok = daPy_lk_c__procClimbDownStart_init(puppet, (s16)(savedShapeY + 0x8000)); break;
+  case PROC_LADDER_UP_END:    ok = daPy_lk_c__procLadderUpEnd_init(puppet, climbHand); break;
+  case PROC_LADDER_DOWN_END:  ok = daPy_lk_c__procLadderDownEnd_init(puppet, climbHand); break;
+  case PROC_LADDER_MOVE:
+  case PROC_CLIMB_MOVE_UP_DOWN:
+  case PROC_CLIMB_MOVE_SIDE:  ok = puppet_climbRung(puppet, proc, climbHand, 1); break;
+
+  // Wall sidle (d_a_player_whide.inc). No init checks the wall; WHIDE_READY's wall (NULL: m352C)
+  // and position only feed the per-frame approach (:266-300). Side and crouch come from the
+  // request key.
+  case PROC_WHIDE_READY: ok = daPy_lk_c__procWHideReady_init(puppet, NULL, FOPAC_CURRENT_POS(actor)); break;
+  case PROC_WHIDE_WAIT:
+  case PROC_WHIDE_MOVE:
+  case PROC_WHIDE_PEEP:
+    if (param & PUPPET_PARAM_WHIDE_CROUCH)
+      DAPY_PY_NO_RESET_FLG0(puppet) |= DAPY_FLG0_WHIDE_CROUCH;
+    else
+      DAPY_PY_NO_RESET_FLG0(puppet) &= ~DAPY_FLG0_WHIDE_CROUCH;
+    DAPY_LK_MDIRECTION(puppet) = (param & 0x0F) == HANG_DIR_RIGHT ? DAPY_DIR_RIGHT : DAPY_DIR_LEFT;
+    if (proc == PROC_WHIDE_WAIT)
+      ok = daPy_lk_c__procWHideWait_init(puppet);
+    else if (proc == PROC_WHIDE_MOVE)
+      ok = daPy_lk_c__procWHideMove_init(puppet); // the walk blend follows the speed per frame
+    else
+      ok = daPy_lk_c__procWHidePeep_init(puppet);
+    break;
+
+  // Block push / pull (d_a_player_pushpull.inc). procPushMove_init / procPullMove_init first run
+  // the block's PushPullCallBack on the puppet's ground poly (setPushPullKeepData, :18-49), so they
+  // are not called: the puppet takes the grab pose (procPushPullWait_init(0) checks nothing,
+  // :52-80), then the push / pull walk anim, and is relabelled like the boat pose
+  // (commonProcInit has no exit handling for these procs).
+  case PROC_PUSH_PULL_WAIT:
+  case PROC_PUSH_MOVE:
+  case PROC_PULL_MOVE:
+    ok = daPy_lk_c__procPushPullWait_init(puppet, 0);
+    if (proc != PROC_PUSH_PULL_WAIT)
+    {
+      daPy_lk_c__setSingleMoveAnime(puppet, proc == PROC_PUSH_MOVE ? ANM_WALKPUSH : ANM_WALKPULL,
+                                    1.0f, 0.0f, -1, 5.0f);
+      DAPY_LK_MCURPROC(puppet) = proc;
+    }
+    break;
 
   // Ledges (see LEDGE HANG). One anim per proc change, like the ladder.
   // SMALL_JUMP (d_a_player_main.cpp:7417-7440): param 0 derives speed.y from the stale m3724
@@ -1126,17 +1263,31 @@ static int puppet_executeBody(daPy_lk_c *link)
         FOPAC_CURRENT_ANGLE(actor)->y = DAPY_LK_M34E8_EXEC(link);
       daPy_lk_c__setBlendAtnMoveAnime(link, -1.0f);
     }
-    else if (curProcNow == PROC_LADDER_MOVE)
+    else if (PUPPET_IS_CLIMB_PROC(curProcNow))
     {
-      // Rung after rung while the peer climbs (see LADDER).
-      puppet_ladderStep(link);
+      // Rung after rung while the peer climbs a ladder or wall (see LADDERS AND VINE WALLS).
+      puppet_climbStep(link, curProcNow);
+    }
+    else if (curProcNow == PROC_WHIDE_MOVE)
+    {
+      // procWHideMove: setBlendWHideMoveAnime(-1.0f) every frame (d_a_player_whide.inc:516): the
+      // step/slide blend from mNormalSpeed (the peer's), in the side mDirection set at init.
+      daPy_lk_c__setBlendWHideMoveAnime(link, -1.0f);
     }
     else if (curProcNow == PROC_CRAWL_MOVE)
     {
-      // procCrawlMove (d_a_player_crawl.inc): frameCtrl.setRate(getCrawlMoveAnmSpeed()) while
-      // the stick is pushed, 0 otherwise. Backward crawling (negative rate) isn't mirrored.
-      PUPPET_DAPY_UNDER0_RATE(link) =
-          (DAPY_LK_MSTICKDISTANCE(link) > 0.05f) ? daPy_lk_c__getCrawlMoveAnmSpeed(link) : 0.0f;
+      // procCrawlMove (d_a_player_crawl.inc:411-437): frameCtrl.setRate(getCrawlMoveAnmSpeed())
+      // while the stick is pushed, 0 otherwise; with the stick behind the facing, backwards and
+      // looping from the end (setLoop(getEnd()), else J3DFrameCtrl's loop can't wrap below start).
+      f32 rate = 0.0f;
+      if (DAPY_LK_MSTICKDISTANCE(link) > 0.05f)
+      {
+        rate = daPy_lk_c__getCrawlMoveAnmSpeed(link);
+        if (daPy_lk_c__getDirectionFromShapeAngle(link) == DAPY_DIR_BACKWARD)
+          rate = -rate;
+      }
+      PUPPET_DAPY_UNDER0_RATE(link) = rate;
+      PUPPET_DAPY_UNDER0_LOOP(link) = rate < 0.0f ? PUPPET_DAPY_UNDER0_END(link) : 0;
     }
     else if (curProcNow == PROC_HANG_MOVE)
     {
@@ -1875,7 +2026,8 @@ int l_puppetFollowState = 0;
  *
  * `key` is the daPyProc value in bits 0-7, plus (for one-shot procs, see
  * puppet_isRestartableProc) the peer's PROC_SEQ in bits 8-15, plus a per-proc init parameter
- * in bits 16-23 (HANG_MOVE's direction, so a shimmy reversal re-inits). A new swing of a combo is a
+ * in bits 16-23 (the side for HANG_MOVE / WHIDE_MOVE / WHIDE_PEEP, so a reversal re-inits, and
+ * the sidle crouch bit). A new swing of a combo is a
  * re-init of the SAME proc (changeCutProc, d_a_player_sword.inc:404-467: standing combo is
  * CUT_L, CUT_L, CUT_L, CUT_EB with m34C4 = 1,2,3,4), so the proc id alone can't tell swings
  * apart; the sequence byte changes on every peer (re)start and forces a re-init.
@@ -2035,11 +2187,12 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
   // (old client / 0 / NaN). Keep it >= 0.05: setBlendMoveAnime treats < 0.05 as "no input"
   // and can switch to the slip/stop animation.
   if (targetProc == PROC_CRAWL_MOVE || targetProc == PROC_CRAWL_AUTO_MOVE || targetProc == PROC_HANG_MOVE ||
-      targetProc == PROC_LADDER_MOVE)
+      PUPPET_IS_CLIMB_PROC(targetProc))
   {
     // Crawling: 0 means lying still (anim paused), so no "full stick" fallback here.
     // Shimmying: getHangMoveAnmSpeed maps the stick to the anim rate (0 = its slowest rate).
-    // Ladder: 0 = hold on the rung; the stick's angle picks up / down (puppet_ladderDir).
+    // Ladders / walls: 0 = hold on the rung; the stick's angle picks the next rung's direction
+    // (puppet_climbRung).
     f32 stick = netStickDistance;
     if (!(stick > 0.0f))
       stick = 0.0f;
@@ -2085,11 +2238,16 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
         u8 netSeq = *(volatile u8 *)(slotBase + PUPPET_SLOT_OFF_PROC_SEQ);
         key |= ((int)netSeq << 8);
       }
-      if (wantProc == PROC_HANG_MOVE)
+      // Side along a wall (shimmy / sidle): a reversal re-inits. Crouched sidling picks the
+      // ANM_WALLDW variants at init (PUPPET_PARAM_WHIDE_CROUCH).
+      if (wantProc == PROC_HANG_MOVE || wantProc == PROC_WHIDE_MOVE || wantProc == PROC_WHIDE_PEEP)
       {
-        int prevDir = ((l_puppetFollowState & 0xFF) == PROC_HANG_MOVE) ? ((l_puppetFollowState >> 16) & 0xFF) : 0;
-        key |= puppet_hangMoveDir(prevDir, netStickDistance, targetStickAngle, targetRotY) << 16;
+        int prevDir = ((l_puppetFollowState & 0xFF) == wantProc) ? ((l_puppetFollowState >> 16) & 0x0F) : 0;
+        key |= puppet_sideDir(prevDir, netStickDistance, targetStickAngle, targetRotY) << 16;
       }
+      if (wantProc >= PROC_WHIDE_WAIT && wantProc <= PROC_WHIDE_PEEP &&
+          (*(volatile u32 *)(slotBase + PUPPET_SLOT_OFF_NO_RESET_FLG0) & DAPY_FLG0_WHIDE_CROUCH) != 0)
+        key |= PUPPET_PARAM_WHIDE_CROUCH << 16;
       puppet_requestProc(puppet, key, slotIndex);
     }
 
