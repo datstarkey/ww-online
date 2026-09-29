@@ -83,6 +83,15 @@ public static class GameMemoryAddresses
     /// </summary>
     public static class Inventory
     {
+        /// <summary>dSv_player_c /* 0x0C4 */ mMap: dSv_player_map_c (d_save.h:410-437, 0x84 bytes).</summary>
+        public const uint SeaMapBase = GameInfo + 0xC4;
+        /// <summary>field_0x0[1..3] (charts owned / opened / completed, u32[4] each) then mFmapBits[49]:
+        /// +0x10..+0x70, the first 97 bytes of <see cref="RoomInventory.SeaMap"/>.</summary>
+        public const uint SeaMapCharts = SeaMapBase + 0x10;
+        public const int SeaMapChartsAndSquaresLength = 0x61;
+        /// <summary>field_0x81: the Triforce charts deciphered (onTriforce), <see cref="RoomInventory.SeaMap"/>[97].</summary>
+        public const uint SeaMapTriforce = SeaMapBase + 0x81;
+
         // Item slots as byte array
         public static readonly ByteArrayMemoryAddress ItemSlots = new(0x803C4C44, 21, "ItemSlots", "All 21 inventory item slots");
         

@@ -94,6 +94,19 @@ public class RoomInventory
     public byte MaxBombs { get; set; }
     public byte WalletSize { get; set; }
 
+    /// <summary>
+    /// The sea chart menu's save data, grow-only (dSv_player_map_c at dSv_player_c +0xC4, d_save.h:410-437):
+    /// bytes 0-47 are field_0x0[1..3] (charts owned / opened / completed: onGetMap, onOpenMap, onCompleteMap,
+    /// one bit per chart 0-127), bytes 48-96 mFmapBits[49] (per sea square: bit 0 arrived, bit 1 the Tingle
+    /// Tuner's arrive bit, ...), byte 97 field_0x81 (the Triforce charts deciphered, onTriforce). The raw
+    /// save bytes, OR-merged: a chart or square anyone has shows for everyone.
+    /// </summary>
+    public byte[] SeaMap { get; set; } = new byte[SeaMapLength];
+
+    public const int SeaMapLength = 98;
+    public const int SeaMapChartBytes = 48;
+    public const int SeaMapSquares = 49;
+
     /// <summary>The room's equipped sword / shield item id (0xFF = none).</summary>
     public byte EquippedSword { get; set; } = NoItem;
     public byte EquippedShield { get; set; } = NoItem;
@@ -146,6 +159,7 @@ public class RoomInventory
     public bool IsValid() =>
         Items is { Length: SlotCount } &&
         ItemGetFlags is { Length: SlotCount } &&
+        SeaMap is { Length: SeaMapLength } &&
         MaxHealth <= MaxHealthLimit &&
         (HeartSources & ~HeartSourceMask) == 0 &&
         MaxMagic <= MaxMagicLimit &&
@@ -205,6 +219,8 @@ public class RoomInventory
         Pearls = Or(Pearls, other.Pearls, ref changed);
         ulong hearts = HeartSources | (other.HeartSources & HeartSourceMask);
         if (hearts != HeartSources) { HeartSources = hearts; changed = true; }
+        for (int i = 0; i < SeaMapLength; i++)
+            SeaMap[i] = Or(SeaMap[i], other.SeaMap[i], ref changed);
 
         if (other.MaxHealth > MaxHealth) { MaxHealth = other.MaxHealth; changed = true; }
         MaxMagic = Max(MaxMagic, other.MaxMagic, ref changed);
@@ -240,6 +256,7 @@ public class RoomInventory
         g.TriforceShards = (byte)(TriforceShards & ~baseline.TriforceShards);
         g.Pearls = (byte)(Pearls & ~baseline.Pearls);
         g.HeartSources = HeartSources & ~baseline.HeartSources;
+        for (int i = 0; i < SeaMapLength; i++) g.SeaMap[i] = (byte)(SeaMap[i] & ~baseline.SeaMap[i]);
         g.MaxHealth = MaxHealth > baseline.MaxHealth ? MaxHealth : (ushort)0;
         g.MaxMagic = MaxMagic > baseline.MaxMagic ? MaxMagic : (byte)0;
         g.MaxArrows = MaxArrows > baseline.MaxArrows ? MaxArrows : (byte)0;
@@ -252,7 +269,7 @@ public class RoomInventory
 
     /// <summary>True when this holds nothing at all (e.g. <see cref="GainsOver"/> found no gains).</summary>
     public bool IsEmpty =>
-        Items.All(b => b == NoItem) && ItemGetFlags.All(b => b == 0) &&
+        Items.All(b => b == NoItem) && ItemGetFlags.All(b => b == 0) && SeaMap.All(b => b == 0) &&
         Swords == 0 && Shields == 0 && PowerBracelets == 0 && PiratesCharm == 0 && HerosCharm == 0 &&
         Songs == 0 && TriforceShards == 0 && Pearls == 0 && HeartSources == 0 &&
         MaxHealth == 0 && MaxMagic == 0 && MaxArrows == 0 && MaxBombs == 0 && WalletSize == 0 &&
@@ -266,6 +283,7 @@ public class RoomInventory
         var c = (RoomInventory)MemberwiseClone();
         c.Items = (byte[])Items.Clone();
         c.ItemGetFlags = (byte[])ItemGetFlags.Clone();
+        c.SeaMap = (byte[])SeaMap.Clone();
         return c;
     }
 
@@ -294,6 +312,9 @@ public class RoomInventory
         Level(d, "max health", before.MaxHealth, after.MaxHealth);
         if (before.HeartSources != after.HeartSources)
             d.Add($"heart sources {BitOperations.PopCount(before.HeartSources)}→{BitOperations.PopCount(after.HeartSources)} (+{string.Join(",", Bits64(after.HeartSources & ~before.HeartSources))})");
+        if (!before.SeaMap.AsSpan().SequenceEqual(after.SeaMap))
+            d.Add($"sea map: charts {before.ChartsOwned}→{after.ChartsOwned} owned, {before.ChartsOpened}→{after.ChartsOpened} opened, " +
+                  $"{before.ChartsCompleted}→{after.ChartsCompleted} completed, squares {before.SquaresVisited}→{after.SquaresVisited}");
         Level(d, "max magic", before.MaxMagic, after.MaxMagic);
         Level(d, "quiver", before.MaxArrows, after.MaxArrows);
         Level(d, "bomb bag", before.MaxBombs, after.MaxBombs);
@@ -309,11 +330,35 @@ public class RoomInventory
     public string Summary() =>
         $"rev {Revision}: {Items.Count(b => b != NoItem)} item(s), swords {Swords:X2}, shields {Shields:X2}, " +
         $"bracelets {PowerBracelets:X2}, charms {PiratesCharm:X2}/{HerosCharm:X2}, songs {Songs:X2}, " +
-        $"triforce {BitOperations.PopCount(TriforceShards)}/8, pearls {Pearls:X2}, max health {MaxHealth}, heart sources {BitOperations.PopCount(HeartSources)}, " +
+        $"triforce {BitOperations.PopCount(TriforceShards)}/8, pearls {Pearls:X2}, charts {ChartsOwned}, squares {SquaresVisited}, max health {MaxHealth}, heart sources {BitOperations.PopCount(HeartSources)}, " +
         $"max magic {MaxMagic}, quiver {MaxArrows}, bomb bag {MaxBombs}, wallet size {WalletSize}, " +
         $"equipped {Hex(EquippedSword)}/{Hex(EquippedShield)}";
 
     public override string ToString() => Summary();
+
+    private int SeaMapBits(int from, int count)
+    {
+        int n = 0;
+        for (int i = from; i < from + count; i++) n += BitOperations.PopCount(SeaMap[i]);
+        return n;
+    }
+
+    /// <summary>Treasure / Triforce charts owned (onGetMap bits).</summary>
+    public int ChartsOwned => SeaMapBits(0, 16);
+    /// <summary>Charts opened (onOpenMap bits).</summary>
+    public int ChartsOpened => SeaMapBits(16, 16);
+    /// <summary>Charts completed, i.e. salvaged (onCompleteMap bits).</summary>
+    public int ChartsCompleted => SeaMapBits(32, 16);
+    /// <summary>Sea squares arrived at (mFmapBits bit 0).</summary>
+    public int SquaresVisited
+    {
+        get
+        {
+            int n = 0;
+            for (int i = 0; i < SeaMapSquares; i++) if ((SeaMap[SeaMapChartBytes + i] & 1) != 0) n++;
+            return n;
+        }
+    }
 
     private static string Hex(byte b) => b == NoItem ? "—" : b.ToString("X2");
 

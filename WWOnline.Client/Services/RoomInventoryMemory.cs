@@ -54,10 +54,25 @@ public static class RoomInventoryMemory
         };
         Array.Copy(buf, ItemsAddr - BlockStart, inv.Items, 0, RoomInventory.SlotCount);
         Array.Copy(buf, GetFlagsAddr - BlockStart, inv.ItemGetFlags, 0, RoomInventory.SlotCount);
+        if (ReadSeaMap(dolphin) is not { } seaMap) return null;
+        inv.SeaMap = seaMap;
         // Unknown equip ids (e.g. mid-cutscene values) read as "none" so they never become gains.
         if (RoomInventory.SwordTier(inv.EquippedSword) == 0) inv.EquippedSword = RoomInventory.NoItem;
         if (RoomInventory.ShieldTier(inv.EquippedShield) == 0) inv.EquippedShield = RoomInventory.NoItem;
         return inv.Normalize();
+    }
+
+    /// <summary>The sea chart menu's save bytes (<see cref="RoomInventory.SeaMap"/>), or null if unreadable.</summary>
+    public static byte[]? ReadSeaMap(IDolphinService dolphin)
+    {
+        var charts = dolphin.ReadMemory(GameMemoryAddresses.Inventory.SeaMapCharts, GameMemoryAddresses.Inventory.SeaMapChartsAndSquaresLength);
+        var tri = dolphin.ReadMemory(GameMemoryAddresses.Inventory.SeaMapTriforce, 1);
+        if (charts is not { Length: GameMemoryAddresses.Inventory.SeaMapChartsAndSquaresLength } || tri is not { Length: 1 })
+            return null;
+        var map = new byte[RoomInventory.SeaMapLength];
+        charts.CopyTo(map, 0);
+        map[RoomInventory.SeaMapLength - 1] = tri[0];
+        return map;
     }
 
     /// <summary>
@@ -111,6 +126,18 @@ public static class RoomInventoryMemory
         after.Songs = WriteMasked(dolphin, GameMemoryAddresses.Inventory.SongsBitfield, RoomInventory.SongMask, local.Songs, room.Songs);
         after.TriforceShards = WriteMasked(dolphin, GameMemoryAddresses.Inventory.TriforceShards, 0xFF, local.TriforceShards, room.TriforceShards);
         after.Pearls = WriteMasked(dolphin, GameMemoryAddresses.Inventory.PearlsBitfield, RoomInventory.PearlMask, local.Pearls, room.Pearls);
+
+        // Sea map / charts: OR only, a byte at a time (the game ORs its own bits in the same way).
+        for (int i = 0; i < RoomInventory.SeaMapLength; i++)
+        {
+            byte want = (byte)(local.SeaMap[i] | room.SeaMap[i]);
+            if (want == local.SeaMap[i]) continue;
+            uint addr = i < GameMemoryAddresses.Inventory.SeaMapChartsAndSquaresLength
+                ? GameMemoryAddresses.Inventory.SeaMapCharts + (uint)i
+                : GameMemoryAddresses.Inventory.SeaMapTriforce;
+            dolphin.WriteMemory(addr, [want]);
+            after.SeaMap[i] = want;
+        }
 
         if (room.MaxHealth != local.MaxHealth)
         {
