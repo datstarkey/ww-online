@@ -527,6 +527,11 @@
 #define FPC_OFF_PROC_NAME         0x08    /* s16 — base_process_class::mProcName (f_pc_base.h:16) */
 #define FPC_NAME_BOMB             0x128   /* fpcNm_BOMB_e (f_pc_name.h:308) */
 #define DABOMB_OFF_REST_TIME      0x6FC   /* s16 — daBomb_c::mRestTime, the fuse (d_a_bomb.h:233; setBombRestTime DOL 0x800681EC: sth r31,0x6FC) */
+/* A Bomb Flower's bomb is its own actor, daBomb2::Act_c (d_a_bflower.cpp:350-376 create it; d_a_bomb2.h) */
+#define FPC_NAME_BOMB2            0x129   /* fpcNm_Bomb2_e (f_pc_name.h:309) */
+#define DABOMB2_OFF_STATE         0x694   /* int — Act_c::mState: 0 wait, 1 carry, 2 explode, 3 sink (d_a_bomb2.h; mode_*_init) */
+#define DABOMB2_OFF_TIMER         0x738   /* int — Act_c::mBombTimer: the fuse in frames, counted down each execute; mode_explode_init zeroes it */
+#define DABOMB2_STATE_EXPLODE     2
 
 /* Guard detection (C# sets PUPPET_ACTION_FLAG_GUARD from the local Link's state) */
 #define DAPY_PROC_GUARD_0         0x0C

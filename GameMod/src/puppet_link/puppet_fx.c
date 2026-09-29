@@ -9,6 +9,8 @@
  *               grab, d_a_player_grab.inc:185) - its state then: position, speedF, speed.y, heading, fuse;
  *   BOMB_PICKUP when he carries it again; EXPLODE when its mRestTime is 0 (procExplode_init zeroes it;
  *               a live bomb's is > 0) - also in his hands; REMOVE when it is gone without exploding (sank).
+ * A Bomb Flower's bomb (daBomb2::Act_c, lit when plucked) is tracked the same way from the frame he
+ * carries it; its fuse is mBombTimer and it explodes at mState 2 (fx_fuse). The viewers get a plain bomb.
  * The boat's cannonball is found the frame the ship reports daSFLG_SHOOT_CANNON: the one BOMB actor
  * with exactly the ship's params (prm_make(STATE_4, FALSE, TRUE), d_a_ship.cpp:4021; enemy cannons use
  * cheapEff = TRUE) - CANNON with its launch state, then EXPLODE / REMOVE like a bomb.
@@ -97,6 +99,7 @@ enum
 typedef struct
 {
   u32 pid;
+  s16 name; // FPC_NAME_BOMB, or FPC_NAME_BOMB2 (a Bomb Flower's bomb)
   u8 state; // FX_TRACK_*
   s8 room;  // its current.roomNo when last seen (for REMOVE, sent after it is gone)
 } FxTrack;
@@ -172,6 +175,20 @@ static fopAc_ac_c *fx_find(u32 pid, s16 name)
 
 #define fx_actor(pid) fx_find((pid), FPC_NAME_BOMB)
 
+// A Bomb Flower's bomb (daBomb2::Act_c): its own actor, with its own fuse and state (puppet_shared.h).
+#define DABOMB2_STATE(b) (*(int *)((u8 *)(b) + DABOMB2_OFF_STATE))
+#define DABOMB2_TIMER(b) (*(int *)((u8 *)(b) + DABOMB2_OFF_TIMER))
+
+// Frames left on a tracked bomb's fuse, 0 once it is exploding (either kind).
+static s16 fx_fuse(fopAc_ac_c *a)
+{
+  if (BASE_PROC_NAME(a) != FPC_NAME_BOMB2)
+    return DABOMB_REST_TIME(a);
+  if (DABOMB2_STATE(a) == DABOMB2_STATE_EXPLODE || DABOMB2_TIMER(a) <= 0)
+    return 0;
+  return DABOMB2_TIMER(a) > 0x7FFF ? 0x7FFF : (s16)DABOMB2_TIMER(a);
+}
+
 // ============================================================================
 // SENDER: the local Link's projectiles -> outbox
 // ============================================================================
@@ -206,7 +223,7 @@ static void fx_emit(u8 *block, u8 kind, u32 id, fopAc_ac_c *ac, const cXyz *at, 
     *(volatile s16 *)(ev + PUPPET_FX_EV_OFF_ANGLE_Z) = FOPAC_SHAPE_ANGLE(ac)->z;
     if (kind != PUPPET_FX_KIND_ARROW) // (an arrow has no timer; these are daBomb_c fields)
       *(volatile s16 *)(ev + PUPPET_FX_EV_OFF_TIMER) =
-          kind == PUPPET_FX_KIND_CANNON ? DABOMB_NO_GRAVITY_TIME(ac) : DABOMB_REST_TIME(ac);
+          kind == PUPPET_FX_KIND_CANNON ? DABOMB_NO_GRAVITY_TIME(ac) : fx_fuse(ac);
   }
   FX_HDR(block, PUPPET_FX_OFF_OUT_WRITE) = w + 1; // entry first, then the seq
 }
@@ -221,13 +238,14 @@ static FxTrack *fx_track(u32 pid)
   return NULL;
 }
 
-static FxTrack *fx_trackAdd(u32 pid, u8 state)
+static FxTrack *fx_trackAdd(u32 pid, s16 name, u8 state)
 {
   for (int i = 0; i < FX_TRACK_MAX; i++)
   {
     if (l_fxTrack[i].state == FX_TRACK_FREE)
     {
       l_fxTrack[i].pid = pid;
+      l_fxTrack[i].name = name;
       l_fxTrack[i].state = state;
       l_fxTrack[i].room = -1;
       return &l_fxTrack[i];
@@ -265,7 +283,12 @@ static void fx_trackLocal(u8 *block, fopAc_ac_c *link)
   {
     fopAc_ac_c *grab = fx_actor(grabId);
     if (grab && fx_isHandBomb(grab))
-      fx_trackAdd(grabId, FX_TRACK_CARRIED);
+      fx_trackAdd(grabId, FPC_NAME_BOMB, FX_TRACK_CARRIED);
+    // A Bomb Flower's bomb, lit when picked: reported like a hand bomb; the viewers' copy is a plain
+    // daBomb_c (the same model), so nothing there needs to know it came from a flower.
+    fopAc_ac_c *flower = grab ? NULL : fx_find(grabId, FPC_NAME_BOMB2);
+    if (flower && fx_fuse(flower) > 0)
+      fx_trackAdd(grabId, FPC_NAME_BOMB2, FX_TRACK_CARRIED);
   }
 
   // The nocked arrow is no longer in the bow: shot (param 1), or put away / swapped (deleted, or param 0).
@@ -283,7 +306,7 @@ static void fx_trackLocal(u8 *block, fopAc_ac_c *link)
   if (ws_isValidPtr(ship) && (DASHIP_STATE_FLAG(ship) & DASHIP_SFLG_SHOOT_CANNON) != 0)
   {
     fopAc_ac_c *ball = (fopAc_ac_c *)fopAcIt_Judge((undefined *)fx_judgeCannon, NULL);
-    if (ball && fx_trackAdd(BASE_PROC_ID(ball), FX_TRACK_FLYING))
+    if (ball && fx_trackAdd(BASE_PROC_ID(ball), FPC_NAME_BOMB, FX_TRACK_FLYING))
       fx_emit(block, PUPPET_FX_KIND_CANNON, BASE_PROC_ID(ball), ball, NULL, 0, 0);
   }
 
@@ -292,7 +315,7 @@ static void fx_trackLocal(u8 *block, fopAc_ac_c *link)
     FxTrack *t = &l_fxTrack[i];
     if (t->state == FX_TRACK_FREE)
       continue;
-    fopAc_ac_c *a = fx_actor(t->pid);
+    fopAc_ac_c *a = fx_find(t->pid, t->name);
     if (a == NULL)
     {
       // Gone without exploding (sank, fell out of the world, the stage ended). A carried one had no copy.
@@ -302,7 +325,7 @@ static void fx_trackLocal(u8 *block, fopAc_ac_c *link)
       continue;
     }
     t->room = FOPAC_CURRENT_ROOMNO(a);
-    if (DABOMB_REST_TIME(a) == 0)
+    if (fx_fuse(a) == 0)
     {
       fx_emit(block, PUPPET_FX_KIND_EXPLODE, t->pid, a, NULL, 0, 0);
       t->state = FX_TRACK_FREE;
