@@ -271,7 +271,7 @@ Measured on origin/main d5e4dfb (REL stored Yaz0): REL 51,632 → 57,792 bytes (
 ### What's left
 - Arrows: section 8.
 - Boomerang, hookshot chain and tip, grappling hook: visual only or not at all (they are bound to the local Link).
-- Carried pots, barrels, rocks and bomb flowers (`daBomb2`): stage 5.
+- Carried pots, barrels and rocks: stage 5. (Bomb Flower bombs, `daBomb2`, are done: carried, thrown and exploding like a bag bomb; the viewers get a plain bomb.)
 - A friendly-fire room rule (copies would keep VsPlayer), and PvP damage back to the thrower.
 
 ---
