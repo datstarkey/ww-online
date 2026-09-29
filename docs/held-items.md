@@ -1,10 +1,12 @@
-# Held items & projectiles on puppets: research
+# Held items & projectiles on puppets
+
+**Status (v0.1.0):** stages 0-1 (held models, use poses, aim, carried bomb; #6), 2-3 (the event channel, real bombs and boat-cannon shots) and 4 for arrows (#14) are built, and all were verified in game on 2026-09-29. Sections 6-8 describe what is built; sections 1-5 are the research it rests on, kept as written (their slot sizes and "today" notes are from before the work). Still not built: a real boomerang, hookshot or grappling hook (visual only, or not at all), carried pots and barrels (stage 5), and friendly fire.
 
 Question: "How can we show a player holding something (the boomerang, a bomb, etc.) and make it real in the other players' world too? Is that possible?"
 
-Short answer: **yes, in stages.** Holding and using items is cheap and fairly safe. Much of it needs no protocol change, because `mEquipItem` already reaches the slot. Real projectiles are possible for **bombs**, which the game already spawns for a second player: the Tingle Tuner bomb, `d_a_agb.cpp:956`. They are hard for the **boomerang, arrows and hookshot**, because those actors are hard-wired to the *local* Link.
+Short answer: **yes, in stages.** Holding and using items is cheap and fairly safe. Much of it needs no protocol change, because `mEquipItem` already reaches the slot. Real projectiles are possible for **bombs**, which the game already spawns for a second player: the Tingle Tuner bomb, `d_a_agb.cpp:956`. They looked hard for the **boomerang, arrows and hookshot**, because those actors are hard-wired to the *local* Link (arrows turned out to be possible without that: section 8).
 
-Citations are to `tww-decomp/` (the `ww-online` checkout is populated) unless they name a GameMod file. **(?)** marks something unverified.
+Citations are to `tww-decomp/` unless they name a GameMod file. **(?)** marks something unverified.
 
 ---
 
@@ -142,7 +144,7 @@ The puppet has its **own item heaps**. `playerInit` → `createHeap` makes `mpIt
 |---|---|---|---|---|
 | **0. Held models** | Puppet shows bow, telescope, Picto Box, Tuner, Deku Leaf, Wind Waker, hammer, bottles and the hookshot body, with take-out/put-away anims | REL only. `mEquipItem` is already in the slot; `setXModel` / `makeItemType` for model-only items; exclude actor items | ~1 day | Low. Main traps: a bow proc before `setBowModel`, and never calling `makeItemType` for boomerang/hookshot/rope/bomb |
 | **1. Use poses** | Mirror the UPPER_MOVE2 anim (whitelist) and item procs (boomerang/hookshot/bow SUBJECT+MOVE, grab procs, fan swing, hammer swings, relabelled bottle/tact/scope poses) plus aim angles. REL-drawn held **boomerang** (left hand, `d_a_boomerang.cpp:436-440` transform) and held **bomb** model (between hands) | Slot 0x48→0x50 (grab kind, body angles), C# reads `mBodyAngle` + grab actor name; add bomb and arrow counts to the guard | 2-3 days | Low-medium. BOOMTHROW crash trap; no event-starting inits |
-| **2. Visual projectiles** (no damage) | Ghost boomerang (peer's thrown-actor pos streamed at 20 Hz + lerp, spinning model), ghost arrow (event pos+angle, straight flight at 200/frame with a BG line check to stop), ghost bomb (event + simple gravity/bounce, or a real bomb with collision off **(?)**), explosion effect only | Event channel (hub method, heap block + outbox in the REL, 1 scratch word) | 3-5 days | Medium: mostly plumbing. No world effects, so nothing to desync |
+| **2. Visual projectiles** (no damage; skipped: stage 3's real bombs came first, section 7) | Ghost boomerang (peer's thrown-actor pos streamed at 20 Hz + lerp, spinning model), ghost arrow (event pos+angle, straight flight at 200/frame with a BG line check to stop), ghost bomb (event + simple gravity/bounce, or a real bomb with collision off **(?)**), explosion effect only | Event channel (hub method, heap block + outbox in the REL, 1 scratch word) | 3-5 days | Medium: mostly plumbing. No world effects, so nothing to desync |
 | **3. Real bombs** | Real `daBomb` copies: spawn on the throw/place event, clear `0x6F0`, set fuse and velocity; authoritative explosion (`STATE_0` at the peer's position, delete the copy). Damages our enemies, breaks our walls, hurts the local Link if the rule allows. Add the KoRL cannon (`STATE_4`) | Stage 2 channel + a room rule (friendly fire / shared combat) | 2-4 days | Medium: double effects, rumble, timing. World switches reconcile through shared world |
 | **4. Real arrows/boomerang** (arrows done, section 8: detached, no swap needed) | Per-instance `sub_method` wrapper that swaps `mpPlayerPtr[0]` to the puppet around the actor's execute/draw, inside the guard | Stage 2 | 1-2 weeks, **research spike first** | High (?): anything reading player 0 inside those executes; untested |
 | **5. Carried world objects** | Pots, barrels, rocks: identity match (name + `home.pos` + room), puppet grabs our copy, throw like a bomb | Stage 2-3 | 1 week | High: races with the local player picking the same pot, room reloads |
@@ -179,9 +181,9 @@ Code: `GameMod/src/puppet_link/puppet_held.c` (REL), called from `puppet_execute
 - Global guard: pending arrow (`+0x5B80`) and bomb (`+0x5B84`) counts added (no puppet path should reach them).
 
 ### Size
-Measured on origin/main 0f6baa1: REL 40,904 → 47,308 bytes (+6,404; `.text` +4.8 KB, `.rodata` +0.6 KB, ~120 relocations), RELS.arc growth 58,304 of the 65,536-byte guard. The review fixes (ship baton, Picto flash) add 372 bytes (REL 47,680), so about 58.7 KB with ~6.9 KB left. The boat cannon/crane PR adds ~2.6 KB more, so stage 2 needs space reclaimed first.
+Measured on origin/main 0f6baa1: REL 40,904 → 47,308 bytes (+6,404; `.text` +4.8 KB, `.rodata` +0.6 KB, ~120 relocations), RELS.arc growth 58,304 of the 65,536-byte guard. The review fixes (ship baton, Picto flash) add 372 bytes (REL 47,680). That was with the REL stored uncompressed; since #11 it is stored Yaz0 and the growth roughly halved (section 7's size).
 
-### Verify in game
+### Verify in game (verified 2026-09-29)
 1. Take out / put away each item on one Link; the other shows the same model and anim at the same time; swap item → item and sword ↔ item.
 2. Bow: aim (standing and strafing), pitch up/down, shoot, reload; no assert. Magic/light arrows keep the bow.
 3. Boomerang: aim, throw (the puppet's boomerang vanishes mid-throw), catch; **no crash on the throw** (the BOOMTHROW trap).
@@ -254,7 +256,7 @@ A copy's AT has `cCcD_AtSPrm_VsPlayer_e` cleared (`+0x5A0`; `procExplode_init` o
 ### Size
 Measured on origin/main d5e4dfb (REL stored Yaz0): REL 51,632 → 57,792 bytes (+6,160; `.text` +5.0 KB), RELS.arc growth 27,392 → 30,272 of the 65,536-byte guard (+2,880).
 
-### Verify in game
+### Verify in game (verified 2026-09-29)
 1. Take out a bomb, walk, throw it. The other player sees the puppet carry it, then a lit bomb fly the same arc, bounce and explode when and where the thrower's does (effect, sound, light, rumble). The viewer's bomb count never changes, and neither Link is hurt by the other's bomb.
 2. Put a bomb down, pick it up again, throw: the copy disappears while it is carried and comes back on the throw.
 3. Let a bomb explode in hand: an explosion at the thrower's hands on the other screen.
@@ -305,9 +307,9 @@ Keyed and de-duplicated like the bombs (a repeat does nothing). The pending arro
 The arrow's AT is Set | VsEnemy | VsOther (`m_at_cps_src`), so it hits the viewer's enemies (the light arrow's instant kill too, except in GanonK), eye switches, torches (fire lights them), ice (fire melts), water (ice makes a platform), and sticks in walls and enemies, all as a local arrow would. It never hits the local Link, his ship or puppets (no VsPlayer bit, as vanilla). The local player's own arrows share the 5-arrow `m_count` ring, so a peer's arrows can retire their stuck arrows sooner (cosmetic). In the bow minigame, peer arrows are normal arrows (vanilla override).
 
 ### Size
-REL 57,792 → 58,876 bytes (+1,084); RELS.arc growth 30,272 → 30,880 of the 65,536-byte guard (+608). After the review fixes (both sections): REL 59,084 bytes, RELS.arc growth 30,976. Rebased on origin/main d0ac5b5 (live world): REL 53,336 → 60,460 bytes, RELS.arc growth 28,416 → 31,904 of 65,536 (+3,488 for sections 7-8).
+REL 57,792 → 58,876 bytes (+1,084); RELS.arc growth 30,272 → 30,880 of the 65,536-byte guard (+608). After the review fixes (both sections): REL 59,084 bytes, RELS.arc growth 30,976. Rebased on origin/main d0ac5b5 (live world): REL 53,336 → 60,460 bytes, RELS.arc growth 28,416 → 31,904 of 65,536 (+3,488 for sections 7-8). The v0.1.0 REL, with the shared-animator fix (#19) on top, is 87,336 bytes raw and 35,383 Yaz0.
 
-### Verify in game
+### Verify in game (verified 2026-09-29)
 1. Shoot normal, fire, ice and light arrows (standing, strafing, up and down): the other player sees the arrow leave the puppet's bow along the same line, with the right tip, glow, trail and shoot sound.
 2. Hit an enemy, a wall, water, lava: it hits, sticks, bounces, splashes, freezes, makes an ice platform or a magma rock, as a local arrow would.
 3. Shoot an eye switch or light a torch with a fire arrow: it triggers in the viewer's world.

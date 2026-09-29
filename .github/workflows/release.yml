@@ -245,13 +245,18 @@ jobs:
             $global:LASTEXITCODE = 0
           }
 
+      # docs/release-notes/v<version>.md, when it exists, goes into the package (the app's update
+      # info) and becomes the GitHub release's body (see the publish step).
       - name: Pack (Velopack)
         shell: pwsh
         run: |
           $icon = @(); if (Test-Path assets/branding/app.ico) { $icon = @('--icon', 'assets/branding/app.ico') }
+          $notes = @(); $notesFile = "docs/release-notes/v$env:VERSION.md"
+          if (Test-Path $notesFile) { $notes = @('--releaseNotes', $notesFile); "Release notes: $notesFile" }
+          else { "No release notes ($notesFile not found)" }
           vpk pack --packId $env:PACK_ID --packVersion $env:VERSION --packDir publish/client `
             --mainExe $env:CLIENT_EXE --packTitle "$env:PACK_TITLE" --packAuthors "$env:PACK_AUTHORS" `
-            --outputDir Releases @icon
+            --outputDir Releases @icon @notes
 
       - name: No Nintendo files in the packages
         shell: pwsh
@@ -269,6 +274,11 @@ jobs:
             --tag $env:GITHUB_REF_NAME --releaseName "WW-Online $env:VERSION" --publish @extra
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           gh release upload $env:GITHUB_REF_NAME (Get-ChildItem dist/*.zip).FullName --clobber
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # vpk takes the body from the package's notes; set it from the file as well, so the page
+          # shows exactly the Markdown in the repo.
+          $notesFile = "docs/release-notes/v$env:VERSION.md"
+          if (Test-Path $notesFile) { gh release edit $env:GITHUB_REF_NAME --notes-file $notesFile }
 
       - name: Keep the packages (dry run)
         if: needs.version.outputs.publish != 'true'

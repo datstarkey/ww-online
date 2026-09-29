@@ -66,7 +66,7 @@ SOFTWARE.
 
 https://github.com/WideBoner/betterww
 
-Used for: the optional quality-of-life game patches.
+Used for: the optional game patches in `GameMod/src/patches/optional/` (quality-of-life tweaks and vanilla bug fixes, ported from its `asm/patches`, `custom_funcs.asm` and `tweaks.py`), the BMG reader in `WWOnline.Patcher/BinaryFormats/Bmg/` (from `wwlib/bmg.py`) and `GameMod/assets/blank.thp`. betterww is based on wwrando and is distributed under the same MIT License:
 
 ```
 The MIT License (MIT)
@@ -91,12 +91,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
-
-## Better Wind Waker (betterww)
-
-https://github.com/WideBoner/betterww
-
-Used for: the optional game patches in `GameMod/src/patches/optional/` (quality-of-life tweaks and vanilla bug fixes, ported from its `asm/patches`, `custom_funcs.asm` and `tweaks.py`), the BMG reader in `WWOnline.Patcher/BinaryFormats/Bmg/` (from `wwlib/bmg.py`) and `GameMod/assets/blank.thp`. betterww is based on wwrando and is distributed under the same MIT License as wwrando above (Copyright (c) 2018 LagoLunatic).
 
 ## Fonts
 

@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 WW-Online: online multiplayer for The Legend of Zelda: The Wind Waker (GameCube, in Dolphin).
-Other players appear as puppet Links, and a room can share world, items, story and wallet.
+Other players appear as puppet Links, and a room can share world, items, story, wallet and projectiles.
 It has two halves: C# apps (client, relay server, patcher) and the game-side mod (`GameMod/`, C + ASM injected into the game).
 
 ## Key rules
@@ -27,8 +27,9 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj -- --build-patchdata
 - If a build fails with "file is locked", a running client or server (e.g. from dev-test) holds `bin/`. Run `.\scripts\dev-test.ps1 -Stop`, or build with `--artifacts-path <tmp>`.
 - HotAvalonia reloads `.axaml` in Debug builds. `dotnet watch` handles C# changes.
 - **Version:** the release version comes from the git tag (`v1.2.3` means `-p:Version=1.2.3`). `Directory.Build.props` holds the dev version and `WwoRepositoryUrl`, the one place the GitHub owner/repo lives. Read them at runtime through `AppInfo` (Shared), never from a hardcoded string.
-- **Protocol:** bump `HubConstants.ProtocolVersion` whenever a hub method, callback or wire DTO changes. `GameHub.Join` refuses a client on a different protocol, and `SignalRClientService` surfaces the reason (`JoinRejected`, and the `ConnectAsync` failure message).
-- **Releases:** push a `v*` tag. `.github/workflows/release.yml` builds PatchData (`--build-patchdata` in devkitPro's Linux container, tag pinned to the local devkitPPC r47.1), packs the client with Velopack and publishes a GitHub Release. Installed apps update from it through `UpdateService`, which is a no-op in dev builds. It then pushes the server's Docker image (amd64 + arm64) to `ghcr.io/<owner>/ww-online-server`. CI (`ci.yml`) runs the Nintendo-files guard, a `-warnaserror` build, both test projects and an amd64 image build + smoke test. See `docs/releasing.md`.
+- **Protocol:** bump `HubConstants.ProtocolVersion` whenever a hub method, callback or wire DTO changes. `GameHub.Join` refuses a client on a different protocol, and `SignalRClientService` surfaces the reason (`JoinRejected`, and the `ConnectAsync` failure message). History: 1 first build; 2 held items + boat parts (`PuppetData` fields); 3 room switches; 4 player events / projectiles + `RoomSettings.SharedProjectiles`. v0.1.0 ships protocol 4.
+- **Hub** (`HubConstants`, `IGameHubClient`): `Join` first on every (re)connect (`SetPlayerName` only turns pre-protocol clients away); `SendPuppetData` / `SendPlayerGameState` / `GetPlayers`; world `SendStageFlags` / `GetWorldFlags`; wallet `JoinWallet` / `SendRupeeDelta`; rules `GetRoomSettings` / `SetRoomSettings` / `ClaimRoomOwner`; items `JoinRoomInventory` / `SendInventoryGains` / `SetRoomInventory` / `GetRoomInventory`; story `JoinRoomStory` / `SendStoryFlags`; switches `JoinRoomSwitches` / `SendRoomSwitches`; projectiles `SendPlayerEvent`. Callbacks: `PlayerJoined` / `PlayerLeft` / `UpdatePlayerCount`, `ReceivePuppetData`, `ReceivePlayerGameState` and `Receive{StageFlags,RupeeTotal,RoomSettings,RoomInventory,StoryFlags,RoomSwitches,PlayerEvent}`.
+- **Releases:** push a `v*` tag. `.github/workflows/release.yml` builds PatchData (`--build-patchdata` in devkitPro's Linux container, tag pinned to the local devkitPPC r47.1), packs the client with Velopack (with `docs/release-notes/v<version>.md` as the release notes when it exists) and publishes a GitHub Release. Installed apps update from it through `UpdateService`, which is a no-op in dev builds. It then pushes the server's Docker image (amd64 + arm64) to `ghcr.io/<owner>/ww-online-server`. CI (`ci.yml`) runs the Nintendo-files guard, a `-warnaserror` build, both test projects and an amd64 image build + smoke test. See `docs/releasing.md`.
 - **Server config:** `ServerOptions` (CLI flags over `WWO_*` env vars over defaults), endpoints in `ServerApp` (hub + `GET /health`). Self-hosting, Docker and the owner key: `docs/self-hosting.md`.
 - **Nintendo-files guard:** run `./scripts/check-no-nintendo-files.ps1` before any commit that adds binaries. With `-Path <dirs>` it checks build output and packages.
 
@@ -37,11 +38,12 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj -- --build-patchdata
 - `-Patch` also recompiles the C code and re-patches the game. This is a compile, so only use it when asked. `-Stop` / `-Collect` stop everything / copy the live Dolphin logs. `-AllowStale` launches against a stale build (it passes `--allow-stale`: otherwise a client's `--auto-attach` refuses a stale game). `-DedicatedServer` runs the server as a separate process.
 - **Logs** are in `logs/latest/`. Older runs are in `logs/sessions/<time>/`.
   - `session.txt`: git rev, PIDs, build-check result.
-  - `client-Player<N>.log`: `[diag]` every 2s, plus `[puppet]`, `[world]`, `[items]`, `[story]`, `[wallet]`, `[fx]` (projectile events sent / received / dropped, REL counters) and `[build-check]` lines.
+  - `client-Player<N>.log`: `[diag]` every 2s, plus `[puppet]`, `[held]`, `[names]`, `[world]` (incl. `live world:`), `[switches]`, `[keys]`, `[items]`, `[story]`, `[wallet]`, `[fx]` (projectile events sent / received / dropped, REL counters), `[launch]`, `[icons]` and `[build-check]` lines.
   - `server.log`: joins and leaves, `[room]` rules/owner, sync store activity, `[stats]` relay rates every 10s.
   - `dolphin-<N>.log`: OSReport output (`[PUPPET]` lines from the REL) and MMU invalid read/write errors.
   - `build.log`, `patch.log`, `build-check.log`.
 - The client's headless modes are `--check-build` (exits 0 fresh / 2 stale / 3 no stamp), `--patch`, `--build-patchdata <dir>` and `--log-file <path>`.
+- **A game crash or freeze** (JUTException screen, `ISI exception` / invalid read in `dolphin-<N>.log`): read the logs, then `scripts/dolphin-crash-context.py` (registers + symbolised stack) and `scripts/dolphin-link-anm-check.py` (foreign animator pointers in Link's shared model data) against the live Dolphin. See GameMod/CLAUDE.md, "Debugging a crash".
 
 ## Layout
 ```
@@ -66,11 +68,14 @@ GameMod/                   game-side mod (see GameMod/CLAUDE.md)
   build/                   compiled output (gitignored)
   config.json              machine paths (gitignored; copy config.example.json)
 tww-decomp/                Wind Waker decompilation (submodule), the reference for offsets
-scripts/dev-test.ps1       local multiplayer test harness
+scripts/                   dev-test.ps1 (local multiplayer test harness), check-no-nintendo-files.ps1
+                           (CI + release guard), dolphin-crash-context.py + dolphin-link-anm-check.py
+                           (read-only crash debugging against a live Dolphin)
+docs/                      design notes (held-items, live-world, small-keys, event-flags,
+                           optional-patches), self-hosting, releasing, release-notes/<tag>.md
 Directory.Build.props      app version + GitHub repo URL (all projects)
 .github/workflows/         ci.yml (every push/PR), release.yml (v* tags; docs/releasing.md)
 deploy/docker-compose.yml  dedicated server example (image built from WWOnline.Server/Dockerfile)
-scripts/                   check-no-nintendo-files.ps1 (CI + release guard)
 ```
 
 ## Patcher and config
@@ -108,7 +113,7 @@ Optional patches (`GameMod/src/patches/optional/*.asm`, betterww QoL + vanilla b
 - **World and story merge in one direction only.** World is per-stage save flags OR-merged. Story is event flags 0x00-0x41, masked by `StoryFlags.SyncMask`. **Items** only grow (OR / MAX), and only the owner can remove an item.
 - **Small keys** (part of Shared world, `docs/small-keys.md`) are not synced but derived: a dungeon's count = its key flags taken (chest tbox / item bits) - its key doors opened (door switches), from a key table built from the player's own stage files (`SmallKeyTableBuilder`, at runtime by `SmallKeyTableProvider`). `SharedSmallKeyService` writes it into mKeyNum (the HUD's pending count in the current stage, only while idle; the saved copy elsewhere). No hub method or server state. The Room page's Dungeons card shows it. Log lines: `[keys]`.
 - **These never sync:** health, magic, arrow and bomb counts, bottle and bag contents, LocalOnly or risky event flags, event registers, mTmp.
-- Every sync service resets and rejoins on `SignalRClientService.Connected`. Nothing is marked "sent" until the send succeeds. Puppets are position/animation/equipment (plus the boat while riding it) only, and never include yourself.
+- Every sync service resets and rejoins on `SignalRClientService.Connected`. Nothing is marked "sent" until the send succeeds. Puppets are position/animation/equipment, the held item + aim + carried bomb (`HeldItemState`), appearance, plus the boat (and its cannon / crane) while riding it, only, and never include yourself.
 - **Name tags:** each peer's name (from `PlayerJoined`, sanitised to printable ASCII by `PuppetNameTags`) is drawn above their puppet by the REL. `PuppetSyncService` writes the REL's names block (pointer at `PUPPET_NAMES_PTR_ADDR`) only where it differs; "Show player names" (Appearance page, `GameSettings.ShowPlayerNames`) is the block's SHOW flag, local only. Log lines: `[names]`.
 - **Live world** (`docs/live-world.md`): chest and switch bits applied from other players to the current stage are handed to the REL (`LiveWorldPoke` → the REL's boot-stamped block at `LIVEWORLD_PTR_ADDR`, one acknowledged batch at a time), which re-creates the actors that read their flag only at create (chests open empty, walls/floors/ice/barricades vanish, crystals show on, locked doors come back unlocked; a lock byte is never written, docs/live-world.md 0.1). Log lines: `[world] live world:` (client) and `[PUPPET] live world:` per actor (Dolphin).
 - **Live room switches:** latching dungeon-visit (dan) and room (zone) switches sync between players in the same stage / room, on-edges only, apply-once, never echoed (`RoomSwitchSyncService`, `RoomSwitchStore`, hub `JoinRoomSwitches`/`SendRoomSwitches`). Which switches are latching comes from the patch-time switch table, which also keeps push-block (path-encoded) memory switches out of the world sync. Log lines: `[switches]`.

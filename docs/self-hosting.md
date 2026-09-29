@@ -114,7 +114,7 @@ Other proxies (nginx, Traefik) work too if they pass WebSocket upgrades (`Upgrad
 `GET /health` answers `200` with:
 
 ```json
-{"status":"ok","app":"WW-Online","version":"0.2.0","commit":"<git sha>","protocol":1,"players":2}
+{"status":"ok","app":"WW-Online","version":"0.1.0","commit":"<git sha>","protocol":4,"players":2}
 ```
 
 The image's `HEALTHCHECK` polls it, so `docker ps` shows `healthy`. Point an uptime monitor at it if you like. `version` and `protocol` are what players' apps must match (see [Updating](#updating)).
@@ -134,8 +134,8 @@ docker rm -f ww-online && docker run -d --name ww-online --restart unless-stoppe
 
 Tags:
 - `latest`: the newest stable release. Players' apps update themselves to the newest release too, so `latest` keeps the server in step with them.
-- `0.2`: the newest `0.2.x`.
-- `0.2.0`: exactly that release. Pre-releases (`0.3.0-beta.1`) only get their exact tag, never `latest` or `0.3`.
+- `0.1`: the newest `0.1.x`.
+- `0.1.0`: exactly that release. Pre-releases (`0.2.0-beta.1`) only get their exact tag, never `latest` or `0.2`.
 
 The server and the players' apps must speak the same protocol. A player on a different one is turned away with a message telling them who needs to update. After a release that changed the protocol, update the server when your players update.
 
@@ -158,7 +158,7 @@ They take the same environment variables and flags. Use a service manager (syste
 From the repo root (the Dockerfile is `WWOnline.Server/Dockerfile`; the build context is the whole repo, and `.dockerignore` keeps everything but the server, the shared project and the build props out):
 
 ```
-docker build -f WWOnline.Server/Dockerfile -t ww-online-server --build-arg VERSION=0.2.0 --build-arg COMMIT=$(git rev-parse HEAD) .
+docker build -f WWOnline.Server/Dockerfile -t ww-online-server --build-arg VERSION=0.1.0 --build-arg COMMIT=$(git rev-parse HEAD) .
 docker run -d --name ww-online -p 6969:6969 ww-online-server
 ```
 
