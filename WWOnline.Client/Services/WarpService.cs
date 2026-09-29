@@ -272,7 +272,7 @@ public sealed class WarpService
     private static string Describe(PuppetData t, TimeSpan age) =>
         $"{t.StageName} room {t.RoomNumber} at ({t.Position.X:F0}, {t.Position.Y:F0}, {t.Position.Z:F0}) " +
         $"entrance {(t.Warp is { } w ? $"point {w.EntryPoint} room {w.EntryRoom} layer {w.Layer} busy {w.Busy}" : "none")}" +
-        $"{(t.Boat != null ? " sailing" : "")}, {age.TotalMilliseconds:F0} ms old";
+        $"{(t.Boat is { Parked: false } ? " sailing" : "")}, {age.TotalMilliseconds:F0} ms old";
 }
 
 /// <summary>The game's own files are the source of truth for stage names.</summary>

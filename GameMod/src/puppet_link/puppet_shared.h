@@ -83,8 +83,8 @@
 #define PUPPET_SLOT_OFF_BODY_ANGLE_X      0x48  /* s16  mBodyAngle.x (Link +0x2B4): aim pitch */
 #define PUPPET_SLOT_OFF_BODY_ANGLE_Y      0x4A  /* s16  mBodyAngle.y (Link +0x2B6): aim yaw, relative to shape_angle.y */
 #define PUPPET_SLOT_OFF_GRAB_KIND         0x4C  /* u8   PUPPET_GRAB_KIND_*: what the peer carries (mActorKeepGrab) */
-#define PUPPET_SLOT_OFF_GRAB_FUSE         0x4D  /* u8   a carried bomb's fuse: frames left (daBomb_c::mRestTime, capped at 255); 0 = none / unknown — last field */
-/* 0x4E..0x4F: padding, written as 0 */
+#define PUPPET_SLOT_OFF_GRAB_FUSE         0x4D  /* u8   a carried bomb's fuse: frames left (daBomb_c::mRestTime, capped at 255); 0 = none / unknown */
+#define PUPPET_SLOT_OFF_BOAT_COLOR        0x4E  /* u16  the peer's boat hull colour, RGB565 (the hull palette's format); 0 = the classic red — last field */
 
 /* PUPPET_SLOT_OFF_GRAB_KIND values */
 #define PUPPET_GRAB_KIND_NONE             0     /* nothing carried, or something the puppet doesn't draw (pot, barrel...) */
@@ -385,10 +385,11 @@
 #define PUPPET_BOAT_OFF_HEAD_FRAME 0x1F /* u8  — mpHeadAnm frame, whole frames */
 
 /* PUPPET_BOAT_OFF_FLAGS bits */
-#define PUPPET_BOAT_FLAG_ACTIVE   0x01  /* peer is riding their boat */
+#define PUPPET_BOAT_FLAG_ACTIVE   0x01  /* the peer has a boat to show: riding it, or PARKED */
 #define PUPPET_BOAT_FLAG_FLY      0x02  /* daShip_c mStateFlag daSFLG_FLY_e: airborne, use POSY */
 #define PUPPET_BOAT_FLAG_MAST_ON  0x04  /* m0392 == SHIP_BCK_MAST_ON2 (mast up / rising), else SHIP_BCK_MAST_OFF2 */
 #define PUPPET_BOAT_FLAG_MAST_HIDE 0x08 /* m03E8 == 0.001: J_FN_MAST scaled away (cannon or crane in its place) */
+#define PUPPET_BOAT_FLAG_PARKED   0x40  /* nobody aboard: they got off on the Great Sea; drawn empty, never seats the puppet */
 /* FLAGS bits 4..5: mPart (daShip_c::Part_e); the cannon / crane is drawn while it is SHIP_PART_CANNON / _CRANE */
 #define PUPPET_BOAT_PART_SHIFT    4
 #define PUPPET_BOAT_PART_MASK     0x3
@@ -548,7 +549,8 @@ typedef char puppet_check_slot_fits[
      PUPPET_SLOT_OFF_BODY_ANGLE_X + 2 <= PUPPET_SLOT_OFF_BODY_ANGLE_Y &&
      PUPPET_SLOT_OFF_BODY_ANGLE_Y + 2 <= PUPPET_SLOT_OFF_GRAB_KIND &&
      PUPPET_SLOT_OFF_GRAB_KIND + 1 <= PUPPET_SLOT_OFF_GRAB_FUSE &&
-     PUPPET_SLOT_OFF_GRAB_FUSE + 1 <= PUPPET_SLOT_SIZE && (PUPPET_SLOT_SIZE % 4) == 0) ? 1 : -1];
+     PUPPET_SLOT_OFF_GRAB_FUSE + 1 <= PUPPET_SLOT_OFF_BOAT_COLOR && (PUPPET_SLOT_OFF_BOAT_COLOR % 2) == 0 &&
+     PUPPET_SLOT_OFF_BOAT_COLOR + 2 <= PUPPET_SLOT_SIZE && (PUPPET_SLOT_SIZE % 4) == 0) ? 1 : -1];
 typedef char puppet_check_slots_before_tracking[
     (PUPPET_SLOT_REGION_END <= PUPPET_PROC_IDS_ADDR) ? 1 : -1];
 typedef char puppet_check_boat_cannon_words[
@@ -594,6 +596,8 @@ typedef char puppet_check_boat_fits[
     (PUPPET_BOAT_OFF_HEAD_FRAME + 1 <= PUPPET_BOAT_SIZE && (PUPPET_BOAT_SIZE % 4) == 0 &&
      PUPPET_BOAT_FLAG_MAST_HIDE < (1 << PUPPET_BOAT_PART_SHIFT) &&
      (PUPPET_BOAT_PART_MASK << PUPPET_BOAT_PART_SHIFT) < (1 << PUPPET_BOAT_HEAD_BCK_SHIFT) &&
+     (PUPPET_BOAT_FLAG_PARKED & (PUPPET_BOAT_PART_MASK << PUPPET_BOAT_PART_SHIFT)) == 0 &&
+     PUPPET_BOAT_FLAG_PARKED > PUPPET_BOAT_FLAG_MAST_HIDE && PUPPET_BOAT_FLAG_PARKED < (1 << PUPPET_BOAT_HEAD_BCK_SHIFT) &&
      SHIP_PART_CRANE <= PUPPET_BOAT_PART_MASK) ? 1 : -1];
 typedef char puppet_check_boats_after_appearance[
     (PUPPET_BOAT_0 >= LOCAL_APPEARANCE_STATUS_ADDR + 4) ? 1 : -1];

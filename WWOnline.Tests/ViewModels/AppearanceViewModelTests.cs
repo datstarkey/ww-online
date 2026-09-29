@@ -103,6 +103,35 @@ public sealed class AppearanceViewModelTests : IDisposable
     }
 
     [Fact]
+    public void BoatColour_MatchTunic_IsTheDefault_AndFollowsTheTunic()
+    {
+        var vm = Vm();
+        Assert.Equal(AppearanceViewModel.BoatMatchTunic, vm.SelectedBoatColor.Name);
+        var look = _published[^1];
+        Assert.Equal((0, 0, 0), (look.BoatR, look.BoatG, look.BoatB)); // default tunic: the classic red, like the sail
+
+        vm.SelectColorCommand.Execute(vm.Swatches.Single(sw => sw.Name == "Blue"));
+        look = _published[^1];
+        Assert.Equal((30, 60, 180), ((int)look.BoatR, (int)look.BoatG, (int)look.BoatB));
+    }
+
+    [Fact]
+    public void BoatColour_Picked_IsSent_AndSaved_AndClassicIsZero()
+    {
+        var vm = Vm();
+        vm.SelectBoatColorCommand.Execute(vm.BoatSwatches.Single(sw => sw.Name == "Gold"));
+        var look = _published[^1];
+        Assert.Equal((200, 170, 40), ((int)look.BoatR, (int)look.BoatG, (int)look.BoatB));
+        Assert.Single(vm.BoatSwatches, sw => sw.IsSelected);
+        Assert.Equal("Gold", _settings.Load().BoatColorName);
+        Assert.Equal("Gold", Vm().SelectedBoatColor.Name); // reloads
+
+        vm.SelectBoatColorCommand.Execute(vm.BoatSwatches.Single(sw => sw.Name == AppearanceViewModel.BoatClassic));
+        look = _published[^1];
+        Assert.Equal((0, 0, 0), ((int)look.BoatR, (int)look.BoatG, (int)look.BoatB));
+    }
+
+    [Fact]
     public void PickingClothes_MapsToTheWireValue_AndSaves()
     {
         var vm = Vm();

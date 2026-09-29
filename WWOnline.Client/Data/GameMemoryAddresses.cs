@@ -572,6 +572,12 @@ public static class GameMemoryAddresses
         /// <summary>play.mpPlayerPtr[2] — the King of Red Lions (daShip_c*), or 0. d_com_inf_game.h
         /// "/* 0x48AC */ fopAc_ac_c* mpPlayerPtr[3]; // 0: Link, 1: Partner, 2: Ship" (dComIfGp_getShipActor).</summary>
         public const uint ShipActorPtr = Play + 0x48AC + 2 * 4;
+        /// <summary>The Great Sea's stage name, where a boat you got off stays (and shows parked to others).</summary>
+        public const string SeaStageName = "sea";
+        /// <summary>base_process_class mProcName (s16 at +0x8, as the REL's BASE_PROC_NAME) and daShip_c's (g_profile_SHIP
+        /// in the vanilla d_a_ship.rel).</summary>
+        public const uint ActorOffsetProcName = 0x08;
+        public const ushort ProcNameShip = 0x0A7;
 
         // daShip_c fields (d_a_ship.h); position/angle/speed are the fopAc_ac_c base fields.
         public const uint ShipOffsetPosX = 0x1F8;      // current.pos

@@ -54,7 +54,9 @@
 
 /* Model flags as daShip_c::createHeap (d_a_ship.cpp:4406-4461) */
 #define BOAT_MODEL_FLAG           0x80000
-#define BOAT_BODY_DIFF_FLAG       0x11200202
+/* + TexNo (bits 16..19, J3DTevBlock::diff): our hull bakes its own texture / palette loads at entry, so its
+ * palette can differ from the local ship's (see "Hull colour"). Sized max(count, TEV stages). */
+#define BOAT_BODY_DIFF_FLAG       0x11240202
 #define BOAT_HEAD_DIFF_FLAG       0x11000002
 #define BOAT_PART_DIFF_FLAG       0x11000002  /* cannon, crane and hook (d_a_ship.cpp:4430-4446) */
 
@@ -506,6 +508,169 @@ static void boat_sailEntry(PuppetBoat *boat)
   *zMtx = savedZ;
 }
 
+/* ---- Hull colour ---------------------------------------------------------------------------
+ * fn_body.bdl has one material, textured with fn_main1 (C8, 64 RGB565 colours; TEX1 lists it twice, two
+ * headers with identical palettes): the red hull is palette entries 46-58 (main 197,60,24), the rest is
+ * wood, rope, trim and the gold emblem. The vanilla material's texture loads live in its shared display
+ * list, so our body model is built with TexNo in its diff flags (BOAT_BODY_DIFF_FLAG): each entry bakes
+ * the loads from the TEX1 headers into our own shape packet's differed list (J3DTevBlock::diff ->
+ * loadTexNo, J3DTevs.cpp:138-152: J3DGDLoadTlut(header + paletteOffset, 256 entries)). So around our body
+ * entry the headers point at a recoloured copy of the palette, like the sail's draw, and are put back
+ * right after; the local ship, drawn from its shared list, never sees it. */
+#define HULL_TLUT_ENTRIES         0x100   /* loadTexNo loads GX_TLUT_256 for more than 16 colours */
+#define HULL_PAL_BYTES            (HULL_TLUT_ENTRIES * 2)
+#define HULL_MAX_HEADERS          8
+#define HULL_MAIN_LUM             97      /* the main red's luminance: that entry becomes the picked colour */
+/* An entry's red weight: g/r at most 0.62 is the hull (its shading and highlights), 0.72 and up is wood,
+ * rope or trim; ramp between. */
+#define HULL_RED_GR_FULL          62
+#define HULL_RED_GR_NONE          72
+
+/* The hull's two palette buffers, in the boat heap (NULL if they don't fit: the hull stays red). */
+static u16 *boat_createHull(JKRSolidHeap *heap)
+{
+  AppAllocFn alloc = (AppAllocFn)(u32)JKRHeap__alloc;
+  return (u16 *)alloc(2 * HULL_PAL_BYTES, 32, heap);
+}
+
+/* The body's TEX1 headers, and the reference one (the first C8 / RGB565 header), or 0. */
+static u32 boat_hullHeaders(PuppetBoat *boat, u32 **first)
+{
+  J3DTexture *tex = J3DMODELDATA_MMATERIALTABLE_MPTEXTURE(J3DMODEL_MPMODELDATA(boat->body));
+  u32 n, i;
+  u8 *timg;
+
+  *first = NULL;
+  if (tex == NULL || tex->mpTexData == NULL)
+    return 0;
+  n = (u16)tex->mCount;
+  if (n > HULL_MAX_HEADERS)
+    n = HULL_MAX_HEADERS;
+  for (i = 0; i < n; i++)
+  {
+    timg = (u8 *)tex->mpTexData + i * 0x20;
+    if (TIMG_FORMAT(timg) == TIMG_FMT_C8 && TIMG_PAL_FORMAT(timg) == TIMG_TLUT_RGB565 &&
+        TIMG_NUM_COLORS(timg) <= HULL_TLUT_ENTRIES)
+    {
+      *first = (u32 *)timg;
+      return n;
+    }
+  }
+  return 0;
+}
+
+/* Is header t's palette the reference's (same count and colours)? Those are the ones swapped. */
+static int boat_hullSame(const u8 *t, const u32 *ref)
+{
+  const u16 *a, *b;
+  u32 i, count;
+
+  if (TIMG_FORMAT(t) != TIMG_FMT_C8 || TIMG_PAL_FORMAT(t) != TIMG_TLUT_RGB565 ||
+      TIMG_NUM_COLORS(t) != TIMG_NUM_COLORS(ref))
+    return 0;
+  a = (const u16 *)(t + TIMG_PAL_OFFSET(t));
+  b = (const u16 *)((const u8 *)ref + TIMG_PAL_OFFSET(ref));
+  count = TIMG_NUM_COLORS(ref);
+  for (i = 0; i < count; i++)
+    if (a[i] != b[i])
+      return 0;
+  return 1;
+}
+
+/* fn_main1's palette with the red in the RGB565 colour c, keeping each entry's shading (see above). */
+static void boat_hullRecolor(u16 *dst, const u32 *timg, u32 c)
+{
+  const u16 *src = (const u16 *)((const u8 *)timg + TIMG_PAL_OFFSET(timg));
+  u32 count = TIMG_NUM_COLORS(timg);
+  int want[3];
+  u32 i;
+  int k;
+
+  want[0] = (int)((c >> 11) & 0x1F) << 3;
+  want[1] = (int)((c >> 5) & 0x3F) << 2;
+  want[2] = (int)(c & 0x1F) << 3;
+  for (i = 0; i < HULL_TLUT_ENTRIES; i++)
+  {
+    u32 e = i < count ? src[i] : 0;
+    int ch[3];
+    int lum, w, t;
+
+    ch[0] = (e >> 11) & 0x1F;
+    ch[1] = (e >> 5) & 0x3F;
+    ch[2] = e & 0x1F;
+    ch[0] = (ch[0] << 3) | (ch[0] >> 2);
+    ch[1] = (ch[1] << 2) | (ch[1] >> 4);
+    ch[2] = (ch[2] << 3) | (ch[2] >> 2);
+    w = boat_ramp(HULL_RED_GR_NONE * ch[0] - 100 * ch[1], (HULL_RED_GR_NONE - HULL_RED_GR_FULL) * ch[0]);
+    lum = (77 * ch[0] + 150 * ch[1] + 29 * ch[2]) >> 8;
+    for (k = 0; k < 3; k++)
+    {
+      t = want[k] * lum / HULL_MAIN_LUM;
+      if (t > 255)
+        t = 255;
+      ch[k] += ((t - ch[k]) * w) / 256;
+    }
+    dst[i] = (u16)(((ch[0] >> 3) << 11) | ((ch[1] >> 2) << 5) | (ch[2] >> 3));
+  }
+}
+
+/* The slot's hull colour: a recoloured palette for this frame's body entry, or NULL (the classic red). */
+static void boat_hullColor(PuppetBoat *boat, u32 slotIndex)
+{
+  u32 c = *(volatile u16 *)(PUPPET_SLOT_BASE(slotIndex) + PUPPET_SLOT_OFF_BOAT_COLOR);
+  AppStoreFn store = (AppStoreFn)(u32)os__DCStoreRange;
+  u32 *ref;
+  u16 *pal;
+
+  boat->hullShow = NULL;
+  if (c == 0 || boat->hullPal == NULL || boat_hullHeaders(boat, &ref) == 0 || ref == NULL)
+    return;
+  if (boat->hullKey != APP_KEY(c))
+  {
+    if (boat->hullKey != 0)
+      boat->hullCur ^= 1; // leave the palette the GPU may still be loading
+    pal = boat->hullPal + boat->hullCur * HULL_TLUT_ENTRIES;
+    boat_hullRecolor(pal, ref, c);
+    store(pal, HULL_PAL_BYTES);
+    boat->hullKey = APP_KEY(c);
+  }
+  boat->hullShow = boat->hullPal + boat->hullCur * HULL_TLUT_ENTRIES;
+}
+
+/* mDoExt_modelEntryDL(body) with the TEX1 headers of the red palette pointing at hullShow. */
+static void boat_hullEntry(PuppetBoat *boat)
+{
+  u32 saved[HULL_MAX_HEADERS];
+  u8 swapped[HULL_MAX_HEADERS];
+  u32 *ref;
+  u32 n, i;
+  u8 *base, *t;
+
+  n = boat->hullShow != NULL ? boat_hullHeaders(boat, &ref) : 0;
+  if (n == 0)
+  {
+    mDoExt_modelEntryDL(boat->body);
+    return;
+  }
+  base = (u8 *)J3DMODELDATA_MMATERIALTABLE_MPTEXTURE(J3DMODEL_MPMODELDATA(boat->body))->mpTexData;
+  for (i = 0; i < n; i++)
+  {
+    t = base + i * 0x20;
+    swapped[i] = (u8)boat_hullSame(t, ref);
+    saved[i] = TIMG_PAL_OFFSET(t);
+  }
+  for (i = 0; i < n; i++)
+    if (swapped[i])
+    {
+      t = base + i * 0x20;
+      TIMG_PAL_OFFSET(t) = (u32)boat->hullShow - (u32)t; // wraps, like the sail's
+    }
+  mDoExt_modelEntryDL(boat->body);
+  for (i = 0; i < n; i++)
+    if (swapped[i])
+      TIMG_PAL_OFFSET(base + i * 0x20) = saved[i];
+}
+
 /* ---- Cannon and crane ----------------------------------------------------------------------
  * Vanilla (d_a_ship.cpp): createHeap builds the cannon (vfncn.bdl), the crane / salvage arm
  * (vfncr.bdl) and the grappling hook on the rope's end ("Link" ropeend.bdl) as plain J3DModels
@@ -607,6 +772,7 @@ static int boat_createModels(PuppetBoat *boat)
     boat->headAnm = boat_createMorf(BOAT_RES_BDL_FN_HEAD_H, SHIP_BCK_FN_LOOK_L, BOAT_HEAD_DIFF_FLAG);
   // The sail and parts are optional: a boat without them still draws.
   boat->sail = boat->headAnm != NULL ? boat_createSail(heap) : NULL;
+  boat->hullPal = boat->headAnm != NULL ? boat_createHull(heap) : NULL;
   if (boat->headAnm != NULL)
     boat_createParts(boat);
   mDoExt_restoreCurrentHeap();
@@ -617,6 +783,7 @@ static int boat_createModels(PuppetBoat *boat)
     boat->bodyAnm = NULL;
     boat->headAnm = NULL;
     boat->sail = NULL;
+    boat->hullPal = NULL;
     boat_clearParts(boat);
     return 0;
   }
@@ -1119,6 +1286,8 @@ void puppet_boatExecute(fopAc_ac_c *actor, PuppetBoat *boat, u32 slotIndex)
   boat_calcModel(boat, boat->head, boat->headAnm, BOAT_CALC_HEAD);
   boat_partsExecute(boat, slotIndex, flags);
   boat_sailExecute(boat, base, flags, slotIndex);
+  boat_hullColor(boat, slotIndex);
+  boat->parked = (flags & PUPPET_BOAT_FLAG_PARKED) != 0;
 
   boat->hasPose = 1;
   boat->visible = 1;
@@ -1126,7 +1295,7 @@ void puppet_boatExecute(fopAc_ac_c *actor, PuppetBoat *boat, u32 slotIndex)
 
 int puppet_boatSeat(PuppetBoat *boat, cXyz *pos, csXyz *angle)
 {
-  if (!boat->visible)
+  if (!boat->visible || boat->parked)
     return 0;
   PSMTXMultVec((MTX34 *)J3DMODEL_MBASETRMTX(boat->body), (cXyz *)&l_boatSeatOffset, pos);
   angle->x = boat->pitch;
@@ -1187,7 +1356,7 @@ void puppet_boatDraw(fopAc_ac_c *actor, PuppetBoat *boat)
   dScnKy_env_light_c__setLightTevColorType(&g_env_light, boat->head, (dKy_tevstr_c *)tev);
 
   dComIfGd_setListP1();
-  mDoExt_modelEntryDL(boat->body);
+  boat_hullEntry(boat);
   mDoExt_modelEntryDL(boat->head);
   boat_partsDraw(boat, (dKy_tevstr_c *)tev);
   dComIfGd_setList();
@@ -1219,6 +1388,9 @@ void puppet_boatDelete(PuppetBoat *boat)
     boat->body = NULL;
     boat->head = NULL;
     boat->sail = NULL; // was in the heap
+    boat->hullPal = NULL;
+    boat->hullShow = NULL;
+    boat->hullKey = 0;
     boat_clearParts(boat);
   }
 

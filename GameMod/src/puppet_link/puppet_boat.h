@@ -28,6 +28,12 @@
  * physics isn't run here), with the grappling hook at its end. Nothing fires, salvages or plays a
  * sound: they are just models.
  *
+ * Parked (PUPPET_BOAT_FLAG_PARKED): the peer got off on the Great Sea; the boat is drawn where it lies,
+ * empty (the puppet is never seated in it).
+ *
+ * Hull colour (PUPPET_SLOT_OFF_BOAT_COLOR): the red of fn_body.bdl is its fn_main1 texture's palette
+ * (C8, 64 RGB565 colours; see puppet_boat.c, "Hull colour").
+ *
  * Not drawn yet: wake effects, the rope's sway and ripples, the hook while the rope is under 3
  * segments (the arm rising / folding), the talk mouth
  * (headJointCallBack0's mAnmTransform swap) and the boat's shadow. The hull's water effect
@@ -99,7 +105,12 @@ typedef struct PuppetBoat
   u8 part;                              /* SHIP_PART_CANNON / _CRANE posed this frame, else 0 */
   u8 ropeCnt;                           /* mRopeCnt */
   u8 hookShow;                          /* the hook is posed this frame */
-  u8 pad4[3];
+  u8 parked;                            /* PUPPET_BOAT_FLAG_PARKED this frame: nobody aboard, never seats */
+  u8 hullCur;                           /* hull palette buffer the recolour key is in */
+  u8 pad4;
+  u16 *hullPal;                         /* two recoloured hull palettes (in `heap`), NULL = none */
+  u32 hullKey;                          /* their RGB565 colour | 0x01000000, 0 = none yet */
+  u16 *hullShow;                        /* the palette this frame's body entry uses, NULL = vanilla */
 } PuppetBoat;
 
 /* PuppetBoat.clothState */

@@ -84,8 +84,10 @@ public static class PuppetLayout
     public const int PUPPET_SLOT_OFF_BODY_ANGLE_Y = 0x4A;
     /// <summary>u8   PUPPET_GRAB_KIND_*: what the peer carries (mActorKeepGrab)</summary>
     public const int PUPPET_SLOT_OFF_GRAB_KIND = 0x4C;
-    /// <summary>u8   a carried bomb's fuse: frames left (daBomb_c::mRestTime, capped at 255); 0 = none / unknown — last field</summary>
+    /// <summary>u8   a carried bomb's fuse: frames left (daBomb_c::mRestTime, capped at 255); 0 = none / unknown</summary>
     public const int PUPPET_SLOT_OFF_GRAB_FUSE = 0x4D;
+    /// <summary>u16  the peer's boat hull colour, RGB565 (the hull palette's format); 0 = the classic red — last field</summary>
+    public const int PUPPET_SLOT_OFF_BOAT_COLOR = 0x4E;
     /// <summary>nothing carried, or something the puppet doesn't draw (pot, barrel...)</summary>
     public const int PUPPET_GRAB_KIND_NONE = 0;
     /// <summary>a bomb (fpcNm_BOMB_e): the REL draws one between the puppet's hands</summary>
@@ -379,7 +381,7 @@ public static class PuppetLayout
     public const int PUPPET_BOAT_OFF_MAST_FRAME = 0x1E;
     /// <summary>u8  — mpHeadAnm frame, whole frames</summary>
     public const int PUPPET_BOAT_OFF_HEAD_FRAME = 0x1F;
-    /// <summary>peer is riding their boat</summary>
+    /// <summary>the peer has a boat to show: riding it, or PARKED</summary>
     public const int PUPPET_BOAT_FLAG_ACTIVE = 0x01;
     /// <summary>daShip_c mStateFlag daSFLG_FLY_e: airborne, use POSY</summary>
     public const int PUPPET_BOAT_FLAG_FLY = 0x02;
@@ -387,6 +389,8 @@ public static class PuppetLayout
     public const int PUPPET_BOAT_FLAG_MAST_ON = 0x04;
     /// <summary>m03E8 == 0.001: J_FN_MAST scaled away (cannon or crane in its place)</summary>
     public const int PUPPET_BOAT_FLAG_MAST_HIDE = 0x08;
+    /// <summary>nobody aboard: they got off on the Great Sea; drawn empty, never seats the puppet</summary>
+    public const int PUPPET_BOAT_FLAG_PARKED = 0x40;
     public const int PUPPET_BOAT_PART_SHIFT = 4;
     public const int PUPPET_BOAT_PART_MASK = 0x3;
     public const int PUPPET_BOAT_HEAD_BCK_SHIFT = 8;

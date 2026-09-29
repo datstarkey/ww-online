@@ -100,6 +100,43 @@ public partial class AppearanceViewModel : ViewModelBase
 
     public ReadOnlyCollection<TunicSwatchViewModel> Swatches { get; }
 
+    /// <summary>"Match tunic": the boat takes the tunic colour (the classic red with the default tunic, like the sail).</summary>
+    public const string BoatMatchTunic = "Match tunic";
+    /// <summary>"Classic": the vanilla red hull (sent as 0,0,0).</summary>
+    public const string BoatClassic = "Classic";
+
+    // Hull colours: Match tunic, the classic red, then the tunic colours (the default green by name).
+    public ReadOnlyCollection<TunicColorPreset> BoatPresets { get; } = new(
+    [
+        new(BoatMatchTunic, 0, 0, 0, TunicColors.DefaultHex),
+        new(BoatClassic, 0, 0, 0, "#C53C18"),
+        new("Green", PuppetLayout.TUNIC_COLOR_DEFAULT_R, PuppetLayout.TUNIC_COLOR_DEFAULT_G,
+            PuppetLayout.TUNIC_COLOR_DEFAULT_B, TunicColors.DefaultHex),
+        new("Red",    180, 30,  30,  "#B41E1E"),
+        new("Blue",   30,  60,  180, "#1E3CB4"),
+        new("Purple", 120, 30,  160, "#781EA0"),
+        new("Black",  20,  20,  20,  "#141414"),
+        new("White",  230, 230, 230, "#E6E6E6"),
+        new("Gold",   200, 170, 40,  "#C8AA28"),
+        new("Orange", 210, 120, 30,  "#D2781E"),
+        new("Pink",   220, 100, 150, "#DC6496"),
+        new("Teal",   30,  160, 150, "#1EA096"),
+    ]);
+
+    public ReadOnlyCollection<TunicSwatchViewModel> BoatSwatches { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedBoatColor), nameof(BoatPreviewBrush))]
+    private int _selectedBoatIndex;
+
+    public TunicColorPreset SelectedBoatColor => BoatPresets[SelectedBoatIndex];
+
+    /// <summary>The hull colour the others see, as a brush (Match tunic follows the tunic swatch).</summary>
+    public IBrush BoatPreviewBrush =>
+        SelectedBoatIndex == 0
+            ? (SelectedColorIndex == 0 ? BoatSwatches[1].Brush : Swatches[SelectedColorIndex].Brush)
+            : BoatSwatches[SelectedBoatIndex].Brush;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SelectedColor), nameof(PreviewBrush), nameof(LookText), nameof(ColorNote))]
     private int _selectedColorIndex;
@@ -149,11 +186,13 @@ public partial class AppearanceViewModel : ViewModelBase
         _publish = publish;
         _publishShowNames = publishShowNames;
         Swatches = new ReadOnlyCollection<TunicSwatchViewModel>(ColorPresets.Select(p => new TunicSwatchViewModel(p)).ToList());
+        BoatSwatches = new ReadOnlyCollection<TunicSwatchViewModel>(BoatPresets.Select(p => new TunicSwatchViewModel(p)).ToList());
 
         var saved = settings.Load();
         _loading = true;
         SelectedClothesIndex = ClothesTypeToIndex(saved.ClothesType);
         SelectedColorIndex = FindColorIndex(saved.TunicColorName);
+        SelectedBoatIndex = FindBoatIndex(saved.BoatColorName);
         ShowPlayerNames = saved.ShowPlayerNames;
         _loading = false;
 
@@ -169,7 +208,17 @@ public partial class AppearanceViewModel : ViewModelBase
         ColorR = SelectedColor.R,
         ColorG = SelectedColor.G,
         ColorB = SelectedColor.B,
+        BoatR = BoatColor.R,
+        BoatG = BoatColor.G,
+        BoatB = BoatColor.B,
     };
+
+    /// <summary>The hull colour sent (0,0,0 = the classic red): Match tunic resolves to the tunic colour, and to the
+    /// classic red with the default tunic, as the sail keeps its vanilla cloth then.</summary>
+    private (byte R, byte G, byte B) BoatColor =>
+        SelectedBoatIndex != 0 ? (SelectedBoatColor.R, SelectedBoatColor.G, SelectedBoatColor.B)
+        : SelectedColorIndex == 0 ? ((byte)0, (byte)0, (byte)0)
+        : (SelectedColor.R, SelectedColor.G, SelectedColor.B);
 
     private static int ClothesTypeToIndex(byte value) => value switch
     {
@@ -185,7 +234,13 @@ public partial class AppearanceViewModel : ViewModelBase
         _ => (byte)PuppetLayout.APPEARANCE_CLOTHES_HERO,
     };
 
-    partial void OnSelectedColorIndexChanged(int value) => OnLookChanged();
+    partial void OnSelectedColorIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(BoatPreviewBrush));
+        OnLookChanged();
+    }
+
+    partial void OnSelectedBoatIndexChanged(int value) => OnLookChanged();
 
     partial void OnSelectedClothesIndexChanged(int value) => OnLookChanged();
 
@@ -209,6 +264,7 @@ public partial class AppearanceViewModel : ViewModelBase
     private void UpdateSelectionFlags()
     {
         for (int i = 0; i < Swatches.Count; i++) Swatches[i].IsSelected = i == SelectedColorIndex;
+        for (int i = 0; i < BoatSwatches.Count; i++) BoatSwatches[i].IsSelected = i == SelectedBoatIndex;
         foreach (var c in ClothesChoices) c.IsSelected = c.Index == SelectedClothesIndex;
     }
 
@@ -226,6 +282,7 @@ public partial class AppearanceViewModel : ViewModelBase
         settings.TunicColorR = look.ColorR;
         settings.TunicColorG = look.ColorG;
         settings.TunicColorB = look.ColorB;
+        settings.BoatColorName = SelectedBoatColor.Name;
         _settings.Save(settings);
     }
 
@@ -239,12 +296,30 @@ public partial class AppearanceViewModel : ViewModelBase
         return 0; // Default (also the old "Green" name)
     }
 
+    private int FindBoatIndex(string? name)
+    {
+        for (int i = 0; i < BoatPresets.Count; i++)
+        {
+            if (string.Equals(BoatPresets[i].Name, name, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return 0; // Match tunic
+    }
+
     [RelayCommand]
     private void SelectColor(TunicSwatchViewModel? swatch)
     {
         if (swatch == null) return;
         int idx = Swatches.IndexOf(swatch);
         if (idx >= 0) SelectedColorIndex = idx;
+    }
+
+    [RelayCommand]
+    private void SelectBoatColor(TunicSwatchViewModel? swatch)
+    {
+        if (swatch == null) return;
+        int idx = BoatSwatches.IndexOf(swatch);
+        if (idx >= 0) SelectedBoatIndex = idx;
     }
 
     [RelayCommand]
