@@ -286,7 +286,7 @@ public class BaitBagMemoryTests
         d.Set(GameMemoryAddresses.Player.PlaySelectItems, P, B, 0xFF);
 
         var next = BaitBag.Apply(bag, Bag.C(3, 0), BaitBag.EquippedMask([36, 37, 0xFF]));
-        Assert.Equal(BaitBagMemory.WriteResult.Written, BaitBagMemory.Write(d, bag, next));
+        Assert.Equal(BagWriteResult.Written, BaitBagMemory.Write(d, bag, next));
 
         Assert.True(Bag.Read(d).SameAs(Bag.Of((E, 0), (B, 3))));
         Assert.Equal(0xFF, d.Get(GameMemoryAddresses.Player.SelectItemSlots));      // X was the pear: cleared
@@ -303,7 +303,7 @@ public class BaitBagMemoryTests
         var d = Bag.Game(Bag.Of((B, 3), (B, 2))); // a use landed after our read
         var next = BaitBag.Apply(read, Bag.C(9, 0));
 
-        Assert.Equal(BaitBagMemory.WriteResult.Raced, BaitBagMemory.Write(d, read, next));
+        Assert.Equal(BagWriteResult.Raced, BaitBagMemory.Write(d, read, next));
         Assert.True(Bag.Read(d).SameAs(Bag.Of((B, 3), (B, 2))));
     }
 }

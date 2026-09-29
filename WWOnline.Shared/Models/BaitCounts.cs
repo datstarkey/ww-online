@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace WWOnline.Shared.Models;
 
 /// <summary>
@@ -12,7 +14,7 @@ namespace WWOnline.Shared.Models;
 /// As a room total both are &gt;= 0 and fit the bag together (<see cref="FitsTheBag"/>); as a delta
 /// (SendBaitDelta) they are signed.
 /// </summary>
-public sealed class BaitCounts : IEquatable<BaitCounts>
+public sealed class BaitCounts : IBagCounts<BaitCounts>
 {
     public const int SlotCount = 8;
     public const int UsesPerSlot = 3;
@@ -36,6 +38,7 @@ public sealed class BaitCounts : IEquatable<BaitCounts>
     /// <summary>Bag slots these counts need: partial bait slots packed into full ones, one per pear.</summary>
     public static int SlotsNeeded(int bait, int pears) => (bait + UsesPerSlot - 1) / UsesPerSlot + pears;
 
+    [JsonIgnore]
     public bool FitsTheBag => SlotsNeeded(Bait, Pears) <= SlotCount;
 
     /// <summary>A room total (or a game's bag): in range and fits the 8 slots.</summary>
@@ -47,11 +50,14 @@ public sealed class BaitCounts : IEquatable<BaitCounts>
         (Bait != 0 || Pears != 0) &&
         Bait >= -MaxBait && Bait <= MaxBait && Pears >= -MaxPears && Pears <= MaxPears;
 
+    [JsonIgnore]
     public bool IsEmpty => Bait == 0 && Pears == 0;
 
     public BaitCounts Clone() => new(Bait, Pears);
 
     public static BaitCounts operator -(BaitCounts a, BaitCounts b) => new(a.Bait - b.Bait, a.Pears - b.Pears);
+
+    public BaitCounts Minus(BaitCounts other) => this - other;
 
     public bool Equals(BaitCounts? other) => other is not null && Bait == other.Bait && Pears == other.Pears;
     public override bool Equals(object? obj) => Equals(obj as BaitCounts);

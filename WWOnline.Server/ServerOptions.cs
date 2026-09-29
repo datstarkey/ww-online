@@ -17,6 +17,7 @@ public sealed record ServerOptions
     public const string SharedStoryVar = "WWO_SHARED_STORY";
     public const string SharedProjectilesVar = "WWO_SHARED_PROJECTILES";
     public const string SharedBaitVar = "WWO_SHARED_BAIT";
+    public const string SharedSpoilsVar = "WWO_SHARED_SPOILS";
     public const string OwnerKeyVar = "WWO_OWNER_KEY";
     public const string LogFileVar = "WWO_LOG_FILE";
 
@@ -24,7 +25,7 @@ public sealed record ServerOptions
         """
         Usage: WWOnline.Server [port] [--log-file <path>] [--owner-key <key>]
                                [--no-shared-wallet] [--no-shared-world] [--no-shared-items] [--no-shared-story]
-                               [--no-shared-bait] [--no-shared-projectiles]
+                               [--no-shared-bait] [--no-shared-spoils] [--no-shared-projectiles]
                                [--version] [--help]
 
         Environment variables (a command-line flag wins over its variable):
@@ -34,6 +35,7 @@ public sealed record ServerOptions
           WWO_SHARED_ITEMS
           WWO_SHARED_STORY
           WWO_SHARED_BAIT     the bait bag's All-Purpose Bait and Hyoi Pears are one room total
+          WWO_SHARED_SPOILS   the spoils bag's counts (Joy Pendants, Chu Jellies...) are one room total
           WWO_SHARED_PROJECTILES  other players' bombs, cannon shots and arrows are real in your world
           WWO_OWNER_KEY       a player who enters this key in the client becomes the room owner
           WWO_LOG_FILE        also log to this file (the console log is always on)
@@ -47,6 +49,7 @@ public sealed record ServerOptions
     public bool SharedStory { get; init; } = true;
     public bool SharedProjectiles { get; init; } = true;
     public bool SharedBait { get; init; } = true;
+    public bool SharedSpoils { get; init; } = true;
 
     /// <summary>
     /// The secret that claims room ownership (GameHub.ClaimRoomOwner). A client that hosts the
@@ -77,6 +80,7 @@ public sealed record ServerOptions
             SharedStory = EnvBool(getEnv, SharedStoryVar, o.SharedStory, errors),
             SharedProjectiles = EnvBool(getEnv, SharedProjectilesVar, o.SharedProjectiles, errors),
             SharedBait = EnvBool(getEnv, SharedBaitVar, o.SharedBait, errors),
+            SharedSpoils = EnvBool(getEnv, SharedSpoilsVar, o.SharedSpoils, errors),
             OwnerKey = Env(getEnv, OwnerKeyVar),
             LogFile = Env(getEnv, LogFileVar),
         };
@@ -100,6 +104,7 @@ public sealed record ServerOptions
                 case "--no-shared-story": o = o with { SharedStory = false }; break;
                 case "--no-shared-projectiles": o = o with { SharedProjectiles = false }; break;
                 case "--no-shared-bait": o = o with { SharedBait = false }; break;
+                case "--no-shared-spoils": o = o with { SharedSpoils = false }; break;
                 default:
                     // A bare number is the port (an out-of-range or overflowing one is an error).
                     // Anything else is left for ASP.NET's own command-line configuration

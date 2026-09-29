@@ -22,6 +22,7 @@ public class GameSyncService : IDisposable
     private readonly WorldFlagSyncService _worldFlagSync;
     private readonly SharedWalletService _sharedWallet;
     private readonly SharedBaitService _sharedBait;
+    private readonly SharedSpoilsService _sharedSpoils;
     private readonly StorySyncService _storySync;
     private readonly SharedSmallKeyService _smallKeys;
     private readonly RoomSwitchSyncService _roomSwitchSync;
@@ -45,6 +46,7 @@ public class GameSyncService : IDisposable
         WorldFlagSyncService worldFlagSync,
         SharedWalletService sharedWallet,
         SharedBaitService sharedBait,
+        SharedSpoilsService sharedSpoils,
         StorySyncService storySync,
         SharedSmallKeyService smallKeys,
         RoomSwitchSyncService roomSwitchSync,
@@ -57,6 +59,7 @@ public class GameSyncService : IDisposable
         _worldFlagSync = worldFlagSync;
         _sharedWallet = sharedWallet;
         _sharedBait = sharedBait;
+        _sharedSpoils = sharedSpoils;
         _storySync = storySync;
         _smallKeys = smallKeys;
         _roomSwitchSync = roomSwitchSync;
@@ -99,6 +102,8 @@ public class GameSyncService : IDisposable
         _sharedWallet.Start();
         // Shared bait bag: All-Purpose Bait / Hyoi Pear counts, one room total
         _sharedBait.Start();
+        // Shared spoils bag: one count per spoil type, one room total
+        _sharedSpoils.Start();
         // Shared items: the room's inventory / equipment / upgrades, owned by the server
         _roomInventorySync.Start();
         // Shared story: event flags (story, cutscenes, side quests, NPC state) OR-merged across players
@@ -173,6 +178,7 @@ public class GameSyncService : IDisposable
         _roomSwitchSync.Stop();
         _sharedWallet.Stop();
         _sharedBait.Stop();
+        _sharedSpoils.Stop();
         _roomInventorySync.Stop();
         _storySync.Stop();
         _smallKeys.Stop();

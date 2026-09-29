@@ -95,8 +95,9 @@ public class ServerOptionsTests
     public void AllNoSharedFlags_TurnTheRulesOff()
     {
         var o = Parse(["--no-shared-wallet", "--no-shared-world", "--no-shared-items", "--no-shared-story",
-                       "--no-shared-projectiles", "--no-shared-bait"]).Options;
-        Assert.False(o.SharedWallet || o.SharedWorld || o.SharedItems || o.SharedStory || o.SharedProjectiles || o.SharedBait);
+                       "--no-shared-projectiles", "--no-shared-bait", "--no-shared-spoils"]).Options;
+        Assert.False(o.SharedWallet || o.SharedWorld || o.SharedItems || o.SharedStory || o.SharedProjectiles || o.SharedBait ||
+                     o.SharedSpoils);
     }
 
     [Theory]
@@ -123,6 +124,18 @@ public class ServerOptionsTests
         Assert.True(env.Options.SharedWallet);
         Assert.False(Parse(["--no-shared-bait"], new() { ["WWO_SHARED_BAIT"] = "true" }).Options.SharedBait);
         Assert.False(Parse([], new() { [ServerOptions.SharedBaitVar] = "maybe" }).IsValid);
+    }
+
+    [Fact]
+    public void SharedSpoils_DefaultsOn_ReadsItsVariable_AndTheFlagWins()
+    {
+        Assert.True(Parse([]).Options.SharedSpoils);
+        var env = Parse([], new() { [ServerOptions.SharedSpoilsVar] = "0" });
+        Assert.True(env.IsValid);
+        Assert.False(env.Options.SharedSpoils);
+        Assert.True(env.Options.SharedBait);
+        Assert.False(Parse(["--no-shared-spoils"], new() { ["WWO_SHARED_SPOILS"] = "yes" }).Options.SharedSpoils);
+        Assert.False(Parse([], new() { [ServerOptions.SharedSpoilsVar] = "sometimes" }).IsValid);
     }
 
     [Fact]
