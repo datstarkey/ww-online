@@ -488,6 +488,16 @@ public static class GameMemoryAddresses
         public const uint ActorOffSpeed = 0x220;           // speed (cXyz)
         public const uint ActorOffSpeedF = 0x254;          // speedF (f32)
 
+        /// <summary>
+        /// daPy_lk_c::execute starts with current.pos = l_debug_keep_pos, shape_angle = l_debug_shape_angle,
+        /// current.angle = l_debug_current_angle (d_a_player_main.cpp:11251-11255, retail too) and saves them
+        /// again at its end (:11716-11718): a position written only to the actor is undone the next frame.
+        /// Addresses: tww-decomp config/GZLE01/symbols.txt (.bss / .sbss statics of d_a_player_main.cpp).
+        /// </summary>
+        public const uint LinkKeepPos = 0x803E440C;          // l_debug_keep_pos (cXyz)
+        public const uint LinkKeepCurrentAngle = 0x803F6F10; // l_debug_current_angle (csXyz)
+        public const uint LinkKeepShapeAngle = 0x803F6F18;   // l_debug_shape_angle (csXyz)
+
         /// <summary>daPy_lk_c mTinkleShieldTimer (d_a_player_main.h:2230 "/* 0x354E */ s16"). With mNoResetFlg1's
         /// EQUIP_DRAGON_SHIELD (0x1) and SOUP_POWER_UP (0x8000) bits (d_a_player.h:199, 213) it is what
         /// dComIfGp_setNextStage folds into mLastMode (DOL 0x8005382C-0x80053850: 0x8000, timer &lt;&lt; 16, 0x4000),

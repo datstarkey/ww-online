@@ -2061,12 +2061,11 @@ static void puppet_requestProc(daPy_lk_c *puppet, int key, int slotIndex)
   if (l_puppetFollowState == key)
     return;
 
+  // No OSReport per transition: it fired on every anim change and flooded the Dolphin log (the
+  // client log's puppet lines carry the peer's proc).
+  (void)slotIndex;
   if (puppet_applyProcInit(puppet, key & 0xFF, (key >> 16) & 0xFF))
-  {
-    OSReport("[PUPPET] proc %04x -> %04x (slot %d)\n",
-             l_puppetFollowState & 0xFFFF, key & 0xFFFF, slotIndex);
     l_puppetFollowState = key;
-  }
 }
 
 // ============================================================================

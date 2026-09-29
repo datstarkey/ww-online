@@ -15,7 +15,10 @@ public enum WarpAction
     LoadEntrance,
 }
 
-public sealed record WarpPlan(WarpAction Action, string Message, StageEntry? Entrance = null, Vector3? Position = null, short AngleY = 0)
+/// <param name="AcrossRooms">A move to another room of the same stage (the Great Sea's squares): the room number
+/// changes once the game notices where Link is, so only a stage change or a void-out stops it.</param>
+public sealed record WarpPlan(WarpAction Action, string Message, StageEntry? Entrance = null, Vector3? Position = null, short AngleY = 0,
+    bool AcrossRooms = false)
 {
     public static WarpPlan Refuse(string message) => new(WarpAction.Refuse, message);
 }
@@ -31,7 +34,8 @@ public readonly record struct WarpResult(bool Ok, string Message);
 /// Decides what "Warp to" does (docs/softlocks.md). Pure: the local game, the target's last puppet data and
 /// the room rule in, a <see cref="WarpPlan"/> out.
 /// <list type="bullet">
-/// <item>Same stage and same room: move Link to the target's position and facing, no reload.</item>
+/// <item>Same stage and same room, or both on the Great Sea (its squares are rooms): move Link to the target's
+/// position and facing, no reload.</item>
 /// <item>Anywhere else: load the target's stage at the spawn point / room / layer they entered it through
 /// (<see cref="WarpInfo"/>). Link appears at that spawn point, not next to them.</item>
 /// </list>
@@ -82,7 +86,11 @@ public static class WarpPlanner
                 _ => $"{name} can't be warped to right now.",
             });
 
-        if (target.StageName == me.Stage && target.RoomNumber == me.Room)
+        // The Great Sea's rooms are its 7x7 grid squares (PuppetVisibility), loaded by where Link is: on the
+        // sea every warp is a move. Its "entrance" is wherever the target last came onto the sea (an island's
+        // door), which can be squares away from them by now.
+        bool atSea = target.StageName == PuppetVisibility.SeaStage && me.Stage == PuppetVisibility.SeaStage;
+        if (target.StageName == me.Stage && (target.RoomNumber == me.Room || atSea))
         {
             if (me.RidingShip)
                 return WarpPlan.Refuse($"You're on your boat. Get off it first, or sail over to {name}.");
@@ -90,7 +98,8 @@ public static class WarpPlanner
                 return WarpPlan.Refuse("Let go first: Link is holding on to something (a ledge, a ladder, a rope, a block...).");
             short angle = unchecked((short)(ushort)Math.Clamp(target.Rotation, 0f, ushort.MaxValue));
             return new WarpPlan(WarpAction.MoveInRoom, $"Moving you to {name}.",
-                Position: new Vector3(target.Position.X, target.Position.Y, target.Position.Z), AngleY: angle);
+                Position: new Vector3(target.Position.X, target.Position.Y, target.Position.Z), AngleY: angle,
+                AcrossRooms: atSea && target.RoomNumber != me.Room);
         }
 
         string where = StageIDs.GetStageName(target.StageName);
@@ -146,7 +155,7 @@ public static class WarpExecutor
                 {
                     // Still the same Link in the same room? (A door or a void-out in between makes the move stale.)
                     if (WarpMemory.ReadU32(dolphin, GameMemoryAddresses.Warp.LinkActorPtr) != local.Link ||
-                        dolphin.Read(GameMemoryAddresses.Stage.CurrentRoomNumber) != local.Room ||
+                        (!plan.AcrossRooms && dolphin.Read(GameMemoryAddresses.Stage.CurrentRoomNumber) != local.Room) ||
                         WarpMemory.IsStageChangePending(dolphin))
                     {
                         Logger.Information("[warp] move stopped: Link changed room or stage (attempt {Attempt})", attempt);

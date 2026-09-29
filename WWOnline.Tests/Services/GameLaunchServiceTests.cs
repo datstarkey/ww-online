@@ -61,6 +61,15 @@ public sealed class GameLaunchServiceTests : IDisposable
         }
 
         public bool HasExited(int processId) => Exited;
+
+        public List<int> Closed = [];
+        public bool CloseSucceeds = true;
+
+        public bool Close(int processId, TimeSpan timeout)
+        {
+            Closed.Add(processId);
+            return CloseSucceeds;
+        }
     }
 
     private GameLaunchService Service() =>
@@ -158,6 +167,38 @@ public sealed class GameLaunchServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task IdleDolphin_WithoutAGame_IsClosed_AndThePatchedGameStarted()
+    {
+        SaveSetup();
+        _running = [new DolphinProcessInfo(99, "Dolphin")];
+        _dolphin.Setup(d => d.ConnectAsync(99)).ReturnsAsync(false); // no game booted in it
+        using var launch = Service();
+
+        var result = await launch.StartGameAsync();
+
+        Assert.Equal([99], _starter.Closed);
+        Assert.Equal(1, _starter.Starts);
+        Assert.Equal(GameLaunchState.Attached, result.State);
+        _dolphin.Verify(d => d.ConnectAsync(7), Times.AtLeastOnce);
+    }
+
+    [Fact]
+    public async Task IdleDolphin_ThatWontClose_IsRefused_WithWhatToDo()
+    {
+        SaveSetup();
+        _running = [new DolphinProcessInfo(99, "Dolphin")];
+        _dolphin.Setup(d => d.ConnectAsync(99)).ReturnsAsync(false);
+        _starter.CloseSucceeds = false;
+        using var launch = Service();
+
+        var result = await launch.StartGameAsync();
+
+        Assert.Equal(GameLaunchState.Blocked, result.State);
+        Assert.Contains("Close Dolphin", result.Message);
+        Assert.Equal(0, _starter.Starts);
+    }
+
+    [Fact]
     public async Task SeveralRunningDolphins_AreNotGuessedBetween()
     {
         SaveSetup();
@@ -211,7 +252,7 @@ public sealed class GameLaunchServiceTests : IDisposable
         Assert.Contains("isn't your patched", result.Message);
         Assert.Equal(0, _attachedCount);
         Assert.False(_connected);
-        Assert.Equal(5, _connects); // a few seconds' grace for Link to be drawn, then no
+        Assert.Equal(6, _connects); // Start game's first look, then a few seconds' grace for Link to be drawn, then no
     }
 
     [Fact]

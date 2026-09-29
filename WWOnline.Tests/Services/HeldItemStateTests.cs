@@ -61,6 +61,22 @@ public class HeldItemStateTests
     }
 
     [Fact]
+    public void ABombFlowersBomb_IsBombKind_WithItsOwnTimerAsTheFuse()
+    {
+        var game = new FakeDolphin();
+        game.SetU32(Link + PuppetLayout.DAPY_OFF_GRAB_ACTOR, Bomb);
+        game.Set(Bomb + PuppetLayout.FPC_OFF_PROC_NAME, 0x01, 0x29); // fpcNm_Bomb2_e
+        game.SetU32(Bomb + PuppetLayout.DABOMB2_OFF_STATE, 1);         // carried
+        game.SetU32(Bomb + PuppetLayout.DABOMB2_OFF_TIMER, 90);
+        Assert.Equal((byte)PuppetLayout.PUPPET_GRAB_KIND_BOMB, HeldItemState.ReadGrabKind(game, Link));
+        Assert.Equal(90, HeldItemState.ReadGrabFuse(game, Link));
+        game.SetU32(Bomb + PuppetLayout.DABOMB2_OFF_TIMER, 1000);      // capped to a byte
+        Assert.Equal(255, HeldItemState.ReadGrabFuse(game, Link));
+        game.SetU32(Bomb + PuppetLayout.DABOMB2_OFF_STATE, (uint)PuppetLayout.DABOMB2_STATE_EXPLODE);
+        Assert.Equal(0, HeldItemState.ReadGrabFuse(game, Link));
+    }
+
+    [Fact]
     public void NoFuse_WithoutACarriedBomb()
     {
         var game = new FakeDolphin();

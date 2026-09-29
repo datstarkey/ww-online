@@ -10,7 +10,7 @@ Each other player on the **Room** page's **Players** list has a **Warp to** butt
 
 What a warp does depends on where the other player is:
 
-- **Same area** (the same stage and the same room): you are moved straight to them, facing the way they face. There is no loading screen.
+- **Same area** (the same stage and the same room), **or both of you out on the Great Sea**: you are moved straight to them, facing the way they face. There is no loading screen. (The sea's grid squares are rooms that load wherever Link is, so a warp across the sea is a move too.)
 - **Anywhere else** (another stage, or another room of the same stage): their area loads for you **at the entrance they came in through**, meaning the door, loading zone or spawn point they last entered it by. You arrive there, not next to them. If that entrance plays a cutscene, it plays for you too.
 
 A line under the Players list says what happened, or why the warp was refused. It is refused when:
