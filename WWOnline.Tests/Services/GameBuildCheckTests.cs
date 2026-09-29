@@ -101,6 +101,10 @@ public class GameBuildCheckTests : IDisposable
     {
         File.Delete(new PatchDataFolder(_patchData).StampPath);
         BuildStamp.Write(GamePath, new BuildStamp.Stamp("legacy", DateTime.UtcNow, 3, ["skip_intro"], "prebuilt"));
+        // No hash to compare: the switch table must be there and current.
+        Assert.Equal(BuildStamp.Status.Stale, Installed(["skip_intro"]).Status);
+        Assert.Equal(BuildStamp.Status.Stale, Installed(null).Status);
+        new WWOnline.Patcher.WorldData.SwitchTable { Rules = WWOnline.Patcher.WorldData.SwitchTableBuilder.RulesVersion }.Write(GamePath);
         Assert.Equal(BuildStamp.Status.Fresh, Installed(["skip_intro"]).Status);
         Assert.True(Installed([]).SelectionChanged);
         Assert.Equal(BuildStamp.Status.Fresh, Installed(null).Status);

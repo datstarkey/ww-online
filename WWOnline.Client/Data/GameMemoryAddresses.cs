@@ -358,6 +358,30 @@ public static class GameMemoryAddresses
         /// <summary>play.mNextStage.mEnable (s8) — nonzero while a stage change is pending; the
         /// live copy and stag pointer are in flux then (putSave → getSave).</summary>
         public const uint NextStageEnable = Play + 0x3EA0 + 0x0C; // play mNextStage + mEnable
+
+        /// <summary>dSv_info_c::mDan (dSv_danBit_c, gameInfo + 0x79C; DOL isSwitch 0x8005DEEC: addi r3,0x79C).
+        /// The dungeon-visit switches 0x80-0xBF of the save slot in <see cref="DanOffStageNo"/>.</summary>
+        public const uint LiveDan = GameInfo + 0x79C;      // dSv_info_c /* 0x079C */ mDan
+        public const int DanOffStageNo = 0x00;             // s8 mStageNo = the slot (dSv_danBit_c::init, DOL 0x8005CBF0)
+        public const int DanOffSwitch = 0x04;              // u32 mSwitch[2] (init clears +4, +8)
+
+        /// <summary>dSv_info_c::mZone[32] (dSv_zone_c, 0x4C each, gameInfo + 0x7A8; DOL createZone 0x8005DAD8
+        /// addi r3,0x7A8 / addi 0x4C, isSwitch 0x8005DFB4 mulli 0x4C, addi 0x7AA).</summary>
+        public const uint ZoneBase = GameInfo + 0x7A8;     // dSv_info_c /* 0x07A8 */ mZone
+        public const int ZoneSize = 0x4C;
+        public const int ZoneCount = 32;                   // dSv_info_c::ZONE_MAX
+        public const int ZoneOffRoomNo = 0x00;             // s8 mRoomNo (< 0 = unused)
+        public const int ZoneOffSwitch = 0x02;             // u16 mSwitch[3]: 0xC0-0xCF, 0xD0-0xDF, 0xE0-0xEF
+
+        public static uint Zone(int zoneNo) => ZoneBase + (uint)(zoneNo * ZoneSize);
+
+        /// <summary>dStage_roomControl_c::mStatus[64] (static, ww_linker.ld dStage_roomControl_c__mStatus;
+        /// dStage_roomStatus_c 0x114 each, d_stage.h:855-869). Not part of gameInfo.</summary>
+        public const uint RoomStatusBase = 0x803BDC88;
+        public const int RoomStatusSize = 0x114;
+        public const int RoomStatusOffZoneNo = 0x107;      // s8 mZoneNo (DOL getZoneNo 0x8005DCE0: lbz r3,0x107)
+
+        public static uint RoomZoneNo(int room) => RoomStatusBase + (uint)(room * RoomStatusSize) + RoomStatusOffZoneNo;
     }
 
     /// <summary>

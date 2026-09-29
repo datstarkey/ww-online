@@ -12,7 +12,7 @@ public static class HubConstants
     /// crosses the wire changes shape or meaning (PuppetData layout, RoomInventory fields, flag
     /// masks...). Pure app changes that don't touch the wire keep it.
     /// </summary>
-    public const int ProtocolVersion = 2;
+    public const int ProtocolVersion = 3; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches)
 
     // Hub method names (server-side methods invoked by clients)
 
@@ -37,6 +37,8 @@ public static class HubConstants
     public const string GetRoomInventory = "GetRoomInventory";
     public const string JoinRoomStory = "JoinRoomStory";
     public const string SendStoryFlags = "SendStoryFlags";
+    public const string JoinRoomSwitches = "JoinRoomSwitches";
+    public const string SendRoomSwitches = "SendRoomSwitches";
 
     // Client callback names (server → client)
     public const string ReceiveStageFlags = "ReceiveStageFlags";
@@ -44,6 +46,7 @@ public static class HubConstants
     public const string ReceiveRoomSettings = "ReceiveRoomSettings";
     public const string ReceiveRoomInventory = "ReceiveRoomInventory";
     public const string ReceiveStoryFlags = "ReceiveStoryFlags";
+    public const string ReceiveRoomSwitches = "ReceiveRoomSwitches";
 
     /// <summary>Largest wallet in the game (dSv_player_status_a_c wallet size 2).</summary>
     public const int MaxRupees = 5000;

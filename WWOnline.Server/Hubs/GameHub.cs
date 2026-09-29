@@ -60,6 +60,7 @@ public class GameHub : Hub<IGameHubClient>
         ItemsSeedGate.Forget(connectionId);
         StorySeedGate.Forget(connectionId);
         WalletSeedGate.Forget(connectionId);
+        RoomSwitchState.Leave(connectionId);
 
         if (exception != null)
             Logger.Warning("{Player} disconnected (error: {Error}) ({Count} online)",
@@ -264,10 +265,11 @@ public class GameHub : Hub<IGameHubClient>
             return;
         }
 
-        bool walletTurnedOff;
+        bool walletTurnedOff, worldTurnedOff;
         lock (RoomLock)
         {
             walletTurnedOff = _roomSettings.SharedWallet && !requested.SharedWallet;
+            worldTurnedOff = _roomSettings.SharedWorld && !requested.SharedWorld;
             _roomSettings.SharedWallet = requested.SharedWallet;
             _roomSettings.SharedWorld = requested.SharedWorld;
             _roomSettings.SharedItems = requested.SharedItems;
@@ -280,6 +282,13 @@ public class GameHub : Hub<IGameHubClient>
             Wallet.Reset();
             WalletSeedGate.Reset();
             Logger.Information("[wallet] shared wallet turned off — total cleared; it re-seeds when turned back on");
+        }
+        if (worldTurnedOff)
+        {
+            // Live room switches are only meaningful while everyone applies them; clients rejoin
+            // their place when the rule is back on.
+            RoomSwitchState.Clear();
+            Logger.Information("[switches] shared world turned off — room switches cleared");
         }
         var preset = requested.MatchingPreset();
         Logger.Information("[room] owner {Player} set rules: {Rules}{Preset}",
@@ -380,6 +389,73 @@ public class GameHub : Hub<IGameHubClient>
 
     /// <summary>Every non-empty stage slot of the shared world — called by clients on connect.</summary>
     public Task<List<StageFlags>> GetWorldFlags() => Task.FromResult(WorldFlags.Snapshot());
+
+    // ── Live room switches (dungeon-visit and room switches, docs/live-world.md §5) ──
+
+    private static readonly RoomSwitchStore RoomSwitchState = new();
+
+    /// <summary>Validate room switches from a client; null (and a warning) if malformed.</summary>
+    private RoomSwitches? AcceptRoomSwitches(RoomSwitches? switches, string method)
+    {
+        if (switches == null || !switches.IsValid())
+        {
+            Logger.Warning("[switches] {Method} rejected: invalid payload from {Player}", method, GetPlayerName(Context.ConnectionId));
+            return null;
+        }
+        return switches.Clone(); // our own copy: the arrays are the client's
+    }
+
+    /// <summary>Push the bits a player just added to the others there: dan and zone to the same room, dan to the rest of the stage.</summary>
+    private async Task RelayRoomSwitches(RoomSwitchStore.Result result)
+    {
+        if (result.Added.IsEmpty) return;
+        var tasks = new List<Task>();
+        if (result.SameRoom.Count > 0)
+            tasks.Add(Clients.Clients(result.SameRoom).ReceiveRoomSwitches(result.Added));
+        if (result.SameStage.Count > 0 && result.Added.Dan.Any(w => w != 0))
+            tasks.Add(Clients.Clients(result.SameStage).ReceiveRoomSwitches(result.Added.DanOnly()));
+        await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// A client is now at this place (stage, save slot, room) with these latching switches set. The
+    /// room's switches merge up; the caller gets everything held for its place to apply, the others
+    /// there get what it added. Null when the rule is off or the payload is bad.
+    /// </summary>
+    public async Task<RoomSwitches?> JoinRoomSwitches(RoomSwitches local)
+    {
+        if (!RoomRules.SharedWorld) return null; // room rule off
+        var accepted = AcceptRoomSwitches(local, nameof(JoinRoomSwitches));
+        if (accepted == null) return null;
+
+        var result = RoomSwitchState.Join(Context.ConnectionId, accepted);
+        Logger.Information("[switches] {Player} is at {Stage} slot {Slot} room {Room}: brought {Added} new, room holds {Held}",
+            GetPlayerName(Context.ConnectionId), accepted.Stage, accepted.Slot, accepted.Room, result.Added.BitCount, result.State.BitCount);
+        await RelayRoomSwitches(result);
+        return result.State;
+    }
+
+    /// <summary>
+    /// A client set new switches at the place it joined. Merged; the others there get the new bits. False when
+    /// the caller isn't joined there (the store was cleared, or it moved): it must join again.
+    /// </summary>
+    public async Task<bool> SendRoomSwitches(RoomSwitches gains)
+    {
+        if (!RoomRules.SharedWorld) return false; // room rule off
+        var accepted = AcceptRoomSwitches(gains, nameof(SendRoomSwitches));
+        if (accepted == null) return false;
+
+        if (RoomSwitchState.Add(Context.ConnectionId, accepted) is not { } result)
+        {
+            Logger.Information("[switches] SendRoomSwitches from {Player} for {Stage} room {Room}: not joined there, asking it to rejoin",
+                GetPlayerName(Context.ConnectionId), accepted.Stage, accepted.Room);
+            return false;
+        }
+        if (result.Added.IsEmpty) return true;
+        Logger.Information("[switches] {Player} set {Added}", GetPlayerName(Context.ConnectionId), result.Added);
+        await RelayRoomSwitches(result);
+        return true;
+    }
 
     // ── Shared wallet ────────────────────────────────────────────────────────
 

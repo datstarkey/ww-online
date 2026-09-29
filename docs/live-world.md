@@ -3,7 +3,7 @@
 When a player in the same room opens a chest, blows up a wall, hits a switch or clears a room so a ladder drops, the other players see the same thing live, and nobody can get a chest's item twice. This is the design doc: what is built (§0), then the research it rests on (§1-§8).
 
 - Most puzzle objects **poll** their switch every frame. When a bit reaches your live save data, they react on their own, often with the same short camera cutscene you would get if you had pressed the switch yourself. That works for memory switches (0x00-0x7F), which `WorldFlagSyncService` syncs.
-- About **half the in-room puzzle switches are not memory switches.** They are dungeon-visit (`dan`, 0x80-0xBF) or room-temporary (`zone`, 0xC0-0xEF) switches. That includes **16 of 18 drop-down ladders** (kill-all-enemies → room switch 0xE0), most torches and about half the crystal and floor switches. Stage 2 syncs them.
+- About **half the in-room puzzle switches are not memory switches.** They are dungeon-visit (`dan`, 0x80-0xBF) or room-temporary (`zone`, 0xC0-0xEF) switches. That includes **16 of 18 drop-down ladders** (kill-all-enemies → room switch 0xE0), most torches and about half the crystal and floor switches. Stage 2 syncs the latching ones, chosen by a table built at patch time (stage 1b).
 - A smaller set of objects reads its flag **only when created**: chests, bombable walls, ice blocks, barricades, crystal visuals and small-key locks. Stage 1 (a small REL pass) brings them up to date. **The chest case was a duplication bug:** see 7.1.
 - Not done, on purpose: shared enemy deaths (stage 4) and a no-cutscene mode (stage 3; cutscenes are handled by their flags). Some things change the world without a flag (pushing most blocks, switchless torches, grass): they stay local.
 
@@ -57,6 +57,55 @@ So a locked door is now **re-created** like a chest: its create builds it exactl
 | A6 | WT breakable floor / an ice block on a memory switch | Breaks / melts it | Gone on P2 |
 | A7 | A1 with P2 in a cutscene, or mid-room-load | | Catches up when the event ends / the room has loaded; nothing duplicates on re-entering the room (layer check) |
 | A8 | A1, then P1 leaves the stage | | P2's chest still opens (P2 keeps a parked puppet until the REL acknowledges) |
+
+### Stage 1b: the switch table (`feature/live-switches`)
+- **Built at patch time from the player's own game** (`WWOnline.Patcher/WorldData`): `StageDataReader` reads every `files/res/Stage/*/Stage.arc` and `Room*.arc` (only the archive header and the .dzs/.dzr are inflated; all layers), the STAG chunk gives each stage's save slot, and main.dol's `l_objectName` (0x80372818) maps object names to process names. `SwitchTableBuilder.SettersOf` says what each actor kind does to its switch (from the decomp, proc names read from each REL's profile). Pipeline step 7 (`BuildSwitchTableStep`, Full builds) and the pre-built patch path both write `<game>/wwo-switch-table.json` (a few KB, ~0.2 s). It is never in the repo; `SwitchTableProvider` finds it next to the patched game (Settings game folder, else the dev config's `game_path`) and re-reads it after a new patch. A patch without stage data fails rather than writing no table; a stage whose archives can't be read (damaged or modded) is skipped and named in the patch log.
+- **Enforced like the rest of the build:** `SwitchTableBuilder.RulesVersion` (bump it whenever the classification changes) is part of the build stamp's source hash, so a game patched before the table existed or with other rules reads as **stale — patch again** (dev sources, installed PatchData and selection-only checks alike). The stamp records the rules of the table it wrote (`SwitchTableRules`), and a stamped game whose table is missing or from other rules is stale too. The client ignores a table from other rules.
+- **Classification** (per save slot for memory switches, per **stage** for dan switches, per stage room for zone switches; a Stage.arc actor's zone room is its own room field, or "unknown"). Dan switches are per stage, not per slot: the game keeps them per slot (`dComIfGs_initDan` only resets on a new slot, `d_save.cpp:1225`), but the stages that share a slot are separate visits (the sea caves in slots 12/13: you always leave through the sea), so `TF_01`'s kill-all doors must not open `TF_02`'s:
+
+| Setter | Latching (may sync) | Unsafe (never syncs) |
+|---|---|---|
+| Crystal `SW_HIT0` | no timer (`(prm >> 20) & 0xFF` is 0/0xFF) | timed (turns it off, `actionOnTimer`) |
+| Torch `bonbori` (`EP`) | no timer (`(prm >> 8) & 0xFF` = 0xFF) | timed (`d_a_ep.cpp:286`) |
+| Floor switch `Kbota*` (`Obj_Swpush`) | types 0, 3 (stay pressed, obey save) | 1 pressure plate, 2 "on is up" |
+| Iron-boots switch (`Obj_Swheavy`) | type 3 | 0/1 pop back up, 2 toggles |
+| `ALLdie`, chest open switch (`angle.z`) and func-2 appear switch, bombable wall / floor / ice / barricades, kill-all bars (door type 2) | always | |
+| AND switch `AND_SW0` | behaviours 0, 2, 3 (output), unless an input is unsafe | behaviour 1 output; behaviour 2's **inputs** (its timer turns them off); count 0xFF; any output fed (through any chain of AND switches) by an unsafe input |
+| AND switch `AND_SW2` | type 0 (one-off), unless an input is unsafe | type 1 (continuous); outputs fed by unsafe inputs (e.g. `SubD45`/`PShip2`: an area switch 0xEB → 0xEC → … → 0xEF starts a Stalfos ambush) |
+| Area switch `SW_C00` | | always: type 0 clears when your Link leaves, the others fire when your Link enters (a player position, e.g. arena bars) |
+| Timer `ObjTime` | | always |
+| Push block `osiBLK*` (`Obj_Movebox`) | | when it follows a path (pathId = `angle.z & 0xFF` != 0xFF, swSave1 != 0xFF, not a "dmy" box (prm bit 30), not `MkieBB`), swSave1 and `angle.z >> 8` are **path-encoded**: excluded from the memory sync too (§7.2). Otherwise its switch is just one it reads |
+
+  A dan or zone switch syncs only if at least one latching setter uses it and no unsafe one does; a switch nobody is known to set (enemy death switches, events) is left alone. An unsafe setter with an unknown room excludes that switch in every room of the stage. On the vanilla game (rules 2) this gives 68 dan and 161 room switches (the 0xE0 ladder rooms `PShip/0-2`, `SubD45/0-2`, `SubD71/1-2`, `M_Dai/5`, ToTG, WT and FW rooms, the sea caves, the sea) and 27 excluded push-block memory switches.
+
+### Stage 2: live dan and room switches (`feature/live-switches`, protocol 2)
+- **What syncs:** the table's syncable dan switches between players in the same stage (and save slot), and zone switches between players in the same stage **and** room (at sea too: each square is a room with its own zone), while **Shared world** is on. On-edges only.
+- **Client** (`RoomSwitchSyncService` + `RoomSwitchTracker`, 4 Hz, scene stable and the same room for 1 s): reads the place (stage name, STAG save slot, `mStayNo`), `mDan` (gameInfo+0x79C, only while its `mStageNo` is this slot) and the stay room's zone (`mStatus[room].mZoneNo`, only if `mZone[z].mRoomNo == room`). A new place **joins** the server's store for it (sending its own latching bits) and applies what the players there set. Then new local bits are sent, received bits are ORed in (u32 dan words, u16 zone words).
+  - **Echo guard:** a bit received from the room is never sent back; nobody ever sends a clear.
+  - **Apply once:** a room bit is written at most once per place, and never if this game has had it there (it may have turned it off itself, e.g. a torch blown out): the room's copy would re-latch it. A bit counts as applied only once the write landed. A new room keeps the stage's dan bookkeeping; a new stage starts afresh, and so does anything that drops the scene gate (a load, void-out, game over, soft reset, title screen): the reload clears the room's switches even at the same place, so the client leaves and joins again.
+  - Applied dan/zone bits also go to `LiveWorldPoke` (words 5-8, ZONE_ROOM = the stay room), so the stage-1 REL pass catches up ice blocks and crystal visuals on room switches. **No REL change in stage 2.**
+- **Server** (`RoomSwitchStore`, `GameHub.JoinRoomSwitches` / `SendRoomSwitches` → `ReceiveRoomSwitches`): every input is validated (`RoomSwitches.IsValid`: stage 1-8 printable ASCII, slot 0-15, room 0-63, exactly 2+2 words, no bits past 0xEF). Each connection is at one place; bits merge up per stage (dan) and per stage room (zone); new bits go to the others in the same room (dan + zone) and dan-only to the rest of the stage, nobody else. A stage's dan bits are dropped when its last player leaves, a room's zone bits when the last player leaves the room (a fresh visit starts clean, like the game). `SendRoomSwitches` for a place the connection hasn't joined returns false and the client joins again (the store was cleared, e.g. Shared world off and on between two ticks); clients also rejoin on every room-rules change. Turning Shared world off clears the store.
+- **Protocol:** `HubConstants.ProtocolVersion` 1 → **2** (new hub methods, callback and DTO). Held items (#6) and boat parts (#7) share protocol 2: nothing was released in between.
+- **Per object** (the §3 classes, confirmed): ladders `Mhsg` (A+ev: poll, drop with their event), torches (A), floor and iron-boots switches (A), shutters / bars / gates (A+ev), switch-appear chests (A+ev) react on their own. Crystal visuals and ice blocks on room switches are B: the stage-1 REL pass handles them. Kill-all bars and genocide chests still count your own enemies (local); a synced `ALLdie` switch opens what polls it.
+- **Also:** push-block memory switches are no longer sent or applied by the world sync (`PushBlockSwitches`).
+- **Logs:** `[switches]` in `client-PlayerN.log` (`at … syncable here`, `joined`, `local set … → sending`, `room set`, `applied`) and `server.log` (`is at …`, `set …`).
+
+**In-game checklist (stage 2).** Two players, Shared world on, both in the room. Patch the game again first (the table is written by the patch).
+
+| # | Where | P1 does | Expected on P2 |
+|---|---|---|---|
+| B1 | PShip / SubD45 / SubD71 room with a ladder on 0xE0, or ET room 5 | Kills P1's enemies (ALLdie sets 0xE0) | P2's ladder **drops with its event** while P2's enemies are alive (T13) |
+| B2 | ToTG room 5 (0xE0/0xE1) or WT room 9 (0xC0-0xC4) | Lights the torches / hits the switches | Same on P2, live |
+| B3 | DRC room 12 pressure plate 0x41, room 16 plates 0xE0/0xE1 | Presses them | **Nothing** on P2 (unsafe: excluded) |
+| B4 | A timed crystal or timed torch on a dan/zone switch | Hits / lights it | Nothing on P2 (excluded) |
+| B5 | B1, then P2 leaves the room and comes back while P1 stays | | P2's ladder is down again (the room's store) |
+| B6 | B1, then both leave the room and one comes back | | The store is gone with the room: vanilla behaviour |
+| B7 | A room with a push block (DRC room 0 / 14) | Pushes it along its path | P2's block does **not** jump to a corrupted position on reload |
+| B8 | Shared world turned off, then on | | No switch syncs while off; on again, both rejoin their room |
+| B9 | Any B1-B2 with P2 mid-jump / swimming / on a ladder | | Note how P2's event starts (T14) |
+| B10 | Sea caves: P1 in `TF_01`, P2 in `TF_02` (same save slot) | Clears the kill-all doors | **Nothing** on P2 (dan switches are per stage) |
+| B11 | `SubD45` / `PShip2` room 0 | Walks in (area switch 0xEB) | P2's Stalfos ambush does **not** start (AND chain on an unsafe input) |
+| B12 | B1, then P2 voids out / dies and continues in the same room | | P2's ladder drops again after the reload (rejoin) |
 
 ---
 
@@ -181,7 +230,7 @@ All these actors are **RELs** (only 26 actors are in main.dol: `config/GZLE01/sp
 
 ---
 
-## 5. Zone and dan switches: sync them per room / per dungeon visit?
+## 5. Zone and dan switches: sync them per room / per dungeon visit? (built as §0 stage 2)
 
 **Why it matters:** section 2 shows ladders, most torches, about half the crystals and floor switches, and most kill-all bars use them.
 
@@ -246,7 +295,7 @@ If the other player opens a chest while you are in the same room, your chest sta
   - Zone off-edges without the echo guard.
 - **Scene stability.** C# writes the live memBit only behind `SceneStabilityGate`. REL pokes must keep `puppet_worldsync_tick`'s gates: `NEXT_STAGE_ENABLE == 0`, stag pointer valid, stage tag matches. They must also add "no event running" and "target room is loaded (`checkRoomDisp`)". Zone writes need `mZoneNo >= 0` and must be for the local stay room.
 - **Save data:** applied memBit bits are saved by your game, which is intended. Dan and zone bits are never saved, so stage 2 can't corrupt a save.
-- **REL budget:** RELS.arc is near its 64 KB ARAM guard (main ~51.9 KB; open PRs #6/#7 add ~9.4 KB). Stage 1 costs 1680 bytes of REL.
+- **REL budget:** RELS.arc is near its 64 KB ARAM guard (with held items and boat parts). Stage 1 costs 1680 bytes of REL.
 
 ---
 
@@ -285,13 +334,13 @@ Two players, **Shared world on** (and Shared wallet on for T1). P1 acts while P2
 - **No protocol change.** Needs a re-patch (build stamp). REL about +1-1.5 KB. Put the diagnostics in the block, not in scratch.
 - **Effort** 2-3 days. **Risk** low-medium. The layer trap (3) is the one to get right. Fixes bug 7.1, the stale key locks, walls and crystal visuals.
 
-### Stage 1b: switch semantics table (patch time)
+### Stage 1b: switch semantics table (patch time) — **built (§0)**
 - The patcher already reads the vanilla game. Build `(stage, room, switch) → setter kind` from the player's own files (`tmp/stage_mine.py` ported to C# on `RarcArchive`/`Yaz0Codec`). Kinds: latching, timed, toggle, pressure, area, path-encoded (movebox).
 - Ship it in the game folder, not the repo.
 - C# stops syncing path-encoded movebox bits (7.2) and can mark latch-risk bits.
 - About 1-2 days. Low risk. **Needed before stage 2.**
 
-### Stage 2: dan and room (zone) switches for players in the same dungeon or room
+### Stage 2: dan and room (zone) switches for players in the same dungeon or room — **built (§0)**
 Section 5. C# writes the bits (the objects poll), plus a hub method, DTO, per-slot dan store and **ProtocolVersion bump**. Whitelisted latching setters only, on-edges only, with the echo guard. This is **what makes most ladders, torches, crystals and floor switches live.**
 - 3-5 days. Medium risk (echo and latch rules, a zone address to verify). No REL change unless B-class objects on zone switches need the stage 1 table (ice blocks).
 

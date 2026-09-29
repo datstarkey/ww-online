@@ -9,6 +9,7 @@ using WWOnline.Patcher.BinaryFormats.Rel;
 using WWOnline.Patcher.Config;
 using WWOnline.Patcher.Patches;
 using WWOnline.Patcher.Pipeline;
+using WWOnline.Patcher.WorldData;
 
 namespace WWOnline.Services;
 
@@ -262,8 +263,12 @@ public class GamePatcherService
             progress?.Report("Patching bi2.bin for 48MB memory...");
             PatchBi2(Path.Combine(outputSys, "bi2.bin"));
 
-            BuildStamp.Write(outputPath, patchDataStamp?.CreateGameStamp(optionalPatchIds)
-                                         ?? UnstampedPatchDataStamp(patchData, patchDiffsDir, catalog, optionalPatchIds));
+            progress?.Report("Building the switch table from the game's stages...");
+            Logger.Information("[patches] {Result}", SwitchTableBuilder.BuildAndWrite(vanillaPath, outputPath));
+
+            var gameStamp = patchDataStamp?.CreateGameStamp(optionalPatchIds)
+                            ?? UnstampedPatchDataStamp(patchData, patchDiffsDir, catalog, optionalPatchIds);
+            BuildStamp.Write(outputPath, gameStamp with { SwitchTableRules = SwitchTableBuilder.RulesVersion }); // table written above
 
             progress?.Report("Patching complete (pre-built).");
             Logger.Information("Pre-built patching completed. Output: {OutputPath}", outputPath);

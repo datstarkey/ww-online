@@ -13,10 +13,10 @@ namespace WWOnline.Services;
 ///
 /// Bits live in one word array, <see cref="Words"/> long: word 0 = chests (dSv_memBit_c::mTbox),
 /// words 1..8 = switch n in word <see cref="SwitchWord"/>(n), bit n &amp; 31 (memory 0x00-0x7F, dan
-/// 0x80-0xBF, zone 0xC0-0xEF of the zone room). <see cref="WorldFlagSyncService"/> records the bits it
-/// applies from the room (<see cref="AddRemote"/>) and reports the game's live bits (<see cref="SetLive"/>):
-/// only bits read back from the live save data are published or waited for, so the REL never acts on a
-/// bit the game doesn't have.
+/// 0x80-0xBF, zone 0xC0-0xEF of the zone room). <see cref="WorldFlagSyncService"/> (chests, memory
+/// switches) and <see cref="RoomSwitchSyncService"/> (dan, zone) record the bits they apply from the room
+/// (<see cref="AddRemote"/>) and report the game's live bits (<see cref="SetLive"/>); only bits read back
+/// from the live save data are published or waited for, so the REL never acts on a bit the game doesn't have.
 ///
 /// Protocol (puppet_shared.h LIVEWORLD_*): the REL's game-heap block (boot-stamped, see
 /// <see cref="BootStampedBlock"/>) carries one batch of NEW bits at a time. It is written under a

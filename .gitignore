@@ -16,6 +16,8 @@ GameMod/src/puppet_link/link_draw_hook_linker.ld
 *.dol
 RELS.arc
 bi2.bin
+# Built at patch time from the player's own stage data (Nintendo-derived)
+wwo-switch-table.json
 
 # Per-user IDE state
 *.DotSettings.user

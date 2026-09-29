@@ -28,4 +28,7 @@ public interface IGameHubClient
 
     /// <summary>The room's shared story flags gained bits (someone progressed, or a joiner brought progress).</summary>
     Task ReceiveStoryFlags(StoryFlags room);
+
+    /// <summary>Dungeon / room switches another player in the same save slot (dan) or room (zone) just set.</summary>
+    Task ReceiveRoomSwitches(RoomSwitches switches);
 }

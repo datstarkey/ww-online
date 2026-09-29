@@ -32,6 +32,7 @@ public class SignalRClientService : IAsyncDisposable
     public event Action<RoomSettings>? RoomSettingsReceived;
     public event Action<RoomInventory>? RoomInventoryReceived;
     public event Action<StoryFlags>? StoryFlagsReceived;
+    public event Action<RoomSwitches>? RoomSwitchesReceived;
 
     // Connection lifecycle. ConnectionLost fires from SignalR's Reconnecting / Closed callbacks
     // (wipe per-connection state). Connected fires after EVERY successful connect — the initial
@@ -374,6 +375,11 @@ public class SignalRClientService : IAsyncDisposable
             RoomInventoryReceived?.Invoke(room);
         });
 
+        connection.On<RoomSwitches>(HubConstants.ReceiveRoomSwitches, switches =>
+        {
+            RoomSwitchesReceived?.Invoke(switches);
+        });
+
         connection.On<StoryFlags>(HubConstants.ReceiveStoryFlags, flags =>
         {
             StoryFlagsReceived?.Invoke(flags);
@@ -475,6 +481,28 @@ public class SignalRClientService : IAsyncDisposable
 
     /// <summary>Report this game's syncable story flags (the server merges any new ones into the room); false if not connected.</summary>
     public Task<bool> SendStoryFlagsAsync(StoryFlags flags) => SendAsync(HubConstants.SendStoryFlags, flags);
+
+    /// <summary>
+    /// Tell the room this game is now at <paramref name="local"/>'s place with those switches set; returns
+    /// everything the room holds for that place, or null if offline or the shared-world rule is off.
+    /// </summary>
+    public async Task<RoomSwitches?> JoinRoomSwitchesAsync(RoomSwitches local)
+    {
+        var connection = _hubConnection;
+        if (connection?.State != HubConnectionState.Connected) return null;
+        return await connection.InvokeAsync<RoomSwitches?>(HubConstants.JoinRoomSwitches, local);
+    }
+
+    /// <summary>
+    /// Report switches this game set at the place it joined. Null if not connected; false when the server
+    /// says this client isn't joined there any more (rejoin), true when taken.
+    /// </summary>
+    public async Task<bool?> SendRoomSwitchesAsync(RoomSwitches gains)
+    {
+        var connection = _hubConnection;
+        if (connection?.State != HubConnectionState.Connected) return null;
+        return await connection.InvokeAsync<bool>(HubConstants.SendRoomSwitches, gains);
+    }
 
     public async ValueTask DisposeAsync()
     {

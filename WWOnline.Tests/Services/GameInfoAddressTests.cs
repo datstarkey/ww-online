@@ -57,6 +57,15 @@ public class GameInfoAddressTests
         Assert.Equal(0x803C9DA0u, GameMemoryAddresses.WorldFlags.StagInfoPtr);
         Assert.Equal(0x803C9D54u, GameMemoryAddresses.WorldFlags.NextStageEnable);
         Assert.Equal(0x803C9EA2u, GameMemoryAddresses.Events.EventMode); // the REL's GAMEINFO_EVT_MODE (gameInfo + 0x529A)
+        // dSv_info_c mDan / mZone (d_save.h:991-996), verified in isSwitch / createZone.
+        Assert.Equal(0x803C53A4u, GameMemoryAddresses.WorldFlags.LiveDan);
+        Assert.Equal(0x803C53B0u, GameMemoryAddresses.WorldFlags.ZoneBase);
+        Assert.Equal(0x803C53B0u + 31 * 0x4Cu + 2, GameMemoryAddresses.WorldFlags.Zone(31) + GameMemoryAddresses.WorldFlags.ZoneOffSwitch);
+        // dStage_roomControl_c::mStatus[5].mZoneNo
+        Assert.Equal(0x803BDC88u + 5 * 0x114u + 0x107u, GameMemoryAddresses.WorldFlags.RoomZoneNo(5));
+        // The zone array ends at mRestart (+0x1128).
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x1128u,
+            GameMemoryAddresses.WorldFlags.ZoneBase + (uint)(GameMemoryAddresses.WorldFlags.ZoneCount * GameMemoryAddresses.WorldFlags.ZoneSize));
     }
 
     [Fact]

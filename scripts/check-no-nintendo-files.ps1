@@ -43,7 +43,8 @@ $ForbiddenExtensions = @(
 
 # Exact file names from the game disc (system area + the files we patch).
 $ForbiddenNames = @(
-    'main.dol', 'rels.arc', 'bi2.bin', 'boot.bin', 'apploader.img', 'fst.bin', 'opening.bnr'
+    'main.dol', 'rels.arc', 'bi2.bin', 'boot.bin', 'apploader.img', 'fst.bin', 'opening.bnr',
+    'wwo-switch-table.json'   # built at patch time from the player's own stage data
 )
 
 # Our own compiled REL, and only at these exact relative paths ('/'-separated, case-sensitive):
