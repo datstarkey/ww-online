@@ -299,9 +299,13 @@ public class FigurineApplyTests
         Assert.Contains("Shared story", fig.PolicyText);
         Assert.Contains("merges into the room", fig.Tooltip);
 
+        // The warp jar registers are shared too, but as warp jars (WarpJarRegisterTests).
         var warpPot = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0x9F07));
         Assert.False(warpPot.IsSharedFigurines);
-        Assert.Contains("never synced", warpPot.Tooltip);
+        Assert.True(warpPot.IsSharedWarpJars);
+
+        var unshared = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0x9D03));
+        Assert.Contains("never synced", unshared.Tooltip);
 
         var making = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0xA9FF));
         Assert.False(making.IsSharedFigurines);

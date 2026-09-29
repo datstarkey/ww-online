@@ -10,7 +10,9 @@ namespace WWOnline.Shared.Models;
 /// only the bits in <see cref="SyncMask"/> (the catalog's Full-sync mask: everything except LocalOnly and
 /// risky Unknown);</item>
 /// <item>the Nintendo Gallery figurines Carlov has made (<see cref="Figurines"/>): the 17 event registers
-/// the game uses as one bitfield (docs/figurines.md).</item>
+/// the game uses as one bitfield (docs/figurines.md);</item>
+/// <item>which dungeon warp jars are open (<see cref="WarpJars"/>): the 6 registers the three-way jars keep
+/// their "open" bits in (docs/live-world.md §0.2).</item>
 /// </list>
 /// Grow-only: players' bits are OR-merged, and only syncable bits are ever stored, sent or applied.
 /// Every other event register (0x79-0xFF) and mTmp are never part of this.
@@ -34,6 +36,18 @@ public class StoryFlags
     public static ReadOnlySpan<byte> FigurineRegisterBytes =>
         [0x95, 0x94, 0x93, 0x92, 0x91, 0x90, 0x8F, 0x8E, 0x8D, 0x8C, 0xB1, 0x9C, 0x84, 0x83, 0x82, 0x81, 0x80];
 
+    /// <summary>
+    /// The event byte of each warp jar group, in daObj_Warpt_c::m_event_reg order (d_a_obj_warpt.cpp:37-44:
+    /// UNK_A207, A107, A007, 9F07, A307, A407). onWarpBit ORs a jar's bit (1, 2 or 4) into its group's byte
+    /// when the jar opens; the other jars read it live when Link warps.
+    /// </summary>
+    public static ReadOnlySpan<byte> WarpJarRegisterBytes => [0xA2, 0xA1, 0xA0, 0x9F, 0xA3, 0xA4];
+
+    public const int WarpJarByteCount = 6;
+
+    /// <summary>The bits of each warp jar register (the registers' 0x07 value mask; the rest of the byte is other flags).</summary>
+    public const byte WarpJarMask = 0x07;
+
     private static readonly byte[] Mask = EventFlagCatalog.GetFullSyncMask()[..ByteCount];
 
     private static readonly byte[] FigMask = BuildFigurineMask();
@@ -53,6 +67,12 @@ public class StoryFlags
     /// </summary>
     public byte[] Figurines { get; set; } = new byte[FigurineByteCount];
 
+    /// <summary>
+    /// The warp jars opened, per group: WarpJars[i] is the <see cref="WarpJarMask"/> bits of event byte
+    /// <see cref="WarpJarRegisterBytes"/>[i].
+    /// </summary>
+    public byte[] WarpJars { get; set; } = new byte[WarpJarByteCount];
+
     private static byte[] BuildFigurineMask()
     {
         var m = new byte[FigurineByteCount];
@@ -68,22 +88,25 @@ public class StoryFlags
         var f = new StoryFlags();
         for (int i = 0; i < ByteCount; i++) f.Bits[i] = (byte)(eventBytes[i] & Mask[i]);
         for (int i = 0; i < FigurineByteCount; i++) f.Figurines[i] = (byte)(eventBytes[FigurineRegisterBytes[i]] & FigMask[i]);
+        for (int i = 0; i < WarpJarByteCount; i++) f.WarpJars[i] = (byte)(eventBytes[WarpJarRegisterBytes[i]] & WarpJarMask);
         return f;
     }
 
     /// <summary>Structure check for anything from the network (call <see cref="Normalize"/> after).</summary>
-    public bool IsValid() => Bits is { Length: ByteCount } && Figurines is { Length: FigurineByteCount };
+    public bool IsValid() =>
+        Bits is { Length: ByteCount } && Figurines is { Length: FigurineByteCount } && WarpJars is { Length: WarpJarByteCount };
 
     /// <summary>Drop every bit outside <see cref="SyncMask"/> / <see cref="FigurineMask"/>. Returns this.</summary>
     public StoryFlags Normalize()
     {
         for (int i = 0; i < ByteCount; i++) Bits[i] &= Mask[i];
         for (int i = 0; i < FigurineByteCount; i++) Figurines[i] &= FigMask[i];
+        for (int i = 0; i < WarpJarByteCount; i++) WarpJars[i] &= WarpJarMask;
         return this;
     }
 
     [JsonIgnore]
-    public bool IsEmpty => Bits.All(b => b == 0) && Figurines.All(b => b == 0);
+    public bool IsEmpty => Bits.All(b => b == 0) && Figurines.All(b => b == 0) && WarpJars.All(b => b == 0);
 
     /// <summary>Set event flags (figurines not included).</summary>
     [JsonIgnore]
@@ -93,6 +116,10 @@ public class StoryFlags
     [JsonIgnore]
     public int FigurineCount => Figurines.Sum(b => BitOperations.PopCount(b));
 
+    /// <summary>Warp jars open.</summary>
+    [JsonIgnore]
+    public int WarpJarCount => WarpJars.Sum(b => BitOperations.PopCount(b));
+
     /// <summary>OR the syncable bits of <paramref name="other"/> into this. Returns true if any bit was added.</summary>
     public bool MergeFrom(StoryFlags other)
     {
@@ -101,6 +128,8 @@ public class StoryFlags
             Bits[i] = Or(Bits[i], (byte)(other.Bits[i] & Mask[i]), ref changed);
         for (int i = 0; i < FigurineByteCount; i++)
             Figurines[i] = Or(Figurines[i], (byte)(other.Figurines[i] & FigMask[i]), ref changed);
+        for (int i = 0; i < WarpJarByteCount; i++)
+            WarpJars[i] = Or(WarpJars[i], (byte)(other.WarpJars[i] & WarpJarMask), ref changed);
         return changed;
     }
 
@@ -117,16 +146,18 @@ public class StoryFlags
         var d = new StoryFlags();
         for (int i = 0; i < ByteCount; i++) d.Bits[i] = (byte)(Bits[i] & ~other.Bits[i]);
         for (int i = 0; i < FigurineByteCount; i++) d.Figurines[i] = (byte)(Figurines[i] & ~other.Figurines[i]);
+        for (int i = 0; i < WarpJarByteCount; i++) d.WarpJars[i] = (byte)(WarpJars[i] & ~other.WarpJars[i]);
         return d;
     }
 
-    /// <summary>A copy holding only the event flags (no figurines).</summary>
-    public StoryFlags FlagsOnly() => new() { Bits = (byte[])Bits.Clone() };
+    /// <summary>A copy holding the event flags and warp jars, without the figurines (which wait for an idle game).</summary>
+    public StoryFlags FlagsOnly() => new() { Bits = (byte[])Bits.Clone(), WarpJars = (byte[])WarpJars.Clone() };
 
     /// <summary>A copy holding only the figurines (no event flags).</summary>
     public StoryFlags FigurinesOnly() => new() { Figurines = (byte[])Figurines.Clone() };
 
-    public StoryFlags Clone() => new() { Bits = (byte[])Bits.Clone(), Figurines = (byte[])Figurines.Clone() };
+    public StoryFlags Clone() =>
+        new() { Bits = (byte[])Bits.Clone(), Figurines = (byte[])Figurines.Clone(), WarpJars = (byte[])WarpJars.Clone() };
 
     public bool Has(ushort id) => (id >> 8) < ByteCount && (Bits[id >> 8] & (id & 0xFF)) != 0;
 
@@ -153,7 +184,8 @@ public class StoryFlags
 
     /// <summary>"3 flag(s)", or "3 flag(s) + 2 figurine(s)" when figurines are set, for log lines.</summary>
     public string CountText() =>
-        FigurineCount == 0 ? $"{BitCount} flag(s)" : $"{BitCount} flag(s) + {FigurineCount} figurine(s)";
+        $"{BitCount} flag(s)" + (FigurineCount == 0 ? "" : $" + {FigurineCount} figurine(s)") +
+        (WarpJarCount == 0 ? "" : $" + {WarpJarCount} warp jar(s)");
 
     /// <summary>
     /// Names of the set flags for log lines, e.g. "MET_KORL, UNK_0F40", then the figurines made as
@@ -167,6 +199,9 @@ public class StoryFlags
         if (names.Count > 0) parts.Add(Truncate(names, max));
         var figs = MadeFigurines().Select(n => $"0x{n:X2}").ToList();
         if (figs.Count > 0) parts.Add("figurines " + Truncate(figs, max));
+        var jars = Enumerable.Range(0, WarpJarByteCount).Where(i => WarpJars[i] != 0)
+            .Select(i => $"0x{WarpJarRegisterBytes[i]:X2}={WarpJars[i]}").ToList();
+        if (jars.Count > 0) parts.Add("warp jars " + string.Join(", ", jars));
         return parts.Count == 0 ? "(none)" : string.Join(", ", parts);
     }
 

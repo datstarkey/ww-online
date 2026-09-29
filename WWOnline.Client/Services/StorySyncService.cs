@@ -258,6 +258,9 @@ public class StorySyncService : IDisposable
             OrByte(dolphin, i, bits.Bits[i]);
         for (int i = 0; i < StoryFlags.FigurineByteCount; i++)
             OrByte(dolphin, StoryFlags.FigurineRegisterBytes[i], (byte)(bits.Figurines[i] & StoryFlags.FigurineMask[i]));
+        // Warp jars, as daObj_Warpt_c::onWarpBit does (getEventReg, OR the bit, setEventReg).
+        for (int i = 0; i < StoryFlags.WarpJarByteCount; i++)
+            OrByte(dolphin, StoryFlags.WarpJarRegisterBytes[i], (byte)(bits.WarpJars[i] & StoryFlags.WarpJarMask));
     }
 
     private static void OrByte(IDolphinService dolphin, int eventByte, byte add)
@@ -304,7 +307,7 @@ public class StorySyncService : IDisposable
                     _joined = true;
                     _loggedWaiting = false;
                     var fresh = room.Except(snapshot).Except(_applied);
-                    toApply = fresh.BitCount + fresh.FigurineCount;
+                    toApply = fresh.BitCount + fresh.FigurineCount + fresh.WarpJarCount;
                 }
                 Logger.Information("[story] joined room story ({Room} in room, this game brought {Mine}); {N} to apply",
                     room.CountText(), snapshot.CountText(), toApply);
