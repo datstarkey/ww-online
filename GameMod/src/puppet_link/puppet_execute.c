@@ -1239,6 +1239,12 @@ static int puppet_executeBody(daPy_lk_c *link)
   // Demo/dead/swim/damage proc changes, item actions and attack checks are skipped: proc
   // transitions come from the network.
 
+  // Except changeDamageProc's hit-flash countdown (d_a_player_main.cpp:5056-5058): the damage
+  // inits set mDamageWaitTimer (:7504 etc.) and puppet_draw tints the puppet red while it is
+  // > 0, so without this the puppet stays red forever after its first hit.
+  if ((DAPY_LK_MMODEFLG(link) & 0x8) == 0 && DAPY_PY_DAMAGE_WAIT_TIMER(link) > 0) // !ModeFlg_DAMAGE
+    DAPY_PY_DAMAGE_WAIT_TIMER(link)--;
+
   // Network-driven movement. PUPPET_class.slotIndex is the first field after the
   // embedded daPy_lk_c. sizeof(daPy_lk_c) here is the GCC size (0x4C30), which is
   // >= the real Metrowerks size (0x4C28), so the field never overlaps game data;
