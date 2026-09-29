@@ -759,7 +759,7 @@ static int puppet_sideDir(int prevDir, f32 stickDistance, s16 stickAngle, s16 sh
 /**
  * puppet_applyProcInit - the ONLY place procX_init functions are called from.
  *
- * Unsupported procs fall back to WAIT; if the puppet is already in WAIT that's a no-op.
+ * Procs without a case here play the peer's own anims from WAIT (puppet_anmmirror.c).
  * The puppet's position and facing are network-authoritative, so they are restored after
  * the init (ladder/damage/cut/hang inits reposition or re-aim Link).
  *
@@ -979,12 +979,14 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
   case PROC_DEMO_SHIP_SIT: ok = puppet_initBoatPose(puppet); break;
 
   case PROC_WAIT:
-  default:
     if (DAPY_LK_MCURPROC(puppet) == PROC_WAIT)
       ok = 1;
     else
       ok = daPy_lk_c__procWait_init(puppet);
     break;
+
+  // No _init here: WAIT playing the peer's own anims (puppet_anmmirror.c).
+  default:             ok = puppet_anmMirrorInit(puppet, proc); break;
   }
 
   // No sword hitbox for the puppet: setCollision only enables mAtCyl/mAtCps while resetFlg0
@@ -1368,6 +1370,7 @@ static int puppet_executeBody(daPy_lk_c *link)
   }
 
   daPy_lk_c__playTextureAnime(link);
+  puppet_anmMirrorFace(link); // the peer's face frames while mirroring (after playTextureAnime's own)
 
   // Position before movement
   fVar2 = FOPAC_CURRENT_POS(actor)->x;
@@ -2272,6 +2275,9 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
       key = puppet_extraKey(key, l_puppetFollowState, netStickDistance, targetStickAngle, targetRotY);
       puppet_requestProc(puppet, key, slotIndex);
     }
+
+    // A proc without an init: the peer's own anims (puppet_anmmirror.c).
+    puppet_anmMirrorTick(puppet, slotIndex);
 
     // The peer's upper-body item anim (aim hold, throw, catch, bow draw, carry), after the proc
     // init so an init's own upper anim is what gets compared (puppet_held.c).

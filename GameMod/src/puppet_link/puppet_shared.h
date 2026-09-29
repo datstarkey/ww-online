@@ -102,6 +102,52 @@
 #define PUPPET_SPAWN_STATE_ADDR  0x803FD118  /* u32[3] — spawn state machine */
 #define PUPPET_SPAWN_COUNTER     0x803FD124  /* u32 — total spawn counter */
 
+/* ============================================================================
+ * Anim mirror (puppet_anmmirror.c). For a proc the REL has no _init for, the puppet plays the
+ * peer's own body anims: their LkAnm bcks on under[0..1] / upper[0..1] with frame, rate and blend
+ * ratio, their face btp / btk and hand shapes. One game-heap block, made and adopted like the
+ * names block (puppet_bootBlock: magic, boot stamp, never freed); C# writes each active slot's
+ * entry every tick in one write; SEQ changes with each new sample of theirs, 0 = no data.
+ * ============================================================================ */
+#define PUPPET_ANM_PTR_ADDR           0x803FD128  /* u32 C: anim mirror block (game heap), 0 = none yet */
+#define PUPPET_ANM_MAGIC              0x50414E4D  /* "PANM" */
+#define PUPPET_ANM_BLOCK_SIZE         0x160       /* header + PUPPET_MAX_SLOTS entries (checked below) */
+#define PUPPET_ANM_OFF_MAGIC          0x00  /* u32 C: PUPPET_ANM_MAGIC once set up */
+#define PUPPET_ANM_OFF_BOOT           0x08  /* u32[2] C: __OSStartTime of the boot that allocated it (= PUPPET_NAMES_OFF_BOOT) */
+#define PUPPET_ANM_OFF_SLOT0          0x10  /* PUPPET_MAX_SLOTS x PUPPET_ANM_SLOT_SIZE */
+#define PUPPET_ANM_SLOT_SIZE          0x70
+/* One slot's entry (the peer's daPy_lk_c, d_a_player_main.h) */
+#define PUPPET_ANM_OFF_SEQ            0x00  /* u32 C#: changes with every new sample from the peer (the REL snaps frames only then), never 0; 0 = no data */
+#define PUPPET_ANM_OFF_PROC           0x04  /* u8  mCurProc the anims were sampled with */
+#define PUPPET_ANM_OFF_HAND_L         0x05  /* u8  mLeftHandIdx (+0x34C0): hands.bdl joint of the left hand shape */
+#define PUPPET_ANM_OFF_HAND_R         0x06  /* u8  mRightHandIdx (+0x34C1) */
+#define PUPPET_ANM_OFF_TEX_BTP        0x08  /* u16 face btp (LkAnm index): m_tex_anm_heap field_0x2 if set, else mIdx; 0xFFFF none */
+#define PUPPET_ANM_OFF_TEX_BTK        0x0A  /* u16 eye btk, same from m_tex_scroll_heap */
+#define PUPPET_ANM_OFF_TEX_BTP_FRAME  0x0C  /* u16 m3530 */
+#define PUPPET_ANM_OFF_TEX_BTK_FRAME  0x0E  /* u16 m3532 */
+#define PUPPET_ANM_OFF_TRACK0         0x10  /* PUPPET_ANM_TRACKS x PUPPET_ANM_TRACK_SIZE */
+#define PUPPET_ANM_TRACKS             4     /* under[0], under[1], upper[0], upper[1] (upper[2] is puppet_held.c's) */
+#define PUPPET_ANM_TRACK_SIZE         0x18
+/* One track: the anm heap's bck, its J3DFrameCtrl and its mDoExt_AnmRatioPack's ratio */
+#define PUPPET_ANM_TR_OFF_BCK         0x00  /* u16 LkAnm bck index, or PUPPET_ANM_BCK_NONE / _SAME */
+#define PUPPET_ANM_TR_OFF_START       0x02  /* s16 J3DFrameCtrl::mStart */
+#define PUPPET_ANM_TR_OFF_END         0x04  /* s16 mEnd */
+#define PUPPET_ANM_TR_OFF_LOOP        0x06  /* s16 mLoop */
+#define PUPPET_ANM_TR_OFF_ATTR        0x08  /* u8  mAttribute (J3DFrameCtrl::EMode_*) */
+#define PUPPET_ANM_TR_OFF_FRAME       0x0C  /* f32 mFrame */
+#define PUPPET_ANM_TR_OFF_RATE        0x10  /* f32 mRate */
+#define PUPPET_ANM_TR_OFF_RATIO       0x14  /* f32 mRatio */
+#define PUPPET_ANM_BCK_NONE           0xFFFF /* no anim on the track (or one the REL can't load: a demo bck) */
+#define PUPPET_ANM_BCK_SAME           0xFFFE /* upper track: plays the under track of the same index */
+/* LkAnm.arc file index ranges by type (GZLE01 LkAnm.h dRes_INDEX_LKANM_*; checked against the
+ * archive: each type is contiguous, largest bck 0x7140 bytes, btk 0x640, btp 0xA40). */
+#define LKANM_BCK_FIRST               0x008
+#define LKANM_BCK_LAST                0x149
+#define LKANM_BTK_FIRST               0x159
+#define LKANM_BTK_LAST                0x1DA
+#define LKANM_BTP_FIRST               0x1DD
+#define LKANM_BTP_LAST                0x277
+
 /* Spawn state machine values stored in PUPPET_SPAWN_STATE_ADDR[i]. The hook owns these
  * arrays: C# must never zero a live entry (it orphans the puppet actor). */
 #define SPAWN_IDLE     0
@@ -428,6 +474,35 @@
 #define DAPY_OFF_NO_RESET_FLG1    0x2A0
 #define DAPY_OFF_MAX_NORMAL_SPEED 0x2A8
 #define DAPY_OFF_ANM_RATIO_UNDER0 0x2FB4  /* mAnmRatioUnder[0].mRatio */
+/* The body anims (d_a_player_main.h:2077-2082) and face anims (:1998-2000, 2097-2098, 2215-2216),
+ * mirrored by puppet_anmmirror.c. Element sizes: mDoExt_AnmRatioPack 8 (m_Do_ext.h:201-202: mRatio,
+ * mAnmTransform), daPy_anmHeap_c 0x10 (d_a_player_main.h:18-26: mIdx, field_0x2..6, m_buffer,
+ * mpAnimeHeap), J3DFrameCtrl 0x14 (J3DAnimation.h:869-875). */
+#define DAPY_OFF_ANM_RATIO_UPPER0 0x2FC4  /* mAnmRatioUpper[0] */
+#define DAPY_OFF_ANM_HEAP_UNDER0  0x2FDC  /* m_anm_heap_under[0] */
+#define DAPY_OFF_ANM_HEAP_UPPER0  0x2FFC  /* m_anm_heap_upper[0] */
+#define DAPY_OFF_FRAME_CTRL_UNDER0 0x302C /* mFrameCtrlUnder[0] */
+#define DAPY_OFF_FRAME_CTRL_UPPER0 0x3054 /* mFrameCtrlUpper[0] */
+#define DAPY_ANM_RATIO_SIZE       0x08
+#define DAPY_ANM_HEAP_SIZE        0x10
+#define DAPY_FRAME_CTRL_SIZE      0x14
+#define ANM_RATIO_OFF_RATIO       0x00    /* f32 mRatio */
+#define ANM_RATIO_OFF_ANM         0x04    /* J3DAnmTransform* mAnmTransform */
+#define ANM_HEAP_OFF_IDX          0x00    /* u16 mIdx: the LkAnm index loaded, 0xFFFF none */
+#define ANM_HEAP_OFF_PRI_IDX      0x02    /* u16 field_0x2: a texture heap's priority (setPriTextureAnime) index */
+#define ANM_HEAP_OFF_DEMO_IDX     0x04    /* u16 field_0x4: a demo (LkD00 archive) id */
+#define ANM_HEAP_OFF_BUFFER       0x08    /* void* m_buffer */
+#define ANM_HEAP_OFF_HEAP         0x0C    /* JKRSolidHeap* mpAnimeHeap */
+#define FRAME_CTRL_OFF_ATTR       0x04    /* u8 */
+#define FRAME_CTRL_OFF_START      0x06    /* s16 */
+#define FRAME_CTRL_OFF_END        0x08    /* s16 */
+#define FRAME_CTRL_OFF_LOOP       0x0A    /* s16 */
+#define FRAME_CTRL_OFF_RATE       0x0C    /* f32 */
+#define FRAME_CTRL_OFF_FRAME      0x10    /* f32 */
+#define DAPY_OFF_TEX_ANM_HEAP     0x31B8  /* daPy_anmHeap_c m_tex_anm_heap (face btp) */
+#define DAPY_OFF_TEX_SCROLL_HEAP  0x31C8  /* daPy_anmHeap_c m_tex_scroll_heap (eye btk) */
+#define DAPY_OFF_HAND_IDX         0x34C0  /* u8 mLeftHandIdx, then u8 mRightHandIdx */
+#define DAPY_OFF_TEX_FRAMES       0x3530  /* u16 m3530 (btp frame), then u16 m3532 (btk frame) */
 #define DAPY_OFF_CURR_LINKTEX     0x338   /* ResTIMG* mpCurrLinktex — the linktexS3TC header in the shared TEX1 */
 #define DAPY_OFF_CUR_PROC         0x31D8
 #define DAPY_OFF_STICK_DISTANCE   0x35B0
@@ -480,6 +555,16 @@ typedef char puppet_check_boat_crane_words[
      PUPPET_BOAT_CRANE_0 >= DBG_DELETE_ISSUED_ADDR + 4 && (PUPPET_BOAT_CRANE_0 % 4) == 0 &&
      PUPPET_BOAT_CRANE_OFF_ROPE + 1 <= PUPPET_BOAT_CRANE_SIZE && (PUPPET_BOAT_CRANE_SIZE % 4) == 0 &&
      PUPPET_BOAT_CRANE_BASE(PUPPET_MAX_SLOTS) <= PUPPET_SYNC_BASE && SHIP_ROPE_MAX <= 0xFF) ? 1 : -1];
+typedef char puppet_check_anm_word[
+    (PUPPET_ANM_PTR_ADDR >= PUPPET_SPAWN_COUNTER + 4 && PUPPET_ANM_PTR_ADDR + 4 <= FRAME_COUNTER_ADDR &&
+     (PUPPET_ANM_PTR_ADDR % 4) == 0) ? 1 : -1];
+typedef char puppet_check_anm_block[
+    (PUPPET_ANM_OFF_TRACK0 + (PUPPET_ANM_TRACKS * PUPPET_ANM_TRACK_SIZE) == PUPPET_ANM_SLOT_SIZE &&
+     PUPPET_ANM_OFF_SLOT0 + (PUPPET_MAX_SLOTS * PUPPET_ANM_SLOT_SIZE) == PUPPET_ANM_BLOCK_SIZE &&
+     PUPPET_ANM_OFF_TEX_BTK_FRAME + 2 <= PUPPET_ANM_OFF_TRACK0 &&
+     PUPPET_ANM_TR_OFF_RATIO + 4 <= PUPPET_ANM_TRACK_SIZE && (PUPPET_ANM_TRACK_SIZE % 4) == 0 &&
+     PUPPET_ANM_OFF_BOOT == PUPPET_NAMES_OFF_BOOT && PUPPET_ANM_OFF_MAGIC == 0 &&
+     PUPPET_ANM_OFF_BOOT + 8 <= PUPPET_ANM_OFF_SLOT0 && (PUPPET_ANM_BLOCK_SIZE % 4) == 0) ? 1 : -1];
 typedef char puppet_check_header_before_slots[
     (PUPPET_SYNC_BASE + PUPPET_HDR_SIZE <= PUPPET_SLOT_0) ? 1 : -1];
 typedef char puppet_check_bookkeeping_after_tracking[

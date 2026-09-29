@@ -49,6 +49,7 @@ public class PuppetData
     {
         if (Position == null) return false;
         if (Boat != null && !Boat.IsValid()) return false;
+        if (Animation != null && !Animation.IsValid()) return false;
         return Position.IsFinite() && float.IsFinite(Rotation);
     }
 
@@ -236,14 +237,93 @@ public class AnimationState
     [JsonPropertyName("upperBodyAnim")]
     public ushort UpperBodyAnimation { get; set; }
 
-    [JsonPropertyName("lowerBodyAnim")]
-    public ushort LowerBodyAnimation { get; set; }
-
-    [JsonPropertyName("eyeAnim")]
-    public ushort EyeAnimation { get; set; }
-
     [JsonPropertyName("animationSpeed")]
     public float AnimationSpeed { get; set; } = 1.0f;
+
+    /// <summary>
+    /// The player's body anims, played by the receiver's puppet in every proc its REL has no init
+    /// for (puppet_anmmirror.c): under[0], under[1], upper[0], upper[1] in that order
+    /// (<see cref="TrackCount"/>). Null: none sent.
+    /// </summary>
+    [JsonPropertyName("tracks")]
+    public AnimTrack[]? Tracks { get; set; }
+
+    /// <summary>The face btp (an LkAnm index), <see cref="AnimTrack.None"/> if none can be mirrored.</summary>
+    [JsonPropertyName("faceBtp")]
+    public ushort FaceBtp { get; set; } = AnimTrack.None;
+
+    /// <summary>The eye btk (an LkAnm index), <see cref="AnimTrack.None"/> if none can be mirrored.</summary>
+    [JsonPropertyName("faceBtk")]
+    public ushort FaceBtk { get; set; } = AnimTrack.None;
+
+    /// <summary>m3530: the face btp's frame.</summary>
+    [JsonPropertyName("faceBtpFrame")]
+    public ushort FaceBtpFrame { get; set; }
+
+    /// <summary>m3532: the eye btk's frame.</summary>
+    [JsonPropertyName("faceBtkFrame")]
+    public ushort FaceBtkFrame { get; set; }
+
+    /// <summary>mLeftHandIdx: the hand shape (a hands.bdl joint; 0 = the body's own hand).</summary>
+    [JsonPropertyName("handL")]
+    public byte HandLeft { get; set; }
+
+    /// <summary>mRightHandIdx.</summary>
+    [JsonPropertyName("handR")]
+    public byte HandRight { get; set; }
+
+    /// <summary>under[0..1] + upper[0..1]; PUPPET_ANM_TRACKS in puppet_shared.h (a test keeps them equal).</summary>
+    public const int TrackCount = 4;
+
+    public bool IsValid() => Tracks == null ||
+        (Tracks.Length <= TrackCount && Tracks.All(t => t != null && t.IsValid()));
+}
+
+/// <summary>
+/// One of Link's body anim tracks (daPy_lk_c, d_a_player_main.h:2077-2082): the bck its anm heap
+/// holds, its J3DFrameCtrl and its blend ratio.
+/// </summary>
+public class AnimTrack
+{
+    /// <summary>No anim on the track, or one the receiver can't load (a cutscene bck). PUPPET_ANM_BCK_NONE.</summary>
+    public const ushort None = 0xFFFF;
+    /// <summary>An upper track playing the under track of the same index. PUPPET_ANM_BCK_SAME.</summary>
+    public const ushort Same = 0xFFFE;
+
+    /// <summary>Largest |frame| / |rate| accepted. Link's longest bck is a few hundred frames; the REL clamps too.</summary>
+    public const float MaxFrame = 32767f;
+    public const float MaxRate = 100f;
+
+    /// <summary>The LkAnm bck index, <see cref="None"/> or <see cref="Same"/>.</summary>
+    [JsonPropertyName("bck")]
+    public ushort Bck { get; set; } = None;
+
+    [JsonPropertyName("start")]
+    public short Start { get; set; }
+
+    [JsonPropertyName("end")]
+    public short End { get; set; }
+
+    [JsonPropertyName("loop")]
+    public short Loop { get; set; }
+
+    /// <summary>J3DFrameCtrl::mAttribute (EMode_NONE .. EMode_LOOP_REVERSE).</summary>
+    [JsonPropertyName("attr")]
+    public byte Attribute { get; set; }
+
+    [JsonPropertyName("frame")]
+    public float Frame { get; set; }
+
+    [JsonPropertyName("rate")]
+    public float Rate { get; set; }
+
+    /// <summary>mDoExt_AnmRatioPack::mRatio: the track's share of the blend.</summary>
+    [JsonPropertyName("ratio")]
+    public float Ratio { get; set; }
+
+    public bool IsValid() =>
+        float.IsFinite(Frame) && float.IsFinite(Rate) && float.IsFinite(Ratio) &&
+        Frame >= -MaxFrame && Frame <= MaxFrame && Rate >= -MaxRate && Rate <= MaxRate;
 }
 
 /// <summary>
