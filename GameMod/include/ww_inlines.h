@@ -995,11 +995,23 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define PROC_NAME_MJDOOR         0x047 // d_a_obj_majyuu_door (FF barricade)
 #define PROC_NAME_SAKU           0x191 // d_a_saku (wooden barricade)
 #define PROC_NAME_SWHIT0         0x1C9 // d_a_swhit0 (crystal switch)
+#define PROC_NAME_DOOR10         0x12E // d_a_door10
+#define PROC_NAME_DOOR12         0x12F // d_a_door12
 
 // daTbox_c (d_a_tbox.h:35-36, d_a_tbox.cpp:23-31): tbox no. = (prm >> 7) & 0x1F, swNo = (prm >> 12) & 0xFF,
 // funcType = prm & 0x7F. checkOpen (REL .text 0xCD8) reads STAGE_SEA2's tbox for funcs 7/8, else the live one.
 #define TBOX_FUNC(prm)           ((prm) & 0x7F)
 #define TBOX_FUNC_ENEMIES        2     // appears when your enemies are dead; its switch is read only at create
 #define TBOX_FUNC_EXTRA_SAVE     7     // 7 and 8 read another stage's chest bits
+
+// Doors (d_door.cpp: getSwbit = prm & 0xFF, DOL 0x8006B39C). dDoor_key2_c mbEnabled at +0 (keyOn/keyOff DOL
+// 0x8006C948/0x8006C954): read only, to skip a door with no lock showing. The action byte selects l_action[]
+// (1 = Wait). Live world re-creates a locked door; it never writes these.
+#define DOOR10_KEYLOCK_OFF       0x308 // door10 setKey: addi r3,r31,0x308 before keyOn/keyOff
+#define DOOR10_ACTION_OFF        0x354 // door10 actionInit: li r0,1; stb r0,0x354(r31)
+#define DOOR12_KEYLOCK_OFF       0x2E4 // door12 setKey: addi r3,r31,0x2E4
+#define DOOR12_ACTION_OFF        0x314 // door12 actionInit: stb r0,0x314(r31)
+#define DOOR_ACTION_WAIT         1
+#define DOOR12_ARG1_TMPBIT       8     // door12 create: arg1 (home.angle.z >> 8) 8 clears tmp bit 0x0440 (d_a_door12.cpp:581)
 
 #endif /* WW_INLINES_H */

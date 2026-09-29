@@ -127,7 +127,7 @@ Caveats:
 - `puppet_shared.h`: needed only for diagnostics. For example, `DOOR_UNLOCK_COUNT_ADDR 0x803FD1D0` (u32, ++ per stale lock cleared) and `DOOR_LAST_UNLOCK_ADDR 0x803FD1D4` (u32, `(saveTbl<<16) | ((procName & 0xFF)<<8) | swbit`). 0x803FD1D0..0x803FD1DF is free: the boats end at `PUPPET_BOAT_BASE(3)` = 0x803FD1D0 and world sync starts at 0x803FD1E0. Add a `typedef` range check and a `PuppetLayoutTests` case. Any change there needs a re-patch.
 
 ### REL (`puppet_worldsync.c`, small)
-> **Tried and removed (2026-09-29):** live world stage 1 cleared `mbEnabled` this way and the game froze (ISI at 0) when the other player then walked up to that door. The crashing call wasn't identified; don't rebuild this without a repro under a debugger. See `docs/live-world.md` 0.1.
+> **Tried and replaced (2026-09-29):** live world stage 1 cleared `mbEnabled` this way and the game froze (ISI at 0) when the other player then walked up to that door. The crashing call wasn't identified. Live world now re-creates the door instead (its create builds it unlocked, as a reload does); never write the lock byte. See `docs/live-world.md` 0.1.
 
 Add `ws_door_judge` plus a loop that runs in `puppet_worldsync_tick` on the same every-4th-frame gate and the same `NEXT_STAGE_ENABLE`/stag checks. It does **not** depend on the item-mask tag, so run it before the `mask == 0` early return. Clear at most N doors per scan, bump the counter, and `OSReport("[PUPPET] door lock cleared sw=%d")`. The code is tiny, so the ARAM impact is negligible, but it is still REL growth (see GameMod/CLAUDE.md rule 6). **Compile or patch only when the user asks.**
 
