@@ -6,7 +6,8 @@ Releases are GitHub Releases in this repo. Players install the app once (`WWOnli
 
 1. Make sure `main` is green in CI.
 2. Decide the version (SemVer). Bump `HubConstants.ProtocolVersion` (in `WWOnline.Shared/Hubs/HubConstants.cs`) if anything that crosses the wire changed: a hub method, a callback, or a DTO's shape or meaning. Players on different protocols can't join each other's rooms. They get a clear "update the app" message instead of subtle desyncs.
-3. Tag and push:
+3. Write the release notes at `docs/release-notes/v<version>.md` (player-facing Markdown; `v0.1.0.md` is the model) and merge them to `main` before tagging. The workflow picks the file up by the tag's version: `vpk pack --releaseNotes` puts it in the package, and after the upload `gh release edit --notes-file` makes it the GitHub release's body. Without a file the release has no notes; you can still paste them into the release page afterwards (Releases → the release → Edit).
+4. Tag and push:
    ```
    git tag v0.3.0            # or v0.4.0-beta.1 for a pre-release
    git push origin v0.3.0
@@ -29,9 +30,9 @@ To rehearse without releasing, run the **Release** workflow by hand (Actions →
    - Zips the server twice: `win-x64`, which is self-contained, and `portable`, which needs the ASP.NET Core 9 runtime and runs as `dotnet WWOnline.Server.dll [port]` on a Linux VPS.
    - Runs the guard on the published app and the server zips.
    - Runs `vpk download github` to fetch the previous release, so Velopack can build a small delta package.
-   - Runs `vpk pack`: packId `WWOnline`, title `WW-Online`, main exe `WWOnline.Client.exe`, icon `assets/branding/app.ico`.
+   - Runs `vpk pack`: packId `WWOnline`, title `WW-Online`, main exe `WWOnline.Client.exe`, icon `assets/branding/app.ico`, and `--releaseNotes docs/release-notes/v<version>.md` when that file exists.
    - Runs the guard on the packages (it opens the `.nupkg` and `Portable.zip`).
-   - Runs `vpk upload github --publish` to create the release. `gh release upload` then attaches the server zips.
+   - Runs `vpk upload github --publish` to create the release. `gh release upload` then attaches the server zips, and `gh release edit --notes-file` sets the body from the notes file (when there is one).
 4. **docker** (Linux, after **windows**, so an image only exists for a version that was released): builds the dedicated server's image from `WWOnline.Server/Dockerfile` for `linux/amd64` and `linux/arm64` (QEMU + Buildx) and pushes it to `ghcr.io/<owner>/ww-online-server` with the tags `<version>`, `<major>.<minor>` and `latest`. A pre-release only gets its exact version tag. The image reports the tag's version and commit in `/health`. A dry run builds both architectures and pushes nothing. Players and admins use it as described in [self-hosting.md](self-hosting.md).
 
 The release's assets are:
