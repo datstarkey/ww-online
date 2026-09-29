@@ -18,6 +18,25 @@ public class GameInfoAddressTests
         Assert.Equal(GameMemoryAddresses.Play + 0x3E94, GameMemoryAddresses.Stage.CurrentStageName.Address);
 
     [Fact]
+    public void WarpAddresses_MatchTheVanillaDol()
+    {
+        // play.mCurStage / mNextStage: the long-standing CurrentStageName / NextStageEnable addresses.
+        Assert.Equal(0x803C9D3Cu, GameMemoryAddresses.Warp.StartStage);
+        Assert.Equal(GameMemoryAddresses.Warp.StartStage, GameMemoryAddresses.Stage.CurrentStageName.Address);
+        Assert.Equal(0x803C9D48u, GameMemoryAddresses.Warp.NextStage);
+        Assert.Equal(GameMemoryAddresses.WorldFlags.NextStageEnable,
+                     GameMemoryAddresses.Warp.NextStage + (uint)GameMemoryAddresses.Warp.NextStageOffEnable);
+        // dComIfGp_setNextStage (DOL 0x800537C8): addi r3,gameInfo,0x5140 (mNextStage); lwz 0x5B4C (mpPlayerPtr[0]);
+        // stfs 0x1150 / stw 0x1154 / sth 0x113C (mRestart's mLastSpeedF / mLastMode / mStartCode).
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x5140, GameMemoryAddresses.Warp.NextStage);
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x5B4C, GameMemoryAddresses.Warp.LinkActorPtr);
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x1150, GameMemoryAddresses.Warp.Restart + (uint)GameMemoryAddresses.Warp.RestartOffLastSpeedF);
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x1154, GameMemoryAddresses.Warp.Restart + (uint)GameMemoryAddresses.Warp.RestartOffLastMode);
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x113C, GameMemoryAddresses.Warp.Restart + (uint)GameMemoryAddresses.Warp.RestartOffStartCode);
+        Assert.Equal(GameMemoryAddresses.Sea.ShipActorPtr - 8, GameMemoryAddresses.Warp.LinkActorPtr);
+    }
+
+    [Fact]
     public void PendingRupeeDelta_IsPlayItemRupeeCount() =>
         Assert.Equal(0x803CA768u, GameMemoryAddresses.Player.PendingRupeeDelta.Address);
 

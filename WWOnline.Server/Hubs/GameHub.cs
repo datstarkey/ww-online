@@ -157,13 +157,15 @@ public class GameHub : Hub<IGameHubClient>
 
     /// <summary>Server defaults from the command line (Program.cs), before anyone connects.</summary>
     public static void ConfigureRoomDefaults(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory,
-                                             bool sharedProjectiles = true, bool sharedBait = true, bool sharedSpoils = true)
+                                             bool sharedProjectiles = true, bool sharedBait = true, bool sharedSpoils = true,
+                                             bool allowWarping = true)
     {
         lock (RoomLock)
             _roomSettings = new RoomSettings
             {
                 SharedWallet = sharedWallet, SharedWorld = sharedWorld, SharedItems = sharedItems, SharedStory = sharedStory,
                 SharedProjectiles = sharedProjectiles, SharedBait = sharedBait, SharedSpoils = sharedSpoils,
+                AllowWarping = allowWarping,
             };
     }
 
@@ -285,6 +287,7 @@ public class GameHub : Hub<IGameHubClient>
             _roomSettings.SharedProjectiles = requested.SharedProjectiles;
             _roomSettings.SharedBait = requested.SharedBait;
             _roomSettings.SharedSpoils = requested.SharedSpoils;
+            _roomSettings.AllowWarping = requested.AllowWarping;
         }
         if (walletTurnedOff)
         {
@@ -376,12 +379,15 @@ public class GameHub : Hub<IGameHubClient>
 
         if (!puppetData.IsValid())
         {
-            Logger.Warning("SendPuppetData rejected: invalid position/rotation from {ConnectionId}",
+            Logger.Warning("SendPuppetData rejected: invalid position, rotation, animation, boat or warp info from {ConnectionId}",
                 Context.ConnectionId);
             return;
         }
 
         puppetData.ClampUnknownValues();
+        // Warping off: nobody gets another player's way in (the entrance a warp loads).
+        if (puppetData.Warp != null && !RoomRules.AllowWarping)
+            puppetData.Warp = null;
         puppetData.PlayerId = Context.ConnectionId;
         EventRelay.UpdateLocation(Context.ConnectionId, puppetData, DateTime.UtcNow);
         PuppetRelayCounts.AddOrUpdate(Context.ConnectionId, 1, (_, n) => n + 1);

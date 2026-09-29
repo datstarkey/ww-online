@@ -52,6 +52,7 @@ public partial class App : Application
         services.AddSingleton<SharedSmallKeyService>();
         services.AddSingleton<PlayerEventService>();
         services.AddSingleton<RoomSettingsService>();
+        services.AddSingleton<WarpService>();
         services.AddSingleton<GameSyncService>();
         services.AddSingleton<GameLogService>();
         services.AddSingleton<GameSettingsService>();

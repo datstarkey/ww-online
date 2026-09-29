@@ -19,7 +19,7 @@
                     <ItemsControl ItemsSource="{Binding Server.Players}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:PlayerRowViewModel">
-                                <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,12">
+                                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
                                     <Border Classes="ww-avatar" Background="{Binding TunicBrush}" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Initials}" Foreground="{Binding AvatarForeground}" />
                                     </Border>
@@ -36,10 +36,37 @@
                                         <TextBlock Text="{Binding StageText}" FontSize="12" Foreground="{StaticResource Text2Brush}"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
+                                    <!-- Warp to (room rule Allow warping; never on your own row) -->
+                                    <Panel Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center"
+                                           IsVisible="{Binding $parent[ItemsControl].((vm:DashboardViewModel)DataContext).AllowWarpingOn}">
+                                        <Button Classes="ww-ghost" MinHeight="32" Padding="10,0" FontSize="12" IsVisible="{Binding !IsLocal}"
+                                                Command="{Binding $parent[ItemsControl].((vm:DashboardViewModel)DataContext).WarpToPlayerCommand}"
+                                                CommandParameter="{Binding}"
+                                                ToolTip.Tip="Warp to this player. Same area: you're moved next to them. Anywhere else: you arrive where they came in (the door or loading zone they used)."
+                                                AutomationProperties.Name="{Binding WarpButtonName}">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <Viewbox Width="14" Height="14" VerticalAlignment="Center">
+                                                    <Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource AccentBrush}" />
+                                                </Viewbox>
+                                                <TextBlock Text="Warp to" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Panel>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <TextBlock Text="{Binding WarpStatus}" IsVisible="{Binding HasWarpStatus}" FontSize="12" TextWrapping="Wrap"
+                               Classes.failed="{Binding WarpFailed}">
+                        <TextBlock.Styles>
+                            <Style Selector="TextBlock">
+                                <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+                            </Style>
+                            <Style Selector="TextBlock.failed">
+                                <Setter Property="Foreground" Value="{StaticResource HeartBrush}" />
+                            </Style>
+                        </TextBlock.Styles>
+                    </TextBlock>
                     <Panel IsVisible="{Binding IsWaitingForPlayers}">
                         <Rectangle RadiusX="12" RadiusY="12" Stroke="{StaticResource OutlineBrush}" StrokeThickness="1"
                                    StrokeDashArray="4,3" />
@@ -479,10 +506,10 @@
                                         <Grid ColumnDefinitions="*,4,*,4,*">
                                             <Button Grid.Column="0" Classes="ww-seg" Classes.active="{Binding IsFullSyncPreset}" Content="Full sync"
                                                     MinHeight="44" HorizontalAlignment="Stretch" Command="{Binding ApplyFullSyncPresetCommand}"
-                                                    ToolTip.Tip="Share everything: wallet, world, items, story and both bags, and other players' projectiles are real." />
+                                                    ToolTip.Tip="Share everything: wallet, world, items, story and both bags, other players' projectiles are real, and players can warp to each other." />
                                             <Button Grid.Column="2" Classes="ww-seg" Classes.active="{Binding IsCoopPreset}" Content="Co-op"
                                                     MinHeight="44" HorizontalAlignment="Stretch" Command="{Binding ApplyCoopPresetCommand}"
-                                                    ToolTip.Tip="Share no progress: each player keeps their own game. You see each other, and other players' projectiles stay on." />
+                                                    ToolTip.Tip="Share no progress: each player keeps their own game, and nobody warps. You see each other, and other players' projectiles stay on." />
                                             <Button Grid.Column="4" Classes="ww-seg" Classes.active="{Binding IsCustomPreset}" Content="Custom"
                                                     MinHeight="44" HorizontalAlignment="Stretch" IsEnabled="False"
                                                     ToolTip.Tip="Lit when the switches below are a mix. Pick a preset to reset." />
@@ -639,6 +666,28 @@
                                                           AutomationProperties.Name="Other players' projectiles" />
                                         </Grid>
                                     </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Allow warping" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="Players can warp to each other from the Players list. It gets someone unstuck when another player's progress closes their way forward." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding AllowWarpingOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding AllowWarpingOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !AllowWarpingOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding AllowWarpingOn}"
+                                                          ToolTip.Tip="Show Warp to on each player. Same area: you're moved next to them. Anywhere else: you arrive where they came in."
+                                                          AutomationProperties.Name="Allow warping" />
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
 
                                 <!-- Coming later (not interactive) -->
@@ -743,6 +792,15 @@
                                             <TextBlock Grid.Column="1" Text="Other players' projectiles" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedProjectilesOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedProjectilesOn}" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44"
+                                            ToolTip.Tip="Players can warp to each other from the Players list.">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="Allow warping" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding AllowWarpingOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !AllowWarpingOn}" />
                                         </Grid>
                                     </Border>
                                 </StackPanel>

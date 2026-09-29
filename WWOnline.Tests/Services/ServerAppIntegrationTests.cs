@@ -231,7 +231,7 @@ public class ServerAppIntegrationTests
         {
             await send();
             var done = await Task.WhenAny(got.Task, Task.Delay(ms));
-            return done == got.Task ? got.Task.Result : null;
+            return done == got.Task ? await got.Task : null;
         }
         finally
         {
@@ -284,6 +284,68 @@ public class ServerAppIntegrationTests
             // Rule off: dropped.
             GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: false);
             Assert.Null(await NextEvent(near, () => sender.SendPlayerEventAsync(Bomb("M_Dai", 3, 4)), 500));
+        }
+        finally
+        {
+            GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: true);
+        }
+    }
+
+    /// <summary>Send one puppet update from <paramref name="sender"/> and return what <paramref name="receiver"/> gets (null: nothing within 3 s).</summary>
+    private static async Task<PuppetData?> RelayOnePuppet(SignalRClientService sender, SignalRClientService receiver, PuppetData data)
+    {
+        var got = new TaskCompletionSource<PuppetData>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnPuppet(PuppetData d) => got.TrySetResult(d);
+        receiver.PuppetDataReceived += OnPuppet;
+        try
+        {
+            await sender.Connection!.InvokeAsync(HubConstants.SendPuppetData, data);
+            var done = await Task.WhenAny(got.Task, Task.Delay(TimeSpan.FromSeconds(3)));
+            return done == got.Task ? await got.Task : null;
+        }
+        finally
+        {
+            receiver.PuppetDataReceived -= OnPuppet;
+        }
+    }
+
+    private static PuppetData PuppetWithWarp(short entryPoint = 3) => new()
+    {
+        StageName = "sea",
+        RoomNumber = 44,
+        Position = new Vector3(1f, 2f, 3f),
+        Warp = new WarpInfo { EntryPoint = entryPoint, EntryRoom = 44, Layer = -1 },
+    };
+
+    [Fact]
+    public async Task WarpInfo_IsRelayedOnlyWhileWarpingIsAllowed_AndValidated()
+    {
+        GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: true, allowWarping: true);
+        try
+        {
+            var (app, port) = await StartAsync();
+            await using var _ = app;
+            await using var a = new SignalRClientService();
+            Assert.True((await a.ConnectAsync("127.0.0.1", port, Name("WarpA"))).success);
+            await using var b = new SignalRClientService();
+            Assert.True((await b.ConnectAsync("127.0.0.1", port, Name("WarpB"))).success);
+
+            // Allowed: the entrance goes through.
+            var relayed = await RelayOnePuppet(a, b, PuppetWithWarp());
+            Assert.NotNull(relayed);
+            Assert.NotNull(relayed!.Warp);
+            Assert.Equal((short)3, relayed.Warp!.EntryPoint);
+            Assert.Equal((sbyte)44, relayed.Warp.EntryRoom);
+
+            // An out-of-range entrance gets the whole update dropped, like any other invalid puppet data.
+            Assert.Null(await RelayOnePuppet(a, b, PuppetWithWarp(entryPoint: 999)));
+
+            // Off: the position still goes through (puppets), the entrance doesn't.
+            GameHub.ConfigureRoomDefaults(true, true, true, true, sharedProjectiles: true, allowWarping: false);
+            var stripped = await RelayOnePuppet(a, b, PuppetWithWarp());
+            Assert.NotNull(stripped);
+            Assert.Null(stripped!.Warp);
+            Assert.Equal(1f, stripped.Position.X);
         }
         finally
         {

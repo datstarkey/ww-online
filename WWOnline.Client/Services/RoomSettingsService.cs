@@ -5,7 +5,7 @@ using WWOnline.Shared.Models;
 namespace WWOnline.Services;
 
 /// <summary>
-/// The room's rules (shared wallet / world / items / story / bait bag / spoils bag, other players' projectiles) as last pushed by the server, plus whether
+/// The room's rules (shared wallet / world / items / story / bait bag / spoils bag, other players' projectiles, warping) as last pushed by the server, plus whether
 /// this client is the room owner. Sync services check <see cref="Current"/> every tick; the
 /// dashboard shows it and lets the room owner change it.
 /// </summary>
@@ -42,7 +42,7 @@ public class RoomSettingsService : IDisposable
     });
 
     public Task SetAsync(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory, bool sharedProjectiles,
-                         bool sharedBait, bool sharedSpoils)
+                         bool sharedBait, bool sharedSpoils, bool allowWarping)
     {
         var requested = Current.Clone();
         requested.SharedWallet = sharedWallet;
@@ -52,6 +52,7 @@ public class RoomSettingsService : IDisposable
         requested.SharedProjectiles = sharedProjectiles;
         requested.SharedBait = sharedBait;
         requested.SharedSpoils = sharedSpoils;
+        requested.AllowWarping = allowWarping;
         return _signalR.SetRoomSettingsAsync(requested);
     }
 
@@ -60,7 +61,8 @@ public class RoomSettingsService : IDisposable
     {
         var requested = Current.Clone().ApplyPreset(preset);
         return SetAsync(requested.SharedWallet, requested.SharedWorld, requested.SharedItems, requested.SharedStory,
-                        requested.SharedProjectiles, requested.SharedBait, requested.SharedSpoils);
+                        requested.SharedProjectiles, requested.SharedBait, requested.SharedSpoils,
+                        requested.AllowWarping);
     }
 
     private void Apply(RoomSettings settings)
@@ -70,7 +72,7 @@ public class RoomSettingsService : IDisposable
         if (old.SharedWallet != settings.SharedWallet || old.SharedWorld != settings.SharedWorld ||
             old.SharedItems != settings.SharedItems || old.SharedStory != settings.SharedStory ||
             old.SharedProjectiles != settings.SharedProjectiles || old.SharedBait != settings.SharedBait ||
-            old.SharedSpoils != settings.SharedSpoils ||
+            old.SharedSpoils != settings.SharedSpoils || old.AllowWarping != settings.AllowWarping ||
             old.OwnerConnectionId != settings.OwnerConnectionId)
         {
             Logger.Information("[room] rules: {Rules}; owner {Owner}{Me}",

@@ -59,8 +59,9 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 | **Shared bait bag** | One stock of All-Purpose Bait and Hyoi Pears. Anyone's purchase, pickup or use counts for everyone. |
 | **Shared spoils bag** | One stock of Joy Pendants, Skull Necklaces, Chu Jellies, Knight's Crests and the other spoils. Anyone's pickup, sale or trade counts for everyone. |
 | **Other players' projectiles** | Other players' bombs, boat-cannon shots and arrows are real in your game: they fly, explode and hit your enemies and walls. Off: you still see them carry a bomb or aim, but nothing flies. |
+| **Allow warping** | A **Warp to** button on each player in the Players list. In the same area it moves you next to them. Anywhere else it takes you to the entrance they came in through. |
 
-- **Full sync** turns everything on. **Co-op** turns the six shared-progress rules off, so you see each other (and each other's projectiles) but keep your own progress.
+- **Full sync** turns everything on. **Co-op** turns the six shared-progress rules and warping off, so you see each other (and each other's projectiles) but keep your own progress.
 - Joining a room never throws away progress: if you're further ahead than the room, your progress is added to it.
 - Never shared: health, magic, bomb and arrow counts, and bottle and delivery bag contents (the bait and spoils bags only with their Shared rules).
 - The Room page's **Dungeons** card shows each dungeon's small keys, map, compass, big key and boss.
@@ -115,6 +116,7 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 - **Join a room:** enter the host's address and your name, then **Join**. WW-Online starts your game in Dolphin the same way. You see the room's rules and items read-only, and anything you pick up still counts for the room.
 - **Your look:** open **Appearance** to pick your clothes (game default, hero's tunic or pajamas) and your tunic colour. It changes live for everyone. **Show player names** there turns the names above the other Links on or off, for your screen only.
 - **Story flags:** on the **Room** page, see which story events the room has reached. The room owner can edit them.
+- **Warp to a player:** with **Allow warping** on, press **Warp to** next to a player on the **Room** page. In the same area you're moved next to them; anywhere else you arrive at the entrance they came in through (the door or loading zone they used).
 - **Dolphin** shows the connection to your game and your live stats. **Start game** starts it by hand; **Attach** links up with a Dolphin you started yourself.
 - **Tools** holds local-only helpers (warp, stats, memory). They only affect your own game.
 
@@ -131,6 +133,7 @@ The host's PC must be reachable on port `6969`. The easiest options:
 
 ## Troubleshooting
 
+- **Stuck? Warp to a player.** Shared story and world only ever move forward, so when another player does something that moves them on (say, leaving Outset Island with Tetra), the others can find their own way forward gone. Press **Warp to** next to that player on the **Room** page (the room's **Allow warping** rule must be on). [Softlocks](docs/softlocks.md) lists the known cases and how warping works.
 - **Purple screen with `d_s_play.cpp` / black screen on boot:** the 48 MB memory setting is off (install step 4; only when you start Dolphin yourself), or the game folder isn't a patched `GZLE01` copy.
 - **WW-Online says to patch your game, and won't start Dolphin:** the game isn't patched yet, WW-Online was updated with new game code, or you changed your patches. Press **Patch now** in the banner (or **Settings → Patch game**).
 - **WW-Online won't link up with a Dolphin you started yourself:** the running game must be your patched `GZLE01` copy, with the 48 MB memory setting on (install step 4). A vanilla or PAL game is refused.
@@ -153,7 +156,7 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj
 - Copy `GameMod/config.example.json` to `GameMod/config.json` and set `vanilla_game_path` (your extracted game) and `game_path` (the patched output).
 - `.\scripts\dev-test.ps1` runs a local two-player test: two Dolphins and two clients, with Player 1 hosting. `-Patch` also rebuilds the in-game code. Logs go to `logs/latest/`.
 - `python scripts/dolphin-crash-context.py <dolphin pid> tww-decomp/config/GZLE01/symbols.txt` prints the registers and stack of a game crash from the running Dolphin (read-only).
-- `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules. `docs/` has the design notes (held items and projectiles, live world, small keys, event flags, optional patches), [self-hosting](docs/self-hosting.md) and [releasing](docs/releasing.md).
+- `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules. `docs/` has the design notes (held items and projectiles, live world, small keys, event flags, optional patches), [softlocks and warping](docs/softlocks.md), [self-hosting](docs/self-hosting.md) and [releasing](docs/releasing.md).
 
 **How it works, in short:** an Avalonia desktop app reads and writes the running game's memory through Dolphin, and a SignalR server relays each player's state. On the game side, a small injected module (C, built with devkitPPC and linked against [the Wind Waker decompilation](https://github.com/zeldaret/tww)) spawns and animates the other players' Links. The game's own code does the work, so they move, fight and draw just like the real Link.
 

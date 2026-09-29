@@ -50,8 +50,11 @@ public partial class PlayerRowViewModel : ObservableObject
     partial void OnSectorChanged(int value) { OnPropertyChanged(nameof(LocationText)); OnPropertyChanged(nameof(StageText)); }
     partial void OnIsInGameChanged(bool value) { OnPropertyChanged(nameof(LocationText)); OnPropertyChanged(nameof(StageText)); }
     partial void OnHasGameStateChanged(bool value) => OnPropertyChanged(nameof(StageText));
-    partial void OnPlayerNameChanged(string value) => OnPropertyChanged(nameof(Initials));
+    partial void OnPlayerNameChanged(string value) { OnPropertyChanged(nameof(Initials)); OnPropertyChanged(nameof(WarpButtonName)); }
     partial void OnCurrentHealthChanged(int value) => OnPropertyChanged(nameof(HeartsText));
+
+    /// <summary>The Warp to button's accessible name.</summary>
+    public string WarpButtonName => $"Warp to {PlayerName}";
 
     public string ShortId => ConnectionId.Length > 8 ? ConnectionId[..8] : ConnectionId;
 

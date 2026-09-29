@@ -45,10 +45,16 @@ public class PuppetData
     [JsonPropertyName("boat")]
     public BoatState? Boat { get; set; }
 
+    /// <summary>What another player needs to warp here; null when unknown, or stripped by the server
+    /// while the room's <see cref="RoomSettings.AllowWarping"/> rule is off.</summary>
+    [JsonPropertyName("warp")]
+    public WarpInfo? Warp { get; set; }
+
     public bool IsValid()
     {
         if (Position == null) return false;
         if (Boat != null && !Boat.IsValid()) return false;
+        if (Warp != null && !Warp.IsValid()) return false;
         if (Animation != null && !Animation.IsValid()) return false;
         return Position.IsFinite() && float.IsFinite(Rotation);
     }

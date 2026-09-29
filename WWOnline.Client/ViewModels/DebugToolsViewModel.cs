@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using WWOnline.Data;
 using WWOnline.Services;
+using WWOnline.Shared.Models;
 
 namespace WWOnline.ViewModels;
 
@@ -157,16 +158,7 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
     private bool? StageExists(string stageName)
     {
         var settings = _settingsService.Load();
-        bool checkedAny = false;
-        foreach (var root in new[] { settings.GamePath, settings.VanillaGamePath })
-        {
-            if (string.IsNullOrWhiteSpace(root)) continue;
-            var stageDir = Path.Combine(root, "files", "res", "Stage");
-            if (!Directory.Exists(stageDir)) continue;
-            checkedAny = true;
-            if (File.Exists(Path.Combine(stageDir, stageName, "Stage.arc"))) return true;
-        }
-        return checkedAny ? false : null;
+        return StageFiles.Exists(stageName, settings.GamePath, settings.VanillaGamePath);
     }
 
     [ObservableProperty]
@@ -306,21 +298,13 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
             byte.TryParse(WarpRoom, out room);
             byte.TryParse(WarpSpawn, out spawn);
 
-            // Write stage name (8 bytes, null padded)
-            var nameBytes = new byte[8];
-            var stageBytes = System.Text.Encoding.ASCII.GetBytes(SelectedWarp.StageName);
-            Array.Copy(stageBytes, nameBytes, Math.Min(stageBytes.Length, 8));
-
-            // Write to NextStage fields to trigger transition
-            _dolphinService.WriteMemory(GameMemoryAddresses.Stage.NextStageName.Address, nameBytes);
-            _dolphinService.WriteMemory(GameMemoryAddresses.Stage.NextRoomNumber.Address, new byte[] { room });
-            _dolphinService.Write(GameMemoryAddresses.Stage.NextSpawnId, (short)spawn);
-
-            // Write layer override (0xFF = default)
-            _dolphinService.Write(GameMemoryAddresses.Stage.NextLayer, (byte)0xFF);
-
-            // Trigger the transition by writing fade type
-            _dolphinService.WriteMemory(0x803C9D54, new byte[] { 0x01 });
+            // play.mNextStage, enable last (layer -1 = the game picks it), as dComIfGp_setNextStage does.
+            if (!WarpMemory.RequestStageChange(_dolphinService,
+                    new StageEntry(SelectedWarp.StageName, spawn, (sbyte)Math.Min(room, (byte)WarpInfo.MaxRoom), -1)))
+            {
+                StatusMessage = "A stage change is already pending";
+                return;
+            }
 
             StatusMessage = $"Warping to {SelectedWarp.Name} (Room {room}, Spawn {spawn})";
             Logger.Information("Warp to {Stage} room={Room} spawn={Spawn}", SelectedWarp.StageName, room, spawn);

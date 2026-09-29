@@ -36,6 +36,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     private readonly SharedWalletService _wallet;
     private readonly RoomSettingsService _room;
+    private readonly WarpService _warp;
     private bool _disposed;
 
     /// <summary>Owner-only edit lock for the room rules.</summary>
@@ -60,6 +61,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _sharedProjectilesOn = true;
     [ObservableProperty] private bool _sharedBaitOn = true;
     [ObservableProperty] private bool _sharedSpoilsOn = true;
+    [ObservableProperty] private bool _allowWarpingOn = true;
     [ObservableProperty] private string _roomOwnerText = "";
     [ObservableProperty] private string _ownerName = "";
 
@@ -97,6 +99,14 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _walletStateText = "Shared";
     [ObservableProperty] private string _walletNote = "";
 
+    // Warp to player (Players card)
+    /// <summary>The last warp's outcome, shown under the players ("" = nothing to show).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWarpStatus))]
+    private string _warpStatus = "";
+    [ObservableProperty] private bool _warpFailed;
+    public bool HasWarpStatus => WarpStatus.Length > 0;
+
     public string OnlineText => $"{Server.Players.Count} online";
     public bool IsWaitingForPlayers => Server.Players.Count <= 1;
     public string LeaveText => Server.IsHosting ? "Close room" : "Leave room";
@@ -121,7 +131,8 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         RoomFlagsViewModel flags,
         SharedWalletService wallet,
         RoomSettingsService room,
-        SharedSmallKeyService smallKeys)
+        SharedSmallKeyService smallKeys,
+        WarpService warp)
     {
         Server = server;
         Live = live;
@@ -132,6 +143,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Dungeons = new DungeonsCardViewModel(smallKeys, a => Dispatcher.UIThread.Post(a));
         _wallet = wallet;
         _room = room;
+        _warp = warp;
         _wallet.TotalChanged += OnWalletTotalChanged;
         _room.Changed += OnRoomRulesChanged;
         Edit.PropertyChanged += OnEditPropertyChanged;
@@ -197,6 +209,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         Edit.End();
         Items.Lock();
         Flags.Lock();
+        WarpStatus = "";
         ShowItemsPage = false;
         ShowFlagsPage = false;
     }
@@ -271,6 +284,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         SharedProjectilesOn = rules.SharedProjectiles;
         SharedBaitOn = rules.SharedBait;
         SharedSpoilsOn = rules.SharedSpoils;
+        AllowWarpingOn = rules.AllowWarping;
         UpdatePreset(rules.MatchingPreset());
         IsOwner = _room.IsOwner;
         OwnerName = rules.OwnerName ?? "";
@@ -333,6 +347,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     partial void OnSharedProjectilesOnChanged(bool value) => PushRules();
     partial void OnSharedBaitOnChanged(bool value) => PushRules();
     partial void OnSharedSpoilsOnChanged(bool value) => PushRules();
+    partial void OnAllowWarpingOnChanged(bool value) => PushRules();
 
     private void PushRules()
     {
@@ -344,9 +359,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         var projectiles = SharedProjectilesOn;
         var bait = SharedBaitOn;
         var spoils = SharedSpoilsOn;
+        var warping = AllowWarpingOn;
         _ = Task.Run(async () =>
         {
-            try { await _room.SetAsync(wallet, world, items, story, projectiles, bait, spoils); }
+            try { await _room.SetAsync(wallet, world, items, story, projectiles, bait, spoils, warping); }
             catch (Exception ex) { Serilog.Log.Warning(ex, "[room] failed to update room rules"); }
         });
     }
@@ -365,7 +381,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         PresetNote = preset switch
         {
             RoomPreset.FullSync => "Everything is shared: wallet, world, items, story and bags.",
-            RoomPreset.Coop => "Players see each other and each other's projectiles, but progress stays on each save.",
+            RoomPreset.Coop => "Players see each other and each other's projectiles, but progress stays on each save (and nobody warps).",
             _ => "A custom mix. Pick a preset to reset.",
         };
     }
@@ -436,6 +452,22 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         CopyInviteText = "Copied";
         await Task.Delay(1500);
         CopyInviteText = "Copy invite";
+    }
+
+    /// <summary>
+    /// "Warp to" on a player's row: same stage and room, Link moves to them; anywhere else, their stage loads
+    /// at the entrance they came in through (WarpService, docs/softlocks.md).
+    /// </summary>
+    [RelayCommand]
+    private async Task WarpToPlayer(PlayerRowViewModel? row)
+    {
+        if (row == null || row.IsLocal) return;
+        WarpFailed = false;
+        WarpStatus = $"Warping to {row.PlayerName}...";
+        string id = row.ConnectionId, name = row.PlayerName;
+        var result = await Task.Run(() => _warp.WarpToAsync(id, name));
+        WarpFailed = !result.Ok;
+        WarpStatus = result.Message;
     }
 
     [RelayCommand]
