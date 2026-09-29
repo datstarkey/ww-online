@@ -12,8 +12,9 @@ namespace WWOnline.Services;
 /// <item><b>Our draw hook</b>: the patched main.dol's Link draw hook (link_draw_hook.c, in the DOL, so it
 /// runs without the puppet REL) writes one of PuppetLayout.STATUS_HOOK / STATUS_TITLE / STATUS_NAME /
 /// STATUS_DONE (puppet_shared.h) to PuppetLayout.STATUS_ADDR every time it draws Link. An unpatched game
-/// never writes there.
-/// Attach only succeeds once a save's data is in memory, so Link is drawn within a few frames.</item>
+/// never writes there. Link isn't drawn on the title screen or file select, so with no save loaded yet
+/// (dSv_player_status_a_c::mMaxLife still 0) a missing status is <see cref="Result.NotInGame"/>: wait,
+/// don't call the game unpatched.</item>
 /// </list>
 /// </summary>
 public static class PatchedGameCheck
@@ -26,8 +27,11 @@ public static class PatchedGameCheck
         NotBooted,
         /// <summary>MEM1 is smaller than 48 MB: Dolphin started without the override.</summary>
         SmallMemory,
-        /// <summary>No draw-hook status word: not our patched game (or Link not drawn yet).</summary>
+        /// <summary>No draw-hook status word with a save loaded: not our patched game.</summary>
         NotPatched,
+        /// <summary>No draw-hook status word yet, but no save is loaded either (title screen, file select):
+        /// Link hasn't been drawn, so it can't tell yet.</summary>
+        NotInGame,
     }
 
     /// <summary>MEM1 the patched game needs: bi2.bin is patched to 48 MB (GamePatcherService.PatchBi2).</summary>
@@ -42,7 +46,10 @@ public static class PatchedGameCheck
     public static Result Check(IDolphinService dolphin)
     {
         if (dolphin.EmulatedMemorySize is long size && size < RequiredMem1Size) return Result.SmallMemory;
-        return IsHookStatus(dolphin.ReadMemory(PuppetLayout.STATUS_ADDR, 4)) ? Result.Ok : Result.NotPatched;
+        if (IsHookStatus(dolphin.ReadMemory(PuppetLayout.STATUS_ADDR, 4))) return Result.Ok;
+        // mMaxLife is 0 until a save is loaded (a real save always has at least 3 hearts); an unreadable
+        // value counts as loaded, so an unpatched game is still refused.
+        return dolphin.ReadMemory(GameMemoryAddresses.Player.MaxHealth.Address, 2) is [0, 0] ? Result.NotInGame : Result.NotPatched;
     }
 
     /// <summary>Is this 4-byte read of STATUS_ADDR (as stored in the game: big-endian) one of <see cref="HookStatuses"/>?</summary>

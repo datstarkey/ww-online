@@ -256,6 +256,44 @@ public sealed class GameLaunchServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task APatchedGameOnFileSelect_IsWaitedFor_NotRefused()
+    {
+        SaveSetup();
+        _hookStatus = [0, 0, 0, 0];   // Link not drawn yet
+        byte[] maxLife = [0, 0];      // no save loaded
+        _dolphin.Setup(d => d.ReadMemory(Data.GameMemoryAddresses.Player.MaxHealth.Address, 2)).Returns(() => _connected ? maxLife : null);
+        _dolphin.Setup(d => d.ConnectAsync(It.IsAny<int>())).Returns((int pid) =>
+        {
+            // Far longer on file select than the unpatched grace (5) or the whole budget (3), then a save loads.
+            if (++_connects == 12) { maxLife = [0, 12]; _hookStatus = "HOOK"u8.ToArray(); }
+            _connected = true;
+            _connectedPid = pid;
+            return Task.FromResult(true);
+        });
+        using var launch = Service();
+        var seen = new List<GameLaunchStatus>();
+        launch.StatusChanged += seen.Add;
+
+        Assert.Equal(GameLaunchState.Attached, (await launch.StartGameAsync()).State);
+        Assert.Equal(1, _attachedCount);
+        Assert.Contains(seen, s => s.Message.Contains("load your save"));
+    }
+
+    [Fact]
+    public async Task AnUnpatchedGameWithASaveLoaded_IsStillRefused()
+    {
+        SaveSetup();
+        _hookStatus = [0, 0, 0, 0];
+        _dolphin.Setup(d => d.ReadMemory(Data.GameMemoryAddresses.Player.MaxHealth.Address, 2)).Returns(() => _connected ? new byte[] { 0, 12 } : null);
+        using var launch = new GameLaunchService(_settings, _ => _build, _dolphin.Object,
+            () => Interlocked.Increment(ref _attachedCount), _starter, TimeSpan.FromMilliseconds(1), maxAttachAttempts: 20);
+
+        var result = await launch.StartGameAsync();
+        Assert.Equal(GameLaunchState.Blocked, result.State);
+        Assert.Contains("isn't your patched", result.Message);
+    }
+
+    [Fact]
     public async Task PatchedHook_ShowingUpAfterBoot_IsAccepted()
     {
         SaveSetup();
