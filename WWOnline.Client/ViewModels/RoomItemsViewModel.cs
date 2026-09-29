@@ -7,6 +7,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using WWOnline.Data;
+using WWOnline.Patcher.Icons;
 using WWOnline.Services;
 using WWOnline.Shared.Models;
 
@@ -27,15 +28,23 @@ public partial class ItemTileViewModel : ObservableObject
 
     [ObservableProperty] private bool _isOwned;
 
+    /// <summary>The game's icon for what is in the slot (else for what "give" puts there); null = show <see cref="Code"/>.</summary>
+    [ObservableProperty] private IImage? _icon;
+
+    /// <summary>The item the icon shows: the owned item (a Deluxe Picto Box, a filled bottle), else <see cref="InventorySlotInfo.ItemId"/>.</summary>
+    public byte DisplayItemId { get; set; }
+
     public ItemTileViewModel(InventorySlotInfo slot, string code)
     {
         Slot = slot;
         Code = code;
+        DisplayItemId = slot.ItemId;
     }
 }
 
-/// <summary>A chip on the Room page's items summary; <see cref="IsExtra"/> ones are outlined ("+ 2 songs").</summary>
-public record ItemChip(string Text, bool IsExtra = false);
+/// <summary>A chip on the Room page's items summary; <see cref="IsExtra"/> ones are outlined ("+ 2 songs").
+/// <see cref="Icon"/> is the game's icon when the icons are extracted.</summary>
+public record ItemChip(string Text, bool IsExtra = false, IImage? Icon = null);
 
 /// <summary>A pick-one option (sword, magic meter, wallet size...). <see cref="Value"/> is the model value.</summary>
 public partial class ChoiceOption : ObservableObject
@@ -47,11 +56,17 @@ public partial class ChoiceOption : ObservableObject
 
     [ObservableProperty] private bool _isSelected;
 
-    public ChoiceOption(string label, int value, string? key = null)
+    /// <summary>The item number whose icon this option shows (null = text only).</summary>
+    public byte? IconItem { get; }
+
+    [ObservableProperty] private IImage? _icon;
+
+    public ChoiceOption(string label, int value, string? key = null, byte? iconItem = null)
     {
         Label = label;
         Value = value;
         Key = key ?? label;
+        IconItem = iconItem;
     }
 }
 
@@ -64,11 +79,18 @@ public partial class FlagOption : ObservableObject
 
     [ObservableProperty] private bool _isOn;
 
-    public FlagOption(string label, int index, IBrush? dot = null)
+    /// <summary>The item number whose icon this option shows (null = none).</summary>
+    public byte? IconItem { get; }
+
+    /// <summary>The game's icon; null = the view's placeholder (<see cref="Dot"/>, a vector shard, text).</summary>
+    [ObservableProperty] private IImage? _icon;
+
+    public FlagOption(string label, int index, IBrush? dot = null, byte? iconItem = null)
     {
         Label = label;
         Index = index;
         Dot = dot;
+        IconItem = iconItem;
     }
 }
 
@@ -98,6 +120,9 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
 
     public ServerViewModel Server { get; }
 
+    /// <summary>The game's item icons (null until extracted from the player's game files).</summary>
+    public ItemIcons Icons { get; }
+
     /// <summary>Read-only by default; Edit items → edit mode, Done → locked.</summary>
     public EditMode Edit { get; } = new();
     public bool IsEditing => Edit.IsEditing;
@@ -109,7 +134,10 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
     private string? _statusMessage;
 
     // ═══ Inventory Management (moved from DebugToolsViewModel) ═══
-    public List<InventorySlotInfo> InventorySlots { get; } = new()
+    public IReadOnlyList<InventorySlotInfo> InventorySlots => DefaultSlots;
+
+    /// <summary>The 21 item-menu slots and what "give" puts in each.</summary>
+    public static IReadOnlyList<InventorySlotInfo> DefaultSlots { get; } = new List<InventorySlotInfo>
     {
         new("Telescope", 0, ItemIDs.MainItems.Telescope),
         new("Sail", 1, ItemIDs.MainItems.Sail),
@@ -186,6 +214,12 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _shardText = "0 of 8";
     [ObservableProperty] private bool _hasOwnedChips;
     [ObservableProperty] private byte _walletSize;
+    [ObservableProperty] private IImage? _swordIcon;
+    [ObservableProperty] private IImage? _shieldIcon;
+    [ObservableProperty] private IImage? _heartIcon;
+    [ObservableProperty] private IImage? _walletIcon;
+    [ObservableProperty] private IImage? _quiverIcon;
+    [ObservableProperty] private IImage? _bombBagIcon;
 
     private RoomInventory? _snapshot;
 
@@ -228,23 +262,25 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         IDolphinService dolphinService,
         RoomInventorySyncService roomInventory,
         RoomSettingsService roomSettings,
-        ServerViewModel server)
+        ServerViewModel server,
+        ItemIcons icons)
     {
         _dolphinService = dolphinService;
         _roomInventory = roomInventory;
         _roomSettings = roomSettings;
         Server = server;
+        Icons = icons;
 
         foreach (var slot in InventorySlots)
             Tiles.Add(new ItemTileViewModel(slot, TileCodes[slot.Slot]));
         SwordOptions.Add(new ChoiceOption("None", ItemIDs.Swords.NoSword));
-        SwordOptions.Add(new ChoiceOption("Hero's Sword", ItemIDs.Swords.HerosSword));
-        SwordOptions.Add(new ChoiceOption("Master Sword", ItemIDs.Swords.MasterSword));
-        SwordOptions.Add(new ChoiceOption("Master Sword (half power)", ItemIDs.Swords.MasterSwordHalf, "Master Sword (Half)"));
-        SwordOptions.Add(new ChoiceOption("Master Sword (full power)", ItemIDs.Swords.MasterSwordFull, "Master Sword (Full)"));
+        SwordOptions.Add(new ChoiceOption("Hero's Sword", ItemIDs.Swords.HerosSword, iconItem: ItemIDs.Swords.HerosSword));
+        SwordOptions.Add(new ChoiceOption("Master Sword", ItemIDs.Swords.MasterSword, iconItem: ItemIDs.Swords.MasterSword));
+        SwordOptions.Add(new ChoiceOption("Master Sword (half power)", ItemIDs.Swords.MasterSwordHalf, "Master Sword (Half)", ItemIDs.Swords.MasterSwordHalf));
+        SwordOptions.Add(new ChoiceOption("Master Sword (full power)", ItemIDs.Swords.MasterSwordFull, "Master Sword (Full)", ItemIDs.Swords.MasterSwordFull));
         ShieldOptions.Add(new ChoiceOption("None", ItemIDs.Shields.NoShield));
-        ShieldOptions.Add(new ChoiceOption("Hero's Shield", ItemIDs.Shields.HerosShield));
-        ShieldOptions.Add(new ChoiceOption("Mirror Shield", ItemIDs.Shields.MirrorShield));
+        ShieldOptions.Add(new ChoiceOption("Hero's Shield", ItemIDs.Shields.HerosShield, iconItem: ItemIDs.Shields.HerosShield));
+        ShieldOptions.Add(new ChoiceOption("Mirror Shield", ItemIDs.Shields.MirrorShield, iconItem: ItemIDs.Shields.MirrorShield));
         MagicOptions.Add(new ChoiceOption("None", 0));
         MagicOptions.Add(new ChoiceOption("Normal", 16));
         MagicOptions.Add(new ChoiceOption("Double", RoomInventory.MaxMagicLimit));
@@ -258,14 +294,14 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         }
         // mTact bits 0-5 (item_func_tact_song1..6), mSymbol bits 0-2 (dSymbol_NAYRU/DIN/FARORE_e)
         string[] songs = ["Wind's Requiem", "Ballad of Gales", "Command Melody", "Earth God's Lyric", "Wind God's Aria", "Song of Passing"];
-        for (int i = 0; i < songs.Length; i++) Songs.Add(new FlagOption(songs[i], i));
-        Pearls.Add(new FlagOption("Din", 1, Brush("#FF7A59")));
-        Pearls.Add(new FlagOption("Farore", 2, Brush("#5BD17A")));
-        Pearls.Add(new FlagOption("Nayru", 0, Brush("#5B9DFF")));
-        for (int i = 0; i < 8; i++) Shards.Add(new FlagOption($"{i + 1} shards", i));
-        Upgrades.Add(new FlagOption("Power Bracelets", 0));
-        Upgrades.Add(new FlagOption("Pirate's Charm", 1));
-        Upgrades.Add(new FlagOption("Hero's Charm", 2));
+        for (int i = 0; i < songs.Length; i++) Songs.Add(new FlagOption(songs[i], i, iconItem: (byte)(ItemIconCatalog.ItemNo.WindsRequiem + i)));
+        Pearls.Add(new FlagOption("Din", 1, Brush("#FF7A59"), ItemIconCatalog.ItemNo.PearlDin));
+        Pearls.Add(new FlagOption("Farore", 2, Brush("#5BD17A"), ItemIconCatalog.ItemNo.PearlFarore));
+        Pearls.Add(new FlagOption("Nayru", 0, Brush("#5B9DFF"), ItemIconCatalog.ItemNo.PearlNayru));
+        for (int i = 0; i < 8; i++) Shards.Add(new FlagOption($"{i + 1} shards", i, iconItem: (byte)(ItemIconCatalog.ItemNo.Triforce1 + i)));
+        Upgrades.Add(new FlagOption("Power Bracelets", 0, iconItem: ItemIconCatalog.ItemNo.PowerBracelets));
+        Upgrades.Add(new FlagOption("Pirate's Charm", 1, iconItem: ItemIconCatalog.ItemNo.PiratesCharm));
+        Upgrades.Add(new FlagOption("Hero's Charm", 2, iconItem: ItemIconCatalog.ItemNo.HerosCharm));
 
         Edit.CanEdit = ItemsEditable;
         Edit.PropertyChanged += OnEditPropertyChanged;
@@ -273,6 +309,8 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         _roomSettings.Changed += OnRoomSettingsChanged;
         _roomInventory.RoomChanged += OnRoomInventoryChanged;
         _dolphinService.ConnectionChanged += OnDolphinConnectionChanged;
+        Icons.Refreshed += RefreshIcons;
+        RefreshIcons();
         OnRoomItemsModeChanged();
 
         // With shared items off, the page mirrors this game's own items (1 Hz read, nothing written).
@@ -282,6 +320,79 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
     }
 
     private static IBrush Brush(string hex) => new SolidColorBrush(Color.Parse(hex));
+
+    /// <summary>
+    /// Every item number this page (and the Room page's summary) asks <see cref="ItemIcons"/> for,
+    /// so a test can check the catalogue has an icon for each. Keep in step with the constructor
+    /// and <see cref="RefreshIcons"/>.
+    /// </summary>
+    public static IEnumerable<byte> ItemsShownAsIcons()
+    {
+        foreach (var slot in DefaultSlots) yield return slot.ItemId;
+        // What an owned slot can hold instead (a Deluxe Picto Box, bottle contents)
+        yield return ItemIDs.PictoBox.DeluxePictoBox;
+        for (byte b = ItemIDs.BottleContents.EmptyBottle; b <= ItemIDs.BottleContents.ForestFirefly; b++) yield return b;
+        yield return ItemIDs.Swords.HerosSword;
+        yield return ItemIDs.Swords.MasterSword;
+        yield return ItemIDs.Swords.MasterSwordHalf;
+        yield return ItemIDs.Swords.MasterSwordFull;
+        yield return ItemIDs.Shields.HerosShield;
+        yield return ItemIDs.Shields.MirrorShield;
+        for (int i = 0; i < 6; i++) yield return (byte)(ItemIconCatalog.ItemNo.WindsRequiem + i);
+        yield return ItemIconCatalog.ItemNo.PearlDin;
+        yield return ItemIconCatalog.ItemNo.PearlFarore;
+        yield return ItemIconCatalog.ItemNo.PearlNayru;
+        for (int i = 0; i < 8; i++) yield return (byte)(ItemIconCatalog.ItemNo.Triforce1 + i);
+        yield return ItemIconCatalog.ItemNo.PowerBracelets;
+        yield return ItemIconCatalog.ItemNo.PiratesCharm;
+        yield return ItemIconCatalog.ItemNo.HerosCharm;
+        yield return ItemIconCatalog.ItemNo.HeartContainer;
+        yield return ItemIconCatalog.ItemNo.GreenRupee;
+        yield return ItemIconCatalog.ItemNo.BigWallet;
+        yield return ItemIconCatalog.ItemNo.GiantWallet;
+        yield return ItemIconCatalog.ItemNo.Quiver60;
+        yield return ItemIconCatalog.ItemNo.Quiver99;
+        yield return ItemIconCatalog.ItemNo.BombBag60;
+        yield return ItemIconCatalog.ItemNo.BombBag99;
+        yield return ItemIDs.MainItems.Bow;
+        yield return ItemIDs.MainItems.Bombs;
+    }
+
+    /// <summary>
+    /// Fetch every icon again (after an extraction, or when the snapshot changed what a slot or
+    /// capacity shows). Each is null until the icons exist; the view then shows its placeholder.
+    /// </summary>
+    private void RefreshIcons()
+    {
+        foreach (var tile in Tiles) tile.Icon = Icons.Get(tile.DisplayItemId);
+        foreach (var o in SwordOptions.Concat(ShieldOptions)) o.Icon = o.IconItem is { } id ? Icons.Get(id) : null;
+        foreach (var f in Songs.Concat(Pearls).Concat(Shards).Concat(Upgrades)) f.Icon = f.IconItem is { } id ? Icons.Get(id) : null;
+        var inv = _snapshot;
+        SwordIcon = inv == null || inv.EquippedSword == RoomInventory.NoItem ? null : Icons.Get(inv.EquippedSword);
+        ShieldIcon = inv == null || inv.EquippedShield == RoomInventory.NoItem ? null : Icons.Get(inv.EquippedShield);
+        HeartIcon = Icons.HeartContainer;
+        // Capacities: the upgrade you have (the game has no icon for the starting wallet, quiver or
+        // bag: a rupee, the bow and a bomb stand in for them).
+        WalletIcon = Icons.Get((inv?.WalletSize ?? 0) switch
+        {
+            >= 2 => ItemIconCatalog.ItemNo.GiantWallet,
+            1 => ItemIconCatalog.ItemNo.BigWallet,
+            _ => ItemIconCatalog.ItemNo.GreenRupee,
+        });
+        QuiverIcon = Icons.Get((inv?.MaxArrows ?? 0) switch
+        {
+            >= 99 => ItemIconCatalog.ItemNo.Quiver99,
+            >= 60 => ItemIconCatalog.ItemNo.Quiver60,
+            _ => ItemIDs.MainItems.Bow,
+        });
+        BombBagIcon = Icons.Get((inv?.MaxBombs ?? 0) switch
+        {
+            >= 99 => ItemIconCatalog.ItemNo.BombBag99,
+            >= 60 => ItemIconCatalog.ItemNo.BombBag60,
+            _ => ItemIDs.MainItems.Bombs,
+        });
+        RebuildChips();
+    }
 
     /// <summary>"Edit items" is offered while locked, to whoever may edit (the owner, or anyone for their own game).</summary>
     public bool ShowEditButton => Edit.CanEdit && !Edit.IsEditing;
@@ -383,8 +494,12 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         int owned = 0;
         foreach (var tile in Tiles)
         {
-            tile.IsOwned = inv.Items[tile.Slot.Slot] != RoomInventory.NoItem;
+            byte item = inv.Items[tile.Slot.Slot];
+            tile.IsOwned = item != RoomInventory.NoItem;
             if (tile.IsOwned) owned++;
+            // An owned slot shows what is really there (Deluxe Picto Box, a filled bottle) when the
+            // game has an icon for it; else the item "give" puts there.
+            tile.DisplayItemId = tile.IsOwned && ItemIconCatalog.TextureForItem(item) != null ? item : tile.Slot.ItemId;
         }
         OwnedCountText = $"{owned} of {RoomInventory.SlotCount}";
 
@@ -419,16 +534,23 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         Upgrades[1].IsOn = (inv.PiratesCharm & RoomInventory.CharmMask) != 0;
         Upgrades[2].IsOn = (inv.HerosCharm & RoomInventory.CharmMask) != 0;
 
-        // Summary chips: owned items (bottles collapsed), then the song count.
+        RefreshIcons(); // also rebuilds the summary chips
+    }
+
+    /// <summary>Summary chips: owned items (bottles collapsed), then the song count.</summary>
+    private void RebuildChips()
+    {
         OwnedChips.Clear();
+        var inv = _snapshot ?? new RoomInventory();
         int bottles = 0;
         foreach (var tile in Tiles)
         {
             if (!tile.IsOwned) continue;
             if (RoomInventory.IsBottleSlot(tile.Slot.Slot)) { bottles++; continue; }
-            OwnedChips.Add(new ItemChip(tile.Name));
+            OwnedChips.Add(new ItemChip(tile.Name, Icon: tile.Icon));
         }
-        if (bottles > 0) OwnedChips.Add(new ItemChip(bottles == 1 ? "Bottle" : $"{bottles} Bottles"));
+        if (bottles > 0)
+            OwnedChips.Add(new ItemChip(bottles == 1 ? "Bottle" : $"{bottles} Bottles", Icon: Icons.Get(ItemIconCatalog.ItemNo.EmptyBottle)));
         int songCount = BitOperations.PopCount((uint)(inv.Songs & RoomInventory.SongMask));
         if (songCount > 0) OwnedChips.Add(new ItemChip($"+ {songCount} song{(songCount == 1 ? "" : "s")}", IsExtra: true));
         HasOwnedChips = OwnedChips.Count > 0;
@@ -755,6 +877,7 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         _roomSettings.Changed -= OnRoomSettingsChanged;
         _roomInventory.RoomChanged -= OnRoomInventoryChanged;
         _dolphinService.ConnectionChanged -= OnDolphinConnectionChanged;
+        Icons.Refreshed -= RefreshIcons;
         _localTimer?.Stop();
         _localTimer?.Dispose();
         _localTimer = null;

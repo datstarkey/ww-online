@@ -154,6 +154,28 @@
                 </StackPanel>
             </Border>
 
+            <!-- Item icons: read from the player's own game files into a local cache (ItemIconService) -->
+            <Border Classes="ww-card" Padding="20,14">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                    <TextBlock Text="ITEM ICONS" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
+                    <ItemsControl Grid.Column="1" ItemsSource="{Binding IconPreview}" VerticalAlignment="Center" Margin="0,0,12,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="IImage">
+                                <Image Source="{Binding}" Width="26" Height="26" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Grid.Column="2" Text="{Binding IconStatusText}" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                               VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                    <Button Grid.Column="3" Classes="ww-secondary" MinHeight="36" Padding="14,0"
+                            Content="Read icons from game" Command="{Binding ExtractIconsCommand}"
+                            ToolTip.Tip="Decode the item icons from your own game files (vanilla folder, else the patched one). They stay on this PC." />
+                </Grid>
+            </Border>
+
             <!-- About -->
             <Border Classes="ww-card" Padding="20,14">
                 <Grid ColumnDefinitions="Auto,*,Auto">

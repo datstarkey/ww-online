@@ -86,7 +86,9 @@ public class RarcFileEntry
         {
             // File entry: read the actual file data.
             DataOffset = dataOffsetOrNodeIndex;
-            int absoluteDataOffset = fileDataListOffset + (int)DataOffset;
+            long absoluteDataOffset = fileDataListOffset + (long)DataOffset;
+            if (absoluteDataOffset + DataSize > data.Length)
+                throw new InvalidDataException($"RARC: \"{Name}\" runs past the end of the archive");
             Data = new byte[DataSize];
             Array.Copy(data, absoluteDataOffset, Data, 0, DataSize);
         }

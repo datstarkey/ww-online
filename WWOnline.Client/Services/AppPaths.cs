@@ -37,6 +37,20 @@ public static class AppPaths
     /// inside, Velopack's replaced-on-update <c>current</c> folder; removed on uninstall, which is fine for logs).</summary>
     public static string InstalledLogsDirectory { get; } = Path.Combine(LocalAppDataRoot, AppDataFolderName, "logs");
 
+    /// <summary>Name of the item icon cache folder. The Nintendo-files guard rejects any path with this
+    /// folder name, and .gitignore ignores it, so a copied cache can't be committed.</summary>
+    public const string IconCacheFolderName = "GameIcons";
+
+    /// <summary>
+    /// Item icons decoded from the player's own game files (<see cref="ItemIconService"/>):
+    /// %LocalAppData%\WWOnline\GameIcons (a cache: next to Velopack's <c>current</c>, never inside it,
+    /// and re-extracted if an uninstall removes it), or under <see cref="SettingsDirectoryVariable"/>
+    /// when that is set, so a throwaway profile never touches the real cache. Never in the repo, the
+    /// app folder or PatchData.
+    /// </summary>
+    public static string IconCacheDirectory => Path.Combine(
+        SettingsDirectoryOverride ?? Path.Combine(LocalAppDataRoot, AppDataFolderName), IconCacheFolderName);
+
     /// <summary>
     /// Log folder: <c>logs/</c> under the working directory for dev builds (unchanged behaviour),
     /// <see cref="InstalledLogsDirectory"/> for an installed app. Only valid after
