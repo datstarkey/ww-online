@@ -94,9 +94,7 @@ public abstract class SharedBagService<T> : IDisposable where T : class, IBagCou
     protected abstract Task<bool> SendDeltaAsync(T delta);
 
     /// <summary>No event running (shops, trades, feeding, cutscenes) and the pause menu is closed: safe to rewrite a bag.</summary>
-    public static bool IsIdle(IDolphinService dolphin) =>
-        dolphin.ReadMemory(GameMemoryAddresses.Events.EventMode, 1) is [0] &&
-        dolphin.ReadMemory(GameMemoryAddresses.Events.MenuPause, 1) is [0];
+    public static bool IsIdle(IDolphinService dolphin) => SceneStabilityGate.IsIdle(dolphin);
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 

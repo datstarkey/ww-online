@@ -731,7 +731,7 @@ public class GameHub : Hub<IGameHubClient>
     /// <summary>Log the flags a player added, plus a WARNING line for any with a known side effect.</summary>
     private static void LogStoryAdded(string player, string verb, StoryFlags added)
     {
-        Logger.Information("[story] {Player} {Verb} {Count} flag(s): {Flags}", player, verb, added.BitCount, added.Describe());
+        Logger.Information("[story] {Player} {Verb} {Count}: {Flags}", player, verb, added.CountText(), added.Describe());
         foreach (var f in added.RiskyFlags())
             Logger.Warning("[story] WARNING {Flag} from {Player}: {Effect} for players who receive it",
                 f.Name, player, EventFlagCatalog.RiskEffect(f.Id));
@@ -758,13 +758,13 @@ public class GameHub : Hub<IGameHubClient>
         if (result.Seeded)
         {
             StorySeedGate.Reset();
-            LogSeeded("story", "room story", decision, StorySeedGate, $"{result.Room.BitCount} flag(s)");
+            LogSeeded("story", "room story", decision, StorySeedGate, result.Room.CountText());
         }
         else if (!result.Added.IsEmpty)
             LogStoryAdded(player, "joined and brought", result.Added);
         else
-            Logger.Information("[story] {Player} joined the room story (nothing new, {Count} flag(s) in room)",
-                player, result.Room.BitCount);
+            Logger.Information("[story] {Player} joined the room story (nothing new, {Count} in room)",
+                player, result.Room.CountText());
 
         if (result.Seeded || !result.Added.IsEmpty)
             await Clients.Others.ReceiveStoryFlags(result.Room);

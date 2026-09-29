@@ -11,7 +11,8 @@ namespace WWOnline.Services;
 /// (story milestones, cutscenes seen, side quests, collectible latches, NPC dialogue state,
 /// tutorial hints) are OR-merged across players through the server, masked to
 /// <see cref="StoryFlags.SyncMask"/> (the catalog's Full-sync mask: never LocalOnly flags, never
-/// registers 0x79-0xFF, never mTmp).
+/// mTmp). So are the Nintendo Gallery figurines Carlov has made (<see cref="StoryFlags.Figurines"/>,
+/// the 17 figurine bitfield registers; docs/figurines.md). No other register (0x79-0xFF) is touched.
 ///
 ///   - on attach this game JOINS: the room owner's game seeds the room; anyone else's flags merge
 ///     up into it, and the room's flags come back to apply;
@@ -21,6 +22,10 @@ namespace WWOnline.Services;
 /// bit this save has ever had (from the room or set by the game itself) is never re-forced. If the
 /// game clears one later we leave it cleared
 /// (the catalog excludes every flag the game is known to clear; this is the safety net).
+/// Figurines are written only while the game is idle (<see cref="SceneStabilityGate.IsIdle"/>): the
+/// game sets them itself only in Carlov's talk event, so a write never races daNpcMt_c::setFigure.
+/// Carlov's in-progress figurine (flags 2F01 / 3080 / 3F01 / 4080 / 4040 and register A9FF) is
+/// LocalOnly and never synced.
 /// </summary>
 public class StorySyncService : IDisposable
 {
@@ -85,8 +90,8 @@ public class StorySyncService : IDisposable
             finally { Monitor.Exit(_tickLock); }
         };
         _timer.Start();
-        Logger.Information("[story] shared story sync started ({Bits} syncable flag bits)",
-            new StoryFlags { Bits = StoryFlags.SyncMask.ToArray() }.BitCount);
+        Logger.Information("[story] shared story sync started ({Bits} syncable flag bits, {Figurines} figurines)",
+            new StoryFlags { Bits = StoryFlags.SyncMask.ToArray() }.BitCount, StoryFlags.TotalFigurines);
     }
 
     public void Stop()
@@ -175,8 +180,8 @@ public class StorySyncService : IDisposable
         // Offline: sync nothing (flags set meanwhile merge up when we rejoin on Connected).
         if (!_signalR.IsConnected) return;
 
-        var raw = _dolphin.ReadMemory(EventFlagCatalog.EventBitfieldAddress, StoryFlags.ByteCount);
-        if (raw == null) return;
+        var raw = _dolphin.ReadMemory(EventFlagCatalog.EventBitfieldAddress, EventFlagCatalog.EventBitfieldSize);
+        if (raw is not { Length: EventFlagCatalog.EventBitfieldSize }) return;
         var local = StoryFlags.FromEventBytes(raw);
 
         if (!_joined)
@@ -193,8 +198,8 @@ public class StorySyncService : IDisposable
         if (!clearedByGame.IsEmpty)
         {
             _clearedLogged.MergeFrom(clearedByGame);
-            Logger.Warning("[story] the game cleared {Count} synced flag(s): {Flags} — leaving them cleared",
-                clearedByGame.BitCount, clearedByGame.Describe());
+            Logger.Warning("[story] the game cleared {Count}: {Flags} — leaving them cleared",
+                clearedByGame.CountText(), clearedByGame.Describe());
         }
 
         // Outbound: bits this game set that the room hasn't seen from us or anyone.
@@ -203,7 +208,7 @@ public class StorySyncService : IDisposable
         var fresh = local.Except(known);
         if (!fresh.IsEmpty)
         {
-            Logger.Information("[story] local set {Count} flag(s): {Flags} → sending", fresh.BitCount, fresh.Describe());
+            Logger.Information("[story] local set {Count}: {Flags} → sending", fresh.CountText(), fresh.Describe());
             _sent.MergeFrom(local);
             var toSend = local.Clone();
             _ = Task.Run(async () =>
@@ -221,28 +226,47 @@ public class StorySyncService : IDisposable
         }
 
         // Inbound: room bits this game is missing and has never had.
-        var missing = _received.Except(local).Except(_applied);
+        var missing = ToApply(_received, local, _applied, () => SceneStabilityGate.IsIdle(_dolphin));
         if (missing.IsEmpty) return;
-        ApplyBits(missing);
+        ApplyBits(_dolphin, missing);
         _applied.MergeFrom(missing);
-        Logger.Information("[story] applied {Count} room flag(s): {Flags}", missing.BitCount, missing.Describe());
+        Logger.Information("[story] applied room {Count}: {Flags}", missing.CountText(), missing.Describe());
         foreach (var f in missing.RiskyFlags())
             Logger.Warning("[story] WARNING applied {Flag}: {Effect}", f.Name, EventFlagCatalog.RiskEffect(f.Id));
     }
 
-    /// <summary>OR <paramref name="bits"/> into the game's event array, one byte at a time (read-modify-write
-    /// per byte keeps the window where the game could race us tiny, and never touches other bits).</summary>
-    private void ApplyBits(StoryFlags bits)
+    /// <summary>
+    /// What to write this tick: the room's bits this game is missing (<paramref name="local"/>) and has never
+    /// had (<paramref name="applied"/>). Figurines wait for an idle game (not talking to Carlov, menu closed):
+    /// without <paramref name="isIdle"/> they are left out, stay missing, and a later tick applies them.
+    /// </summary>
+    public static StoryFlags ToApply(StoryFlags room, StoryFlags local, StoryFlags applied, Func<bool> isIdle)
+    {
+        var missing = room.Except(local).Except(applied);
+        return missing.FigurineCount > 0 && !isIdle() ? missing.FlagsOnly() : missing;
+    }
+
+    /// <summary>
+    /// OR <paramref name="bits"/> into the game's event array, one byte at a time (read-modify-write per
+    /// byte keeps the window where the game could race us tiny, and never touches other bits): the flags
+    /// into bytes 0x00-0x41, the figurines into their registers (<see cref="StoryFlags.FigurineRegisterBytes"/>),
+    /// as daNpcMt_c::setFigure does (getEventReg, OR the bit, setEventReg).
+    /// </summary>
+    public static void ApplyBits(IDolphinService dolphin, StoryFlags bits)
     {
         for (int i = 0; i < StoryFlags.ByteCount; i++)
-        {
-            byte add = bits.Bits[i];
-            if (add == 0) continue;
-            uint addr = EventFlagCatalog.EventBitfieldAddress + (uint)i;
-            var b = _dolphin.ReadMemory(addr, 1);
-            if (b == null) continue;
-            _dolphin.WriteMemory(addr, new[] { (byte)(b[0] | add) });
-        }
+            OrByte(dolphin, i, bits.Bits[i]);
+        for (int i = 0; i < StoryFlags.FigurineByteCount; i++)
+            OrByte(dolphin, StoryFlags.FigurineRegisterBytes[i], (byte)(bits.Figurines[i] & StoryFlags.FigurineMask[i]));
+    }
+
+    private static void OrByte(IDolphinService dolphin, int eventByte, byte add)
+    {
+        if (add == 0) return;
+        uint addr = EventFlagCatalog.EventBitfieldAddress + (uint)eventByte;
+        var b = dolphin.ReadMemory(addr, 1);
+        if (b is not { Length: 1 } || (b[0] | add) == b[0]) return;
+        dolphin.WriteMemory(addr, new[] { (byte)(b[0] | add) });
     }
 
     private void TryJoin(StoryFlags local)
@@ -279,10 +303,11 @@ public class StorySyncService : IDisposable
                     _sent.MergeFrom(snapshot);
                     _joined = true;
                     _loggedWaiting = false;
-                    toApply = room.Except(snapshot).Except(_applied).BitCount;
+                    var fresh = room.Except(snapshot).Except(_applied);
+                    toApply = fresh.BitCount + fresh.FigurineCount;
                 }
-                Logger.Information("[story] joined room story ({Room} flag(s) in room, this game brought {Mine}); {N} to apply",
-                    room.BitCount, snapshot.BitCount, toApply);
+                Logger.Information("[story] joined room story ({Room} in room, this game brought {Mine}); {N} to apply",
+                    room.CountText(), snapshot.CountText(), toApply);
             }
             catch (Exception ex) { Logger.Warning(ex, "[story] join failed (retrying)"); }
             finally { Interlocked.Exchange(ref _joining, 0); }

@@ -587,7 +587,7 @@
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
                                                 <TextBlock Text="Shared story" FontWeight="SemiBold" FontSize="15" />
-                                                <TextBlock Text="Main story progress merges up. Players can split up and finish different parts." FontSize="13"
+                                                <TextBlock Text="Main story progress and Nintendo Gallery figurines merge up. Players can split up and finish different parts." FontSize="13"
                                                            Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
                                             </StackPanel>
                                             <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding SharedStoryOn}">

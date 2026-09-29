@@ -55,4 +55,12 @@ public class SceneStabilityGate
         _lastStage = "";
         _stableTicks = 0;
     }
+
+    /// <summary>
+    /// No event running (talks, shops, trades, cutscenes: play.mEvtCtrl.mMode != 0) and the pause menu is
+    /// closed: safe to rewrite save data the game itself only changes from an event (a bag, a figurine).
+    /// </summary>
+    public static bool IsIdle(IDolphinService dolphin) =>
+        dolphin.ReadMemory(GameMemoryAddresses.Events.EventMode, 1) is [0] &&
+        dolphin.ReadMemory(GameMemoryAddresses.Events.MenuPause, 1) is [0];
 }
