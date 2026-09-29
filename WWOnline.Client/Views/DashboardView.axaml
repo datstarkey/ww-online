@@ -647,6 +647,28 @@
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
                                         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                                             <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconBag}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Shared delivery bag" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="One bag of quest items: trade goods, letters, the Cabana Deed and Beedle's tickets. An item anyone receives is everyone's, and one anyone hands over or trades is gone for everyone." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding SharedDeliveryOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding SharedDeliveryOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !SharedDeliveryOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding SharedDeliveryOn}"
+                                                          ToolTip.Tip="The delivery bag's quest items (trade goods, letters...) are one room bag. Off: each player keeps their own."
+                                                          AutomationProperties.Name="Shared delivery bag" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
                                                 <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSwords}" Stroke="{StaticResource HeartBrush}" /></Viewbox>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
@@ -783,6 +805,15 @@
                                             <TextBlock Grid.Column="1" Text="Shared spoils bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedSpoilsOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedSpoilsOn}" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44"
+                                            ToolTip.Tip="The delivery bag's quest items (trade goods, letters...) are one room bag.">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconBag}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="Shared delivery bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedDeliveryOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedDeliveryOn}" />
                                         </Grid>
                                     </Border>
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44"

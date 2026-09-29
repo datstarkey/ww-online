@@ -47,6 +47,7 @@ public partial class App : Application
         services.AddSingleton<SharedWalletService>();
         services.AddSingleton<SharedBaitService>();
         services.AddSingleton<SharedSpoilsService>();
+        services.AddSingleton<SharedDeliveryService>();
         services.AddSingleton<StorySyncService>();
         services.AddSingleton<SmallKeyTableProvider>();
         services.AddSingleton<SharedSmallKeyService>();

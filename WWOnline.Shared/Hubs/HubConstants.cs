@@ -17,9 +17,10 @@ public static class HubConstants
     /// SendBaitDelta, ReceiveBaitTotal, BaitCounts, RoomSettings.SharedBait), the shared spoils bag
     /// (JoinSpoils, SendSpoilsDelta, ReceiveSpoilsTotal, SpoilsCounts, RoomSettings.SharedSpoils) and warp
     /// to player (PuppetData.Warp, RoomSettings.AllowWarping). 6: Nintendo Gallery figurines in the room
-    /// story (StoryFlags.Figurines), and the dungeon warp jars' open bits (StoryFlags.WarpJars).
+    /// story (StoryFlags.Figurines) and the shared delivery bag (JoinDelivery, SendDeliveryDelta,
+    /// ReceiveDeliveryTotal, DeliveryCounts, RoomSettings.SharedDelivery).
     /// </summary>
-    public const int ProtocolVersion = 6; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait + spoils bags (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait; JoinSpoils / SendSpoilsDelta / ReceiveSpoilsTotal, SharedSpoils), warp to player (PuppetData.Warp, AllowWarping). 6: figurines in the room story (StoryFlags.Figurines)
+    public const int ProtocolVersion = 6; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait + spoils bags (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait; JoinSpoils / SendSpoilsDelta / ReceiveSpoilsTotal, SharedSpoils), warp to player (PuppetData.Warp, AllowWarping). 6: figurines in the room story (StoryFlags.Figurines), shared delivery bag (JoinDelivery / SendDeliveryDelta / ReceiveDeliveryTotal, SharedDelivery), warp jars in the room story (StoryFlags.WarpJars)
 
     // Hub method names (server-side methods invoked by clients)
 
@@ -49,6 +50,14 @@ public static class HubConstants
 
     /// <summary>A signed <see cref="Models.SpoilsCounts"/> change (spoils picked up / sold / traded), while SharedSpoils is on.</summary>
     public const string SendSpoilsDelta = "SendSpoilsDelta";
+
+    /// <summary>Join the shared delivery bag with this game's <see cref="Models.DeliveryCounts"/>; returns the room's
+    /// bag to adopt (null: rule off, or waiting for the room owner to seed it).</summary>
+    public const string JoinDelivery = "JoinDelivery";
+
+    /// <summary>A signed <see cref="Models.DeliveryCounts"/> change (quest items received / handed over / traded,
+    /// plus newly obtained flags), while SharedDelivery is on.</summary>
+    public const string SendDeliveryDelta = "SendDeliveryDelta";
     public const string GetRoomSettings = "GetRoomSettings";
     public const string SetRoomSettings = "SetRoomSettings";
     public const string ClaimRoomOwner = "ClaimRoomOwner";
@@ -70,6 +79,7 @@ public static class HubConstants
     public const string ReceiveRupeeTotal = "ReceiveRupeeTotal";
     public const string ReceiveBaitTotal = "ReceiveBaitTotal";
     public const string ReceiveSpoilsTotal = "ReceiveSpoilsTotal";
+    public const string ReceiveDeliveryTotal = "ReceiveDeliveryTotal";
     public const string ReceiveRoomSettings = "ReceiveRoomSettings";
     public const string ReceiveRoomInventory = "ReceiveRoomInventory";
     public const string ReceiveStoryFlags = "ReceiveStoryFlags";
