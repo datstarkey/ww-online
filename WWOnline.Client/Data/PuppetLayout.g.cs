@@ -207,6 +207,8 @@ public static class PuppetLayout
     public const int PUPPET_BOAT_FLAG_MAST_ON = 0x04;
     /// <summary>m03E8 == 0.001: J_FN_MAST scaled away (cannon or crane in its place)</summary>
     public const int PUPPET_BOAT_FLAG_MAST_HIDE = 0x08;
+    public const int PUPPET_BOAT_PART_SHIFT = 4;
+    public const int PUPPET_BOAT_PART_MASK = 0x3;
     public const int PUPPET_BOAT_HEAD_BCK_SHIFT = 8;
     public const int PUPPET_BOAT_HEAD_BCK_MASK = 0xFF;
     /// <summary>AKIBI1: first bck in the archive</summary>
@@ -218,6 +220,28 @@ public static class PuppetLayout
     public const int SHIP_BCK_MAST_ON2 = 0x0B;
     /// <summary>KYAKKAN1: last bck in the archive</summary>
     public const int SHIP_BCK_LAST = 0x0E;
+    public const int SHIP_PART_WAIT = 0;
+    /// <summary>the sail</summary>
+    public const int SHIP_PART_STEER = 1;
+    public const int SHIP_PART_CANNON = 2;
+    /// <summary>the salvage arm</summary>
+    public const int SHIP_PART_CRANE = 3;
+    /// <summary>mRopeCnt's cap: ARRAY_SIZE(mRopeLineSegments) (d_a_ship.cpp:3108-3109)</summary>
+    public const int SHIP_ROPE_MAX = 250;
+    public const uint PUPPET_BOAT_CANNON_0 = 0x803FCFB4;
+    /// <summary>3 slots end at 0x803FCFC0 = DBG_MAGIC_DETECTED_ADDR</summary>
+    public const int PUPPET_BOAT_CANNON_SIZE = 0x04;
+    /// <summary>s16 — m0394: VFNCN J CANON1 turns by this about X</summary>
+    public const int PUPPET_BOAT_CANNON_OFF_YAW = 0x00;
+    /// <summary>s16 — m0396: J CANON2 turns by -this about Y (0..0x4000)</summary>
+    public const int PUPPET_BOAT_CANNON_OFF_PITCH = 0x02;
+    public const uint PUPPET_BOAT_CRANE_0 = 0x803FCFE0;
+    /// <summary>3 slots end at 0x803FCFEC = CLIENT_HEARTBEAT_ADDR</summary>
+    public const int PUPPET_BOAT_CRANE_SIZE = 0x04;
+    /// <summary>s16 — m0398 + m039C: VFNCR V_CRANE_ROTATION turns by -this about Z</summary>
+    public const int PUPPET_BOAT_CRANE_OFF_ANGLE = 0x00;
+    /// <summary>u8  — mRopeCnt: 10-unit rope segments (0..SHIP_ROPE_MAX); 0x03 is spare</summary>
+    public const int PUPPET_BOAT_CRANE_OFF_ROPE = 0x02;
     /// <summary>u32 — times magic marker seen</summary>
     public const uint DBG_MAGIC_DETECTED_ADDR = 0x803FCFC0;
     /// <summary>u32 — fopAcM_create attempts</summary>

@@ -599,6 +599,11 @@ static inline daPy_ProcFunc dapy_lk_getCurProcFunc(daPy_lk_c *link)
 // mDoLib_project dereference them unchecked (m_Do_lib.cpp:82, 109)
 #define DDLST_LIST_MPVIEWPORT(drawlist)         (*(void**)((u8*)(drawlist) + 0x230))
 #define DDLST_LIST_MPVIEW(drawlist)             (*(void**)((u8*)(drawlist) + 0x234))
+// m3DLineMatSortPacket[2] (d_drawlist.h:699, size 0x14 each), what dComIfGd_set3DlineMat passes to
+// mDoExt_3DlineMatSortPacket::setMat with the line's getMaterialID() (DOL daHimo2_Draw 0x800EC56C:
+// mulli id,0x14; addis 1; addi 0x6078 onto drawlist = gameInfo+0x5D1C)
+#define DDLST_LIST_3DLINEMATSORTPACKET(drawlist, id) \
+  ((mDoExt_3DlineMatSortPacket*)((u8*)(drawlist) + 0x16078 + ((id) * 0x14)))
 
 // JUTFont (JUTFont.h): vtable at +0 (verified against __vt__10JUTResFont 0x8039D1A8 in main.dol),
 // mValid +0x04, mColor1..4 (TColor = RGBA u32, what drawChar_scale's GXColor1u32 sends) +0x0C..+0x18.

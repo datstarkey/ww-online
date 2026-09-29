@@ -97,6 +97,58 @@ public class BoatStateTests
     }
 
     [Fact]
+    public void PartsAtTheGamesLimits_AreValid()
+    {
+        Assert.True(Puppet(new BoatState
+        {
+            Part = BoatState.PartCannon, CannonYaw = short.MinValue, CannonPitch = BoatState.MaxCannonPitch,
+        }).IsValid());
+        Assert.True(Puppet(new BoatState
+        {
+            Part = BoatState.PartCrane, CraneAngle = -BoatState.MaxCraneAngle, RopeLength = BoatState.MaxRopeLength,
+        }).IsValid());
+        Assert.True(Puppet(new BoatState { Part = BoatState.PartSteer, CraneAngle = BoatState.MaxCraneAngle }).IsValid());
+    }
+
+    [Fact]
+    public void PartLimits_AreTheDecompsRanges()
+    {
+        // d_a_ship.cpp:1788-1792 (m0396 <= 0x4000), 1830-1958 (m0398 -> +-0x3000, m039C -> +-0x800), 3108 (250 segments).
+        Assert.Equal(0x4000, BoatState.MaxCannonPitch);
+        Assert.Equal(0x3800, BoatState.MaxCraneAngle);
+        Assert.Equal(250, BoatState.MaxRopeLength);
+    }
+
+    [Theory]
+    [InlineData(4, 0, 0, 0)]
+    [InlineData(255, 0, 0, 0)]
+    [InlineData(2, -1, 0, 0)]
+    [InlineData(2, BoatState.MaxCannonPitch + 1, 0, 0)]
+    [InlineData(2, short.MinValue, 0, 0)]
+    [InlineData(3, 0, BoatState.MaxCraneAngle + 1, 0)]
+    [InlineData(3, 0, short.MinValue, 0)]
+    [InlineData(3, 0, 0, BoatState.MaxRopeLength + 1)]
+    public void OutOfRangeParts_RejectThePuppet(int part, int pitch, int crane, int rope)
+    {
+        Assert.False(Puppet(new BoatState
+        {
+            Part = (byte)part, CannonPitch = (short)pitch, CraneAngle = (short)crane, RopeLength = (byte)rope,
+        }).IsValid());
+    }
+
+    [Fact]
+    public void Parts_SurviveJson()
+    {
+        var boat = new BoatState { Part = 3, CannonYaw = -0x1234, CannonPitch = 0x2000, CraneAngle = -0x3100, RopeLength = 200 };
+        var copy = System.Text.Json.JsonSerializer.Deserialize<BoatState>(System.Text.Json.JsonSerializer.Serialize(boat))!;
+        Assert.Equal(boat.Part, copy.Part);
+        Assert.Equal(boat.CannonYaw, copy.CannonYaw);
+        Assert.Equal(boat.CannonPitch, copy.CannonPitch);
+        Assert.Equal(boat.CraneAngle, copy.CraneAngle);
+        Assert.Equal(boat.RopeLength, copy.RopeLength);
+    }
+
+    [Fact]
     public void Pose_SurvivesJson()
     {
         var boat = new BoatState

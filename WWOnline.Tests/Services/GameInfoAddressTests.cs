@@ -66,6 +66,12 @@ public class GameInfoAddressTests
         Assert.Equal(0x3A2u, GameMemoryAddresses.Sea.ShipOffsetHeadY);     // m03A2
         Assert.Equal(0x3B4u, GameMemoryAddresses.Sea.ShipOffsetHeadBck);   // m03B4
         Assert.Equal(0x3E8u, GameMemoryAddresses.Sea.ShipOffsetMastScale); // m03E8
+        Assert.Equal(0x34Eu, GameMemoryAddresses.Sea.ShipOffsetPart);        // mPart
+        Assert.Equal(0x394u, GameMemoryAddresses.Sea.ShipOffsetCannonYaw);   // m0394
+        Assert.Equal(0x396u, GameMemoryAddresses.Sea.ShipOffsetCannonPitch); // m0396
+        Assert.Equal(0x398u, GameMemoryAddresses.Sea.ShipOffsetCraneAngle);  // m0398
+        Assert.Equal(0x39Cu, GameMemoryAddresses.Sea.ShipOffsetCraneSwing);  // m039C
+        Assert.Equal(0x39Eu, GameMemoryAddresses.Sea.ShipOffsetRopeCnt);     // mRopeCnt
         // mDoExt_McaMorf::mFrameCtrl at 0x58 (the vanilla ctor at 0x80012650 builds its
         // J3DFrameCtrl at this+0x58) + J3DFrameCtrl::mFrame at 0x10.
         Assert.Equal(0x68u, GameMemoryAddresses.Sea.McaMorfOffsetFrame);

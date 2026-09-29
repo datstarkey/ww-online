@@ -212,7 +212,8 @@
  * boat (hull + head from the "Ship" archive) and seats the puppet in it. Fields mirror the
  * peer's daShip_c (d_a_ship.h): Y is only used while flying, otherwise the local sea sets it.
  * The pose fields feed the same joint maths as daShip_c's body/head joint callbacks
- * (d_a_ship.cpp:110-231), and the frames/bcks its two mDoExt_McaMorfs play.
+ * (d_a_ship.cpp:110-231), and the frames/bcks its two mDoExt_McaMorfs play. The block is full:
+ * the cannon / crane pose lives in the slot's PUPPET_BOAT_CANNON_* / PUPPET_BOAT_CRANE_* words (below).
  * ============================================================================ */
 #define PUPPET_BOAT_0             0x803FD170
 #define PUPPET_BOAT_SIZE          0x20  /* 3 slots end at 0x803FD1D0; 0x803FD1D0..DF is reserved (docs/small-keys.md) */
@@ -235,6 +236,9 @@
 #define PUPPET_BOAT_FLAG_FLY      0x02  /* daShip_c mStateFlag daSFLG_FLY_e: airborne, use POSY */
 #define PUPPET_BOAT_FLAG_MAST_ON  0x04  /* m0392 == SHIP_BCK_MAST_ON2 (mast up / rising), else SHIP_BCK_MAST_OFF2 */
 #define PUPPET_BOAT_FLAG_MAST_HIDE 0x08 /* m03E8 == 0.001: J_FN_MAST scaled away (cannon or crane in its place) */
+/* FLAGS bits 4..5: mPart (daShip_c::Part_e); the cannon / crane is drawn while it is SHIP_PART_CANNON / _CRANE */
+#define PUPPET_BOAT_PART_SHIFT    4
+#define PUPPET_BOAT_PART_MASK     0x3
 /* FLAGS bits 8..15: m03B4, mpHeadAnm's bck (a SHIP_BCK_* index; 0 = keep the current one) */
 #define PUPPET_BOAT_HEAD_BCK_SHIFT 8
 #define PUPPET_BOAT_HEAD_BCK_MASK 0xFF
@@ -246,6 +250,33 @@
 #define SHIP_BCK_MAST_OFF2        0x0A
 #define SHIP_BCK_MAST_ON2         0x0B
 #define SHIP_BCK_LAST             0x0E  /* KYAKKAN1: last bck in the archive */
+
+/* daShip_c::Part_e (d_a_ship.h): mPart, the thing on the mast joint */
+#define SHIP_PART_WAIT            0
+#define SHIP_PART_STEER           1     /* the sail */
+#define SHIP_PART_CANNON          2
+#define SHIP_PART_CRANE           3     /* the salvage arm */
+#define SHIP_ROPE_MAX             250   /* mRopeCnt's cap: ARRAY_SIZE(mRopeLineSegments) (d_a_ship.cpp:3108-3109) */
+
+/* ============================================================================
+ * Per-slot boat parts: the pose of the peer's cannon / crane. The boat block is full, so these are
+ * one word per slot in two small free gaps of the scratch region (between SPAWN_FRAME_COUNTER_ADDR
+ * and the DBG_* counters, and between CLIENT_DBG_SLOT0_GATES and CLIENT_HEARTBEAT_ADDR). Written by
+ * C# with the boat block, before its FLAGS word; FLAGS' PART field (PUPPET_BOAT_PART_*) says which
+ * part, if any, is out and so which word the REL reads. Fields mirror the peer's daShip_c
+ * (d_a_ship.h) as its cannon / crane joint callbacks use them (d_a_ship.cpp:147-178), plus the
+ * crane's rope length (setRopePos, :3148-3272).
+ * ============================================================================ */
+#define PUPPET_BOAT_CANNON_0          0x803FCFB4
+#define PUPPET_BOAT_CANNON_SIZE       0x04  /* 3 slots end at 0x803FCFC0 = DBG_MAGIC_DETECTED_ADDR */
+#define PUPPET_BOAT_CANNON_BASE(i)    (PUPPET_BOAT_CANNON_0 + ((i) * PUPPET_BOAT_CANNON_SIZE))
+#define PUPPET_BOAT_CANNON_OFF_YAW    0x00  /* s16 — m0394: VFNCN J CANON1 turns by this about X */
+#define PUPPET_BOAT_CANNON_OFF_PITCH  0x02  /* s16 — m0396: J CANON2 turns by -this about Y (0..0x4000) */
+#define PUPPET_BOAT_CRANE_0           0x803FCFE0
+#define PUPPET_BOAT_CRANE_SIZE        0x04  /* 3 slots end at 0x803FCFEC = CLIENT_HEARTBEAT_ADDR */
+#define PUPPET_BOAT_CRANE_BASE(i)     (PUPPET_BOAT_CRANE_0 + ((i) * PUPPET_BOAT_CRANE_SIZE))
+#define PUPPET_BOAT_CRANE_OFF_ANGLE   0x00  /* s16 — m0398 + m039C: VFNCR V_CRANE_ROTATION turns by -this about Z */
+#define PUPPET_BOAT_CRANE_OFF_ROPE    0x02  /* u8  — mRopeCnt: 10-unit rope segments (0..SHIP_ROPE_MAX); 0x03 is spare */
 
 /* Hook debug counters — read by the C# client diagnostics */
 #define DBG_MAGIC_DETECTED_ADDR   0x803FCFC0  /* u32 — times magic marker seen */
@@ -331,6 +362,15 @@ typedef char puppet_check_slot_fits[
      PUPPET_SLOT_OFF_GRAB_KIND + 1 <= PUPPET_SLOT_SIZE && (PUPPET_SLOT_SIZE % 4) == 0) ? 1 : -1];
 typedef char puppet_check_slots_before_tracking[
     (PUPPET_SLOT_REGION_END <= PUPPET_PROC_IDS_ADDR) ? 1 : -1];
+typedef char puppet_check_boat_cannon_words[
+    (PUPPET_BOAT_CANNON_0 >= SPAWN_FRAME_COUNTER_ADDR + 4 && PUPPET_BOAT_CANNON_BASE(PUPPET_MAX_SLOTS) <= DBG_MAGIC_DETECTED_ADDR &&
+     PUPPET_BOAT_CANNON_0 >= SCRATCH_REGION_START && (PUPPET_BOAT_CANNON_0 % 4) == 0 &&
+     PUPPET_BOAT_CANNON_OFF_PITCH + 2 <= PUPPET_BOAT_CANNON_SIZE && (PUPPET_BOAT_CANNON_SIZE % 4) == 0) ? 1 : -1];
+typedef char puppet_check_boat_crane_words[
+    (PUPPET_BOAT_CRANE_0 >= CLIENT_DBG_SLOT0_GATES + 4 && PUPPET_BOAT_CRANE_BASE(PUPPET_MAX_SLOTS) <= CLIENT_HEARTBEAT_ADDR &&
+     PUPPET_BOAT_CRANE_0 >= DBG_DELETE_ISSUED_ADDR + 4 && (PUPPET_BOAT_CRANE_0 % 4) == 0 &&
+     PUPPET_BOAT_CRANE_OFF_ROPE + 1 <= PUPPET_BOAT_CRANE_SIZE && (PUPPET_BOAT_CRANE_SIZE % 4) == 0 &&
+     PUPPET_BOAT_CRANE_BASE(PUPPET_MAX_SLOTS) <= PUPPET_SYNC_BASE && SHIP_ROPE_MAX <= 0xFF) ? 1 : -1];
 typedef char puppet_check_header_before_slots[
     (PUPPET_SYNC_BASE + PUPPET_HDR_SIZE <= PUPPET_SLOT_0) ? 1 : -1];
 typedef char puppet_check_bookkeeping_after_tracking[
@@ -346,7 +386,9 @@ typedef char puppet_check_worldsync_in_region[
     (WORLDSYNC_SCAN_CAND_ADDR + 4 <= SCRATCH_REGION_END) ? 1 : -1];
 typedef char puppet_check_boat_fits[
     (PUPPET_BOAT_OFF_HEAD_FRAME + 1 <= PUPPET_BOAT_SIZE && (PUPPET_BOAT_SIZE % 4) == 0 &&
-     (PUPPET_BOAT_FLAG_MAST_HIDE < (1 << PUPPET_BOAT_HEAD_BCK_SHIFT))) ? 1 : -1];
+     PUPPET_BOAT_FLAG_MAST_HIDE < (1 << PUPPET_BOAT_PART_SHIFT) &&
+     (PUPPET_BOAT_PART_MASK << PUPPET_BOAT_PART_SHIFT) < (1 << PUPPET_BOAT_HEAD_BCK_SHIFT) &&
+     SHIP_PART_CRANE <= PUPPET_BOAT_PART_MASK) ? 1 : -1];
 typedef char puppet_check_boats_after_appearance[
     (PUPPET_BOAT_0 >= LOCAL_APPEARANCE_STATUS_ADDR + 4) ? 1 : -1];
 typedef char puppet_check_boats_before_worldsync[
