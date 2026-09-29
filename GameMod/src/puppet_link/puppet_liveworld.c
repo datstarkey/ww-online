@@ -24,6 +24,11 @@
  * on it (lid radius 70, body 85): he would drop into the jar and warp. */
 #define LW_NEAR_DOOR 25 /* x10 units */
 #define LW_NEAR_JAR 12
+/* A soil mound grows a tree (collision, cull box 300), the flower house (cull box 1000) and the flame lift drop to
+ * where they lie once cut: never onto the local Link. */
+#define LW_NEAR_TREE 30
+#define LW_NEAR_HOUSE 100
+#define LW_NEAR_LIFT 50
 
 /* Which actors read which flag only at create, and what brings them up to date. Every key is
  * (prm >> shift) & mask (or home.angle.x's), verified in the actor's REL (docs/live-world.md). */
@@ -63,6 +68,19 @@ static const LwRule l_lwRules[] = {
     /* a normal warp jar with its lid on: its create sees the lid switch and builds it open (no lid, no break
      * effect, no event), as on a reload. A lidded jar never polls it (modeClose, d_a_obj_warpt.cpp:455-474). */
     {PROC_NAME_OBJ_WARPT, LW_ANGLE_X, 0xFF, WARPT_LID_OFF, WARPT_MODE_OFF, WARPT_MODE_CLOSE, LW_NEAR_JAR},
+    /* Dungeon objects that only read their switch at create (docs/live-world.md 0.3). Gone: door plant (FW, REL
+     * daSs_Create 0x3260; switch 0 = none, never placed), light statue (ET, d_a_obj_mkie.cpp:210), song statue
+     * (ET/WT, d_a_obj_mknjd.cpp:303, STOP), Phantom Ganon door (d_a_obj_vfan.cpp:90, STOP), leaf pile (FW,
+     * d_a_obj_leaves.cpp:471). Built in their set state: soil tree (WT, d_a_obj_vmc.cpp:145), flower house (FW,
+     * d_a_kokiie.cpp:438), flame lift (DRC, d_a_mflft.cpp:650). */
+    {PROC_NAME_SS, 24, 0xFF, 0, 0, 0, 0},
+    {PROC_NAME_MKIE, 16, 0xFF, 0, 0, 0, 0},
+    {PROC_NAME_MKNJD, 0, 0xFF, 0, 0, 0, 0},
+    {PROC_NAME_VFAN, 0, 0xFF, 0, 0, 0, 0},
+    {PROC_NAME_LEAVES, 13, 0xFF, 0, 0, 0, 0},
+    {PROC_NAME_VMC, 8, 0xFF, 0, 0, 0, LW_NEAR_TREE},
+    {PROC_NAME_KOKIIE, 24, 0xFF, 0, 0, 0, LW_NEAR_HOUSE},
+    {PROC_NAME_MFLFT, 24, 0xFF, 0, 0, 0, LW_NEAR_LIFT},
 };
 #define LW_RULE_END (l_lwRules + sizeof(l_lwRules) / sizeof(l_lwRules[0]))
 
