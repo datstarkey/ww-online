@@ -132,7 +132,7 @@ public static class PuppetLayout
     public const int LIVEWORLD_MAGIC = 0x4C495645;
     /// <summary>"LW" | saveTbl</summary>
     public const int LIVEWORLD_TAG_MAGIC = 0x4C570000;
-    public const int LIVEWORLD_BLOCK_SIZE = 0x48;
+    public const int LIVEWORLD_BLOCK_SIZE = 0x4C;
     /// <summary>tbox + 8 switch words</summary>
     public const int LIVEWORLD_BIT_WORDS = 9;
     public const int LIVEWORLD_ZONE_ROOM_NONE = 0xFF;
@@ -154,6 +154,8 @@ public static class PuppetLayout
     public const int LIVEWORLD_OFF_POKE_COUNT = 0x40;
     /// <summary>u32 C: passes held back for an actor still being created</summary>
     public const int LIVEWORLD_OFF_WAIT = 0x44;
+    /// <summary>u32 C: with DONE_SEQ: actors left undone (not ready in ~2 s, hits full, delete refused): publish again</summary>
+    public const int LIVEWORLD_OFF_RETRY = 0x48;
     /// <summary>u32 C#: LOCAL_APPEARANCE_MAGIC while WORD is valid (else REL uses game default + vanilla colour)</summary>
     public const uint LOCAL_APPEARANCE_TAG_ADDR = 0x803FD150;
     /// <summary>"LAPP"</summary>

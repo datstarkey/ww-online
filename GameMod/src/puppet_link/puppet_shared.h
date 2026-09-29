@@ -173,7 +173,7 @@
 #define LIVEWORLD_PTR_ADDR            0x803FD14C  /* u32 C: live-world block (game heap), 0 = none yet */
 #define LIVEWORLD_MAGIC               0x4C495645  /* "LIVE" */
 #define LIVEWORLD_TAG_MAGIC           0x4C570000  /* "LW" | saveTbl */
-#define LIVEWORLD_BLOCK_SIZE          0x48
+#define LIVEWORLD_BLOCK_SIZE          0x4C
 #define LIVEWORLD_BIT_WORDS           9           /* tbox + 8 switch words */
 #define LIVEWORLD_ZONE_ROOM_NONE      0xFF
 #define LIVEWORLD_OFF_MAGIC           0x00        /* u32 C: LIVEWORLD_MAGIC once set up */
@@ -185,6 +185,7 @@
 #define LIVEWORLD_OFF_DONE_SEQ        0x3C        /* u32 C: SEQ of the last batch handled */
 #define LIVEWORLD_OFF_POKE_COUNT      0x40        /* u32 C: ++ per actor re-created or unlocked */
 #define LIVEWORLD_OFF_WAIT            0x44        /* u32 C: passes held back for an actor still being created */
+#define LIVEWORLD_OFF_RETRY           0x48        /* u32 C: with DONE_SEQ: actors left undone (not ready in ~2 s, hits full, delete refused): publish again */
 
 /* ============================================================================
  * Per-Link appearance (puppet_appearance.c). Every Link on screen shares one J3DModelData, so
@@ -426,7 +427,7 @@ typedef char puppet_check_liveworld_word[
      (LIVEWORLD_PTR_ADDR % 4) == 0) ? 1 : -1];
 typedef char puppet_check_liveworld_block[
     (LIVEWORLD_OFF_BITS + (LIVEWORLD_BIT_WORDS * 4) <= LIVEWORLD_OFF_DONE_SEQ &&
-     LIVEWORLD_OFF_WAIT + 4 <= LIVEWORLD_BLOCK_SIZE && (LIVEWORLD_BLOCK_SIZE % 4) == 0 &&
+     LIVEWORLD_OFF_RETRY + 4 <= LIVEWORLD_BLOCK_SIZE && (LIVEWORLD_BLOCK_SIZE % 4) == 0 &&
      LIVEWORLD_OFF_MAGIC == PUPPET_NAMES_OFF_MAGIC && LIVEWORLD_OFF_BOOT == PUPPET_NAMES_OFF_BOOT) ? 1 : -1];
 typedef char puppet_check_appearance_words[
     (LOCAL_APPEARANCE_STATUS_ADDR + 4 <= WORLDSYNC_ITEM_MASK_ADDR) ? 1 : -1];

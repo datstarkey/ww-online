@@ -12,14 +12,13 @@
  * in the live mMemory.mItem, provided it is idle on the ground (not being collected by the
  * local player, not held by the boomerang/hookshot/another actor).
  *
- * Chests and other actors that read a flag only at create: puppet_liveworld.c (called from the tick).
+ * Chests and other actors that read a flag only at create: puppet_liveworld.c (run from the draw).
  * Switch-polling actors need nothing.
  *
  * Everything is offset-macro based (ww_inlines.h, WORLD SYNC block). REL: literals OK.
  */
 
 #include "puppet_worldsync.h"
-#include "puppet_liveworld.h"
 
 #define WS_SCAN_INTERVAL_MASK    3  /* scan every 4th game frame (mask arrives at ~20Hz) */
 #define WS_MAX_DESPAWN_PER_SCAN  8
@@ -115,17 +114,6 @@ void puppet_worldsync_tick(void)
   if ((frame & WS_SCAN_INTERVAL_MASK) != 0)
     return;
 
-  /* No stage change in flight (dStage_Delete does putSave, then the next stage's
-   * dStage_stagInfoInit does getSave; the stag pointer is stale in between). */
-  if (GAMEINFO_NEXT_STAGE_ENABLE(&g_dComIfG_gameInfo) != 0)
-    return;
-  u8 *stag = GAMEINFO_STAGE_STAGINFO(&g_dComIfG_gameInfo);
-  if (!ws_isValidPtr(stag))
-    return;
-  u32 saveTbl = STAGINFO_SAVE_TBL(stag);
-
-  puppet_liveworld_tick(saveTbl); /* chests, walls, crystals, key locks: puppet_liveworld.c */
-
   volatile u32 *tagp = (volatile u32 *)WORLDSYNC_STAGE_TAG_ADDR;
   volatile u32 *maskp = (volatile u32 *)WORLDSYNC_ITEM_MASK_ADDR;
 
@@ -135,6 +123,15 @@ void puppet_worldsync_tick(void)
   u32 mask = *maskp;
   if (mask == 0 || *tagp != tag)
     return; /* nothing to do, or C# rewrote the pair mid-read */
+
+  /* No stage change in flight (dStage_Delete does putSave, then the next stage's
+   * dStage_stagInfoInit does getSave; the stag pointer is stale in between). */
+  if (GAMEINFO_NEXT_STAGE_ENABLE(&g_dComIfG_gameInfo) != 0)
+    return;
+  u8 *stag = GAMEINFO_STAGE_STAGINFO(&g_dComIfG_gameInfo);
+  if (!ws_isValidPtr(stag))
+    return;
+  u32 saveTbl = STAGINFO_SAVE_TBL(stag);
   if (saveTbl >= DSV_STAGE_MAX || saveTbl != (tag & WS_TAG_SAVETBL_MASK))
     return;
 

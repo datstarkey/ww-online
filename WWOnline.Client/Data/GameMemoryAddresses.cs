@@ -151,6 +151,12 @@ public static class GameMemoryAddresses
     /// </summary>
     public static class Events
     {
+        /// <summary>play.mEvtCtrl.mMode (d_com_inf_game.h:718 mEvtCtrl at play + 0x3F38, d_event.h:154 mMode +0xC2):
+        /// dComIfGp_event_runCheck() is mMode != 0. The REL's GAMEINFO_EVT_MODE.</summary>
+        public const uint EventMode = Play + 0x3F38 + 0xC2;
+        /// <summary>dMenu_pause (d_meter.cpp:52, ww_linker.ld d_meter__dMenu_pause; dMenu_flag() reads it): nonzero while
+        /// the pause / item menu is open (fopAc_Draw then draws no actor).</summary>
+        public const uint MenuPause = 0x803F7097;
         public static readonly ByteArrayMemoryAddress EventBitfield = new(0x803C522C, 256, "EventBitfield", "Event bit flags");
         // dSv_save_c /* 0x624 */ mEvent; isEventBit(no) = mFlags[no >> 8] & (no & 0xFF) (d_save.cpp:1197).
         // playerInit tests EVENT_BIT_HERO_CLOTHES there (DOL 0x80125AD0: addi r3,r3,0x624; li r4,0x2A80).

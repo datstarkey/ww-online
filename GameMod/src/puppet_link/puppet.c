@@ -494,6 +494,7 @@ int daPuppet_Delete(PUPPET_class *this)
  */
 int daPuppet_Draw(PUPPET_class *this)
 {
+  puppet_liveworld_draw(); // create-only actors catch up; after all executes (see puppet_liveworld.h)
   // Parked this frame (execute skipped the model calc): never draw, even if C# flipped the
   // slot ACTIVE between our execute and this draw.
   if (this->parked)

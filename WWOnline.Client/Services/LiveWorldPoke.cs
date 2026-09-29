@@ -13,16 +13,18 @@ namespace WWOnline.Services;
 ///
 /// Bits live in one word array, <see cref="Words"/> long: word 0 = chests (dSv_memBit_c::mTbox),
 /// words 1..8 = switch n in word <see cref="SwitchWord"/>(n), bit n &amp; 31 (memory 0x00-0x7F, dan
-/// 0x80-0xBF, zone 0xC0-0xEF of <see cref="ZoneRoom"/>). <see cref="WorldFlagSyncService"/> records the
-/// bits it applies from the room (<see cref="AddRemote"/>) and calls <see cref="Tick"/> with the game's
-/// live bits: only bits read back from the live save data are published, so the REL never acts on a
+/// 0x80-0xBF, zone 0xC0-0xEF of the zone room). <see cref="WorldFlagSyncService"/> records the bits it
+/// applies from the room (<see cref="AddRemote"/>) and reports the game's live bits (<see cref="SetLive"/>):
+/// only bits read back from the live save data are published or waited for, so the REL never acts on a
 /// bit the game doesn't have.
 ///
 /// Protocol (puppet_shared.h LIVEWORLD_*): the REL's game-heap block (boot-stamped, see
 /// <see cref="BootStampedBlock"/>) carries one batch of NEW bits at a time. It is written under a
 /// seqlock (SEQ odd while writing) and only when the REL has acknowledged the previous one
 /// (DONE_SEQ == SEQ), so each bit is handled once per stage visit. The REL only runs while a puppet
-/// exists, so <see cref="PuppetSyncService"/> asks for a parked one while <see cref="IsNeeded"/>.
+/// exists, so <see cref="PuppetSyncService"/> asks for a parked one while <see cref="IsNeeded"/>. The REL
+/// acknowledges a batch with RETRY set when it left actors undone (not ready in time, too many, a refused
+/// delete): the batch is published again, up to <see cref="MaxRetries"/> times.
 /// Thread-safe: <see cref="Tick"/> runs on the world-sync timer, <see cref="IsNeeded"/> on the puppet one.
 /// </summary>
 public sealed class LiveWorldPoke
@@ -32,8 +34,15 @@ public sealed class LiveWorldPoke
     public const int Words = PuppetLayout.LIVEWORLD_BIT_WORDS;
     public const int ZoneRoomNone = PuppetLayout.LIVEWORLD_ZONE_ROOM_NONE;
 
-    /// <summary>Stop asking for a worker puppet when the REL makes no progress for this long (until the next change).</summary>
+    /// <summary>Stop asking for a worker puppet when the REL makes no progress for this long (not counting time
+    /// in an event or the pause menu, when the REL waits on purpose), until the next change or <see cref="ReArmAfter"/>.</summary>
     public static readonly TimeSpan GiveUpAfter = TimeSpan.FromSeconds(10);
+
+    /// <summary>After giving up, ask again this much later.</summary>
+    public static readonly TimeSpan ReArmAfter = TimeSpan.FromSeconds(30);
+
+    /// <summary>How many times a batch the REL couldn't finish is published again.</summary>
+    public const int MaxRetries = 3;
 
     /// <summary>The word holding switch <paramref name="switchNo"/> (0x00-0xEF).</summary>
     public static int SwitchWord(int switchNo) => 1 + (switchNo >> 5);
@@ -60,10 +69,12 @@ public sealed class LiveWorldPoke
     private int _zoneRoom = ZoneRoomNone;
     private readonly uint[] _remote = new uint[Words];  // bits other players set in this stage visit
     private readonly uint[] _handled = new uint[Words]; // of those, the ones the REL acknowledged
+    private readonly uint[] _live = new uint[Words];    // the game's live bits, as last reported
+    private int _retries;                               // consecutive batches acknowledged with RETRY
     private Batch? _inFlight;
     private (uint Address, ulong Boot)? _block;         // the REL block _handled/_inFlight belong to
     private (uint Seq, uint Done, bool Block, int Fresh)? _progress;
-    private DateTime _progressSince;
+    private DateTime _progressSince, _gaveUpAt;
     private bool _gaveUp, _requested;
 
     public LiveWorldPoke() : this(() => DateTime.UtcNow) { }
@@ -80,6 +91,8 @@ public sealed class LiveWorldPoke
             _zoneRoom = ZoneRoomNone;
             Array.Clear(_remote);
             Array.Clear(_handled);
+            Array.Clear(_live);
+            _retries = 0;
             _inFlight = null; // the REL won't act on a batch for another stage; the next Tick publishes one for this stage
             Changed();
         }
@@ -96,7 +109,7 @@ public sealed class LiveWorldPoke
             if (room == _zoneRoom) return;
             _zoneRoom = room;
             int c0 = SwitchWord(0xC0), e0 = SwitchWord(0xE0);
-            _remote[c0] = _remote[e0] = _handled[c0] = _handled[e0] = 0;
+            _remote[c0] = _remote[e0] = _handled[c0] = _handled[e0] = _live[c0] = _live[e0] = 0;
             Changed();
         }
     }
@@ -117,6 +130,16 @@ public sealed class LiveWorldPoke
         }
     }
 
+    /// <summary>The game's live bits for words <paramref name="firstWord"/>.. (read back after the writes).</summary>
+    public void SetLive(int firstWord, IReadOnlyList<uint> words)
+    {
+        lock (_lock)
+        {
+            for (int i = 0; i < words.Count && firstWord + i < Words; i++)
+                _live[firstWord + i] = words[i];
+        }
+    }
+
     /// <summary>Chests and memory switches of a dSv_memBit_c as <see cref="Words"/> (dan and zone words empty).</summary>
     public static uint[] FromMemBit(uint tbox, IReadOnlyList<uint> memorySwitchWords)
     {
@@ -128,12 +151,12 @@ public sealed class LiveWorldPoke
     }
 
     /// <summary>
-    /// Collect the REL's acknowledgement and publish the next batch: remote bits not handled yet that
-    /// <paramref name="live"/> (this game's live bits, <see cref="Words"/> layout) has. Also publishes an
-    /// empty batch when the REL still holds one for another stage, so it can acknowledge. Null when there
-    /// is no usable block yet (the REL allocates it when a puppet is created).
+    /// Collect the REL's acknowledgement and publish the next batch: remote bits not handled yet that the
+    /// game's live bits (<see cref="SetLive"/>) have. Also publishes an empty batch when the REL still holds
+    /// one for another stage, so it can acknowledge. Null when there is no usable block yet (the REL
+    /// allocates it when a puppet is created).
     /// </summary>
-    public TickResult? Tick(IDolphinService dolphin, IReadOnlyList<uint> live)
+    public TickResult? Tick(IDolphinService dolphin)
     {
         lock (_lock)
         {
@@ -146,7 +169,20 @@ public sealed class LiveWorldPoke
             {
                 if (b.Done == inFlight.Seq)
                 {
-                    for (int i = 0; i < Words; i++) _handled[i] |= inFlight.Bits[i];
+                    if (b.Retry != 0 && _retries < MaxRetries)
+                    {
+                        _retries++; // not handled: the same bits go out again below
+                        Logger.Information("[world] live world: the REL left {N} actor(s) undone — publishing the batch again ({Try}/{Max})",
+                            b.Retry, _retries, MaxRetries);
+                    }
+                    else
+                    {
+                        if (b.Retry != 0)
+                            Logger.Warning("[world] live world: {N} actor(s) still undone after {Max} tries — leaving them to the next room load",
+                                b.Retry, MaxRetries);
+                        _retries = 0;
+                        for (int i = 0; i < Words; i++) _handled[i] |= inFlight.Bits[i];
+                    }
                     acknowledged = inFlight;
                     _inFlight = null;
                 }
@@ -163,7 +199,7 @@ public sealed class LiveWorldPoke
             bool any = false;
             for (int i = 0; i < Words; i++)
             {
-                fresh[i] = _remote[i] & ~_handled[i] & (i < live.Count ? live[i] : 0);
+                fresh[i] = _remote[i] & ~_handled[i] & _live[i];
                 any |= fresh[i] != 0;
             }
             bool relIdle = b.Seq == b.Done;
@@ -179,8 +215,9 @@ public sealed class LiveWorldPoke
 
     /// <summary>
     /// Does the REL have work, so a (parked) puppet must exist for it to run? Yes while it holds a batch
-    /// it hasn't acknowledged, or there are bits to hand it (and, with no block yet, so it creates one).
-    /// Gives up after <see cref="GiveUpAfter"/> without progress, until the next change.
+    /// it hasn't acknowledged, or there are bits (still live) to hand it (and, with no block yet, so it
+    /// creates one). Gives up after <see cref="GiveUpAfter"/> without progress, not counting time in an event
+    /// or the pause menu (the REL waits for those on purpose), and asks again <see cref="ReArmAfter"/> later.
     /// </summary>
     public bool IsNeeded(IDolphinService dolphin)
     {
@@ -192,18 +229,23 @@ public sealed class LiveWorldPoke
             {
                 int fresh = 0;
                 for (int i = 0; i < Words; i++)
-                    fresh += System.Numerics.BitOperations.PopCount(_remote[i] & ~_handled[i]);
+                    fresh += System.Numerics.BitOperations.PopCount(_remote[i] & ~_handled[i] & _live[i]);
                 var b = Read(dolphin);
                 need = b is { } blk ? blk.Seq != blk.Done || fresh > 0 : fresh > 0;
                 progress = (b?.Seq ?? 0, b?.Done ?? 0, b != null, fresh);
             }
 
+            var now = _clock();
+            if (_gaveUp && now - _gaveUpAt >= ReArmAfter)
+            {
+                _gaveUp = false;
+                _progress = null;
+            }
             if (!need)
                 _progress = null;
             else if (!_gaveUp)
             {
-                var now = _clock();
-                if (_progress != progress)
+                if (_progress != progress || IsWaitingOnPurpose(dolphin))
                 {
                     _progress = progress;
                     _progressSince = now;
@@ -211,8 +253,9 @@ public sealed class LiveWorldPoke
                 else if (now - _progressSince >= GiveUpAfter)
                 {
                     _gaveUp = true;
-                    Logger.Warning("[world] live world: the REL made no progress in {Seconds:F0}s (seq {Seq}, done {Done}, block {Block}, {Fresh} bit(s) waiting) — giving up until the next change",
-                        GiveUpAfter.TotalSeconds, progress.Item1, progress.Item2, progress.Item3, progress.Item4);
+                    _gaveUpAt = now;
+                    Logger.Warning("[world] live world: the REL made no progress in {Seconds:F0}s (seq {Seq}, done {Done}, block {Block}, {Fresh} bit(s) waiting) — giving up for {ReArm:F0}s or until the next change",
+                        GiveUpAfter.TotalSeconds, progress.Item1, progress.Item2, progress.Item3, progress.Item4, ReArmAfter.TotalSeconds);
                 }
             }
 
@@ -228,8 +271,16 @@ public sealed class LiveWorldPoke
         }
     }
 
-    /// <summary>The REL block's state: address, boot stamp, SEQ, DONE_SEQ and POKE_COUNT.</summary>
-    public readonly record struct BlockState(uint Address, ulong Boot, uint Seq, uint Done, uint PokeCount);
+    /// <summary>An event runs or the pause menu is open: the REL holds its batch on purpose (puppet_liveworld.c).</summary>
+    private static bool IsWaitingOnPurpose(IDolphinService dolphin)
+    {
+        var evt = dolphin.ReadMemory(GameMemoryAddresses.Events.EventMode, 1);
+        var menu = dolphin.ReadMemory(GameMemoryAddresses.Events.MenuPause, 1);
+        return evt is [not 0] || menu is [not 0];
+    }
+
+    /// <summary>The REL block's state: address, boot stamp, SEQ, DONE_SEQ, POKE_COUNT and RETRY.</summary>
+    public readonly record struct BlockState(uint Address, ulong Boot, uint Seq, uint Done, uint PokeCount, uint Retry = 0);
 
     /// <summary>Read the live-world block, or null when there is no usable one.</summary>
     public static BlockState? Read(IDolphinService dolphin)
@@ -243,7 +294,8 @@ public sealed class LiveWorldPoke
         return new BlockState(address, boot,
             BootStampedBlock.ReadU32(c, PuppetLayout.LIVEWORLD_OFF_SEQ),
             BootStampedBlock.ReadU32(c, PuppetLayout.LIVEWORLD_OFF_DONE_SEQ),
-            BootStampedBlock.ReadU32(c, PuppetLayout.LIVEWORLD_OFF_POKE_COUNT));
+            BootStampedBlock.ReadU32(c, PuppetLayout.LIVEWORLD_OFF_POKE_COUNT),
+            BootStampedBlock.ReadU32(c, PuppetLayout.LIVEWORLD_OFF_RETRY));
     }
 
     // A different block (first sight, or a new boot's): nothing it acknowledged is ours.

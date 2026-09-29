@@ -220,7 +220,8 @@ public class WorldFlagSyncService : IDisposable
     /// </summary>
     private void TickLiveWorld(StageFlags live)
     {
-        if (_liveWorld.Tick(_dolphin, LiveWorldPoke.FromMemBit(live.Tbox, live.Switch)) is not { } r) return;
+        _liveWorld.SetLive(0, LiveWorldPoke.FromMemBit(live.Tbox, live.Switch)[..5]);
+        if (_liveWorld.Tick(_dolphin) is not { } r) return;
         if (r.Acknowledged is { IsEmpty: false } done)
             Logger.Information("[world] live world: REL handled {Batch} ({Pokes} actor(s) updated so far)", done, r.PokeCount);
         if (r.Published is { IsEmpty: false } batch)

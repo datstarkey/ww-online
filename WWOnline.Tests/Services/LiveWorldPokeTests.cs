@@ -36,6 +36,12 @@ public class LiveWorldPokeTests
         g.SetU32(block + PuppetLayout.LIVEWORLD_OFF_POKE_COUNT, pokes);
     }
 
+    private static LiveWorldPoke.TickResult? Tick(LiveWorldPoke poke, FakeDolphin game, uint[] live)
+    {
+        poke.SetLive(0, live);
+        return poke.Tick(game);
+    }
+
     private static uint[] Chest(int n) { var w = new uint[LiveWorldPoke.Words]; w[0] = 1u << n; return w; }
 
     private static uint[] Switch(int n)
@@ -79,7 +85,7 @@ public class LiveWorldPokeTests
         // The live copy only has the chest so far (the switch write hasn't been read back yet).
         var live = new uint[LiveWorldPoke.Words];
         live[0] = 1u << 4;
-        var r = poke.Tick(game, live);
+        var r = Tick(poke, game, live);
 
         Assert.NotNull(r!.Value.Published);
         Assert.Equal(1u << 4, Bits(game, 0));
@@ -101,20 +107,20 @@ public class LiveWorldPokeTests
         var poke = new LiveWorldPoke();
         poke.SetStage(Slot);
         poke.AddRemote(Slot, Chest(1));
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
         uint first = Seq(game);
 
         // More bits while the REL hasn't handled the first batch: nothing is written.
         poke.AddRemote(Slot, Chest(2));
         int writes = 0;
         game.BeforeWrite = _ => writes++;
-        var waiting = poke.Tick(game, AllLive);
+        var waiting = Tick(poke, game, AllLive);
         Assert.Null(waiting!.Value.Published);
         Assert.Equal(0, writes);
 
         RelAcknowledges(game, pokes: 1);
         game.BeforeWrite = null;
-        var next = poke.Tick(game, AllLive);
+        var next = Tick(poke, game, AllLive);
         Assert.Equal(first, next!.Value.Acknowledged!.Seq);
         Assert.Equal(1u, next.Value.PokeCount);
         Assert.Equal(1u << 2, Bits(game, 0)); // only the new chest: chest 1 was handled
@@ -122,10 +128,10 @@ public class LiveWorldPokeTests
 
         // Nothing new: once acknowledged, the block is left alone.
         RelAcknowledges(game, pokes: 2);
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
         writes = 0;
         game.BeforeWrite = _ => writes++;
-        Assert.Null(poke.Tick(game, AllLive)!.Value.Published);
+        Assert.Null(Tick(poke, game, AllLive)!.Value.Published);
         Assert.Equal(0, writes);
     }
 
@@ -136,14 +142,14 @@ public class LiveWorldPokeTests
         var poke = new LiveWorldPoke();
         poke.SetStage(Slot);
         poke.AddRemote(Slot + 1, Chest(1)); // world sync applied it to a saved slot, not the current stage
-        Assert.Null(poke.Tick(game, AllLive)!.Value.Published);
+        Assert.Null(Tick(poke, game, AllLive)!.Value.Published);
 
         poke.AddRemote(Slot, Chest(5));
-        poke.Tick(game, AllLive); // published, not acknowledged yet
+        Tick(poke, game, AllLive); // published, not acknowledged yet
         poke.SetStage(Slot + 1);
 
         // The REL won't act on the old stage's batch: an empty batch for this stage lets it acknowledge.
-        var r = poke.Tick(game, AllLive);
+        var r = Tick(poke, game, AllLive);
         Assert.NotNull(r!.Value.Published);
         Assert.True(r.Value.Published!.IsEmpty);
         Assert.Equal((uint)PuppetLayout.LIVEWORLD_TAG_MAGIC | (Slot + 1), game.GetU32(Block + PuppetLayout.LIVEWORLD_OFF_TAG));
@@ -157,16 +163,16 @@ public class LiveWorldPokeTests
         var poke = new LiveWorldPoke();
         poke.SetStage(Slot);
         poke.AddRemote(Slot, Switch(0x10));
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
         RelAcknowledges(game);
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
 
         // Same stage, but a block from a new boot (soft reset) at another address.
         const uint other = Block + 0x100;
         byte[] newBoot = [0x00, 0x00, 0x12, 0x35, 0, 0, 0, 1];
         var game2 = GameWithBlock(other, newBoot);
         game2.Set(GameMemoryAddresses.System.OSStartTime.Address, newBoot);
-        var r = poke.Tick(game2, AllLive);
+        var r = Tick(poke, game2, AllLive);
         Assert.False(r!.Value.Published!.IsEmpty);
         Assert.Equal(1u << 0x10, Bits(game2, LiveWorldPoke.SwitchWord(0x10), other));
     }
@@ -185,8 +191,8 @@ public class LiveWorldPokeTests
         none.BeforeWrite = _ => writes++;
         stale.BeforeWrite = _ => writes++;
 
-        Assert.Null(poke.Tick(none, AllLive));
-        Assert.Null(poke.Tick(stale, AllLive));
+        Assert.Null(Tick(poke, none, AllLive));
+        Assert.Null(Tick(poke, stale, AllLive));
         Assert.Equal(0, writes);
     }
 
@@ -198,15 +204,15 @@ public class LiveWorldPokeTests
         poke.SetStage(Slot);
         poke.SetZoneRoom(7);
         poke.AddRemote(Slot, Switch(0xE0));
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
         Assert.Equal(7u, game.GetU32(Block + PuppetLayout.LIVEWORLD_OFF_ZONE_ROOM));
         Assert.Equal(1u, Bits(game, 8));
         RelAcknowledges(game);
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
 
         poke.SetZoneRoom(8);
         poke.AddRemote(Slot, Switch(0x05));
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
         Assert.Equal(8u, game.GetU32(Block + PuppetLayout.LIVEWORLD_OFF_ZONE_ROOM));
         Assert.Equal(0u, Bits(game, 8));
         Assert.Equal(1u << 5, Bits(game, 1));
@@ -222,13 +228,15 @@ public class LiveWorldPokeTests
         Assert.False(poke.IsNeeded(game)); // nothing to do
 
         poke.AddRemote(Slot, Chest(3));
+        Assert.False(poke.IsNeeded(game)); // not read back from the live copy yet (the game may have cleared it)
+        poke.SetLive(0, AllLive);
         Assert.True(poke.IsNeeded(new FakeDolphin())); // no block yet: a puppet makes the REL create one
         Assert.True(poke.IsNeeded(game));
 
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
         Assert.True(poke.IsNeeded(game)); // published, not handled
         RelAcknowledges(game);
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
         Assert.False(poke.IsNeeded(game));
     }
 
@@ -240,7 +248,7 @@ public class LiveWorldPokeTests
         var poke = new LiveWorldPoke(() => now);
         poke.SetStage(Slot);
         poke.AddRemote(Slot, Chest(3));
-        poke.Tick(game, AllLive);
+        Tick(poke, game, AllLive);
 
         Assert.True(poke.IsNeeded(game));
         now += LiveWorldPoke.GiveUpAfter;
@@ -248,5 +256,57 @@ public class LiveWorldPokeTests
 
         poke.AddRemote(Slot, Chest(4)); // a change re-arms it
         Assert.True(poke.IsNeeded(game));
+    }
+
+    [Fact]
+    public void IsNeeded_ReArmsAfterAWhile_AndDoesntCountTimeInAnEventOrTheMenu()
+    {
+        var now = new DateTime(2026, 1, 1);
+        var game = GameWithBlock();
+        var poke = new LiveWorldPoke(() => now);
+        poke.SetStage(Slot);
+        poke.AddRemote(Slot, Chest(3));
+        Tick(poke, game, AllLive);
+        Assert.True(poke.IsNeeded(game));
+
+        // A long cutscene: the REL waits on purpose, the clock doesn't run.
+        game.Set(GameMemoryAddresses.Events.EventMode, 1);
+        now += LiveWorldPoke.GiveUpAfter * 3;
+        Assert.True(poke.IsNeeded(game));
+        game.Set(GameMemoryAddresses.Events.EventMode, 0);
+        game.Set(GameMemoryAddresses.Events.MenuPause, 1);
+        now += LiveWorldPoke.GiveUpAfter * 3;
+        Assert.True(poke.IsNeeded(game));
+        game.Set(GameMemoryAddresses.Events.MenuPause, 0);
+
+        now += LiveWorldPoke.GiveUpAfter / 2;
+        Assert.True(poke.IsNeeded(game));  // the clock starts again from the last wait
+        now += LiveWorldPoke.GiveUpAfter;
+        Assert.False(poke.IsNeeded(game)); // no progress while nothing forbade it
+        now += LiveWorldPoke.ReArmAfter;
+        Assert.True(poke.IsNeeded(game));  // asks again later
+    }
+
+    [Fact]
+    public void ABatchTheRelLeftUndone_IsPublishedAgain_ThenGivenUp()
+    {
+        var game = GameWithBlock();
+        var poke = new LiveWorldPoke();
+        poke.SetStage(Slot);
+        poke.AddRemote(Slot, Chest(6));
+        Tick(poke, game, AllLive);
+
+        for (int i = 0; i < LiveWorldPoke.MaxRetries; i++)
+        {
+            game.SetU32(Block + PuppetLayout.LIVEWORLD_OFF_RETRY, 1);
+            uint before = Seq(game);
+            RelAcknowledges(game);
+            var again = Tick(poke, game, AllLive);
+            Assert.Equal(1u << 6, again!.Value.Published!.Bits[0]); // the same bits again
+            Assert.True(Seq(game) > before);
+        }
+        RelAcknowledges(game); // still RETRY: given up, handled
+        Assert.Null(Tick(poke, game, AllLive)!.Value.Published);
+        Assert.False(poke.IsNeeded(game));
     }
 }
