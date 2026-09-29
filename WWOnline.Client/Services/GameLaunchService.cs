@@ -166,6 +166,8 @@ public sealed class GameLaunchService : IDisposable
     private readonly IDolphinStarter _starter;
     private readonly TimeSpan _attachInterval;
     private readonly int _maxAttachAttempts;
+    private readonly Func<Action, Task> _runOnUi;
+    private readonly SemaphoreSlim _attachLock = new(1, 1);
     private readonly CancellationTokenSource _shutdown = new();
     private int _busy;
     private GameLaunchStatus _status = GameLaunchStatus.Idle;
@@ -173,7 +175,8 @@ public sealed class GameLaunchService : IDisposable
     public GameLaunchService(GameSettingsService settings, OptionalPatchCatalogService patchCatalog, IDolphinService dolphin,
         GameMemoryMonitorService memoryMonitor, GameSyncService gameSync)
         : this(settings, patchCatalog.CheckGameBuild, dolphin, () => { memoryMonitor.Start(); gameSync.Start(); },
-            new DolphinProcessStarter(), TimeSpan.FromSeconds(2), maxAttachAttempts: 90)
+            new DolphinProcessStarter(), TimeSpan.FromSeconds(2), maxAttachAttempts: 90,
+            a => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(a).GetTask())
     {
     }
 
@@ -184,9 +187,11 @@ public sealed class GameLaunchService : IDisposable
     /// <param name="starter">Starts Dolphin.</param>
     /// <param name="attachInterval">Wait between attach attempts while the game boots.</param>
     /// <param name="maxAttachAttempts">Attempts before giving up (90 × 2s in the app).</param>
+    /// <param name="runOnUi">Runs <paramref name="onAttached"/> on the UI thread (tests run it inline; null = inline).</param>
     public GameLaunchService(GameSettingsService settings, Func<string, OptionalPatchBuildStatus> checkBuild, IDolphinService dolphin,
-        Action onAttached, IDolphinStarter starter, TimeSpan attachInterval, int maxAttachAttempts)
+        Action onAttached, IDolphinStarter starter, TimeSpan attachInterval, int maxAttachAttempts, Func<Action, Task>? runOnUi = null)
     {
+        _runOnUi = runOnUi ?? (a => { a(); return Task.CompletedTask; });
         _settings = settings;
         _checkBuild = checkBuild;
         _dolphin = dolphin;
@@ -277,9 +282,9 @@ public sealed class GameLaunchService : IDisposable
             return attached switch
             {
                 AttachOutcome.Attached => SetStatus(new(GameLaunchState.Attached, $"Attached to Dolphin (PID {pid}).")),
-                AttachOutcome.ProcessExited => SetStatus(new(GameLaunchState.Failed, "Dolphin closed before the game started.")),
-                _ => SetStatus(new(GameLaunchState.Failed,
-                    "The game didn't finish booting in time. Once it's running, attach on the Dolphin page.")),
+                AttachOutcome.SmallMemory or AttachOutcome.NotPatched =>
+                    SetStatus(new(GameLaunchState.Blocked, OutcomeMessage(attached, startedHere))),
+                _ => SetStatus(new(GameLaunchState.Failed, OutcomeMessage(attached, startedHere))),
             };
         }
         catch (OperationCanceledException)
@@ -299,14 +304,18 @@ public sealed class GameLaunchService : IDisposable
 
     /// <summary>
     /// The CLI's --auto-attach: keep trying until the game has booted in Dolphin (<paramref name="processId"/>,
-    /// else the first Dolphin found). The caller has already applied <see cref="LaunchReadiness.EvaluateAutoAttach"/>.
+    /// else the first Dolphin found). The caller has already applied <see cref="LaunchReadiness.EvaluateAutoAttach"/>;
+    /// the running game must still pass <see cref="PatchedGameCheck"/>.
     /// </summary>
     public async Task<bool> WaitAndAttachAsync(int? processId, CancellationToken ct = default)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _shutdown.Token);
         try
         {
-            return await WaitAndAttachAsync(processId, startedHere: false, linked.Token).ConfigureAwait(false) == AttachOutcome.Attached;
+            var outcome = await WaitAndAttachAsync(processId, startedHere: false, linked.Token).ConfigureAwait(false);
+            if (outcome is AttachOutcome.SmallMemory or AttachOutcome.NotPatched)
+                Logger.Error("[launch] {Message}", OutcomeMessage(outcome, startedHere: false));
+            return outcome == AttachOutcome.Attached;
         }
         catch (OperationCanceledException)
         {
@@ -314,38 +323,115 @@ public sealed class GameLaunchService : IDisposable
         }
     }
 
-    /// <summary>Attach to one Dolphin and start the memory monitor and game sync. False while the game hasn't booted.</summary>
-    public async Task<bool> AttachAsync(int processId)
+    /// <summary>
+    /// The Dolphin page's Attach: attach to <paramref name="processId"/> even if the running game fails
+    /// <see cref="PatchedGameCheck"/> (the player's call), but say so.
+    /// </summary>
+    /// <returns>Attached (with a warning when the game doesn't look like the patched one, else null), or not.</returns>
+    public async Task<(bool Attached, string? Warning)> AttachManuallyAsync(int processId)
     {
-        if (_dolphin.IsConnected && _dolphin.ConnectedProcessId == processId) return true;
-        if (!await _dolphin.ConnectAsync(processId).ConfigureAwait(false)) return false;
-        _onAttached();
-        Logger.Information("[launch] attached to Dolphin PID {Pid}", processId);
-        return true;
+        var result = await AttachAsync(processId, requirePatchedGame: false).ConfigureAwait(false);
+        return result switch
+        {
+            PatchedGameCheck.Result.Ok => (true, null),
+            PatchedGameCheck.Result.SmallMemory or PatchedGameCheck.Result.NotPatched =>
+                (true, "Attached anyway, but careful: " + OutcomeMessage(ToOutcome(result), startedHere: false)),
+            _ => (false, null),
+        };
     }
 
-    private enum AttachOutcome { Attached, TimedOut, ProcessExited }
+    /// <summary>
+    /// Attach to one Dolphin and, once the game passes <see cref="PatchedGameCheck"/>, start the memory
+    /// monitor and game sync (on the UI thread, like the Attach button always did). One attach at a
+    /// time: a second caller waits, then finds the first one's connection. With
+    /// <paramref name="requirePatchedGame"/>, a game that fails the check is detached again.
+    /// </summary>
+    /// <returns><see cref="PatchedGameCheck.Result.NotBooted"/> when Dolphin has no game (yet).</returns>
+    private async Task<PatchedGameCheck.Result> AttachAsync(int processId, bool requirePatchedGame)
+    {
+        await _attachLock.WaitAsync(_shutdown.Token).ConfigureAwait(false);
+        try
+        {
+            if (_dolphin.IsConnected)
+                return _dolphin.ConnectedProcessId == processId ? PatchedGameCheck.Result.Ok : PatchedGameCheck.Result.NotBooted;
+            if (!await _dolphin.ConnectAsync(processId).ConfigureAwait(false)) return PatchedGameCheck.Result.NotBooted;
+
+            var check = PatchedGameCheck.Check(_dolphin);
+            if (check != PatchedGameCheck.Result.Ok && requirePatchedGame)
+            {
+                _dolphin.Disconnect();
+                Logger.Information("[launch] PID {Pid}: not attaching yet ({Check})", processId, check);
+                return check;
+            }
+            await _runOnUi(_onAttached).ConfigureAwait(false);
+            Logger.Information("[launch] attached to Dolphin PID {Pid} ({Check})", processId, check);
+            return check;
+        }
+        finally
+        {
+            _attachLock.Release();
+        }
+    }
+
+    /// <summary>How many 2s attempts a booted game may take to show the patch's draw hook before we give up on it.</summary>
+    private const int NotPatchedGraceAttempts = 5;
+
+    private enum AttachOutcome { Attached, TimedOut, ProcessExited, SmallMemory, NotPatched }
+
+    private static AttachOutcome ToOutcome(PatchedGameCheck.Result r) => r switch
+    {
+        PatchedGameCheck.Result.SmallMemory => AttachOutcome.SmallMemory,
+        PatchedGameCheck.Result.NotPatched => AttachOutcome.NotPatched,
+        PatchedGameCheck.Result.Ok => AttachOutcome.Attached,
+        _ => AttachOutcome.TimedOut,
+    };
+
+    private static string OutcomeMessage(AttachOutcome outcome, bool startedHere) => outcome switch
+    {
+        AttachOutcome.SmallMemory =>
+            "Dolphin is running without the 48 MB memory setting the patched game needs, so WW-Online won't use it. " +
+            "Close Dolphin and let WW-Online start it (it turns the setting on), or turn on Config → Advanced → Enable " +
+            "Emulated Memory Size Override with MEM1 at 48 MB.",
+        AttachOutcome.NotPatched =>
+            "The game running in Dolphin isn't your patched WW-Online game, so WW-Online won't link up with it. " +
+            "Close Dolphin and let WW-Online start it.",
+        AttachOutcome.ProcessExited => "Dolphin closed before the game started.",
+        _ => startedHere
+            ? "The game didn't finish booting in time. Once it's running, attach on the Dolphin page."
+            : "No game showed up in Dolphin in time. Boot your patched game in it (or close Dolphin and let WW-Online start it).",
+    };
 
     private async Task<AttachOutcome> WaitAndAttachAsync(int? processId, bool startedHere, CancellationToken ct)
     {
+        int notPatched = 0;
         for (int attempt = 1; attempt <= _maxAttachAttempts; attempt++)
         {
             await Task.Delay(_attachInterval, ct).ConfigureAwait(false);
-            if (_dolphin.IsConnected) return AttachOutcome.Attached;
             if (startedHere && processId is int started && _starter.HasExited(started)) return AttachOutcome.ProcessExited;
 
             var target = processId ?? _dolphin.EnumerateProcesses().FirstOrDefault()?.ProcessId;
-            if (target is int pid && await AttachAsync(pid).ConfigureAwait(false))
+            if (target is not int pid) continue;
+            ct.ThrowIfCancellationRequested();
+            var check = await AttachAsync(pid, requirePatchedGame: true).ConfigureAwait(false);
+            switch (check)
             {
-                Logger.Information("[launch] attached on attempt {Attempt}", attempt);
-                return AttachOutcome.Attached;
+                case PatchedGameCheck.Result.Ok:
+                    Logger.Information("[launch] attached on attempt {Attempt}", attempt);
+                    return AttachOutcome.Attached;
+                case PatchedGameCheck.Result.SmallMemory:
+                    return AttachOutcome.SmallMemory;
+                case PatchedGameCheck.Result.NotPatched:
+                    // Booted, but Link hasn't been drawn by the patched hook yet: give it a few tries.
+                    if (++notPatched >= NotPatchedGraceAttempts) return AttachOutcome.NotPatched;
+                    break;
             }
             if (attempt % 10 == 0)
                 Logger.Information("[launch] still waiting for the game to boot (attempt {Attempt}/{Max})", attempt, _maxAttachAttempts);
         }
         Logger.Warning("[launch] gave up attaching after {Max} attempts", _maxAttachAttempts);
-        return AttachOutcome.TimedOut;
+        return notPatched > 0 ? AttachOutcome.NotPatched : AttachOutcome.TimedOut;
     }
+
 
     private GameLaunchStatus SetStatus(GameLaunchStatus status, bool log = true)
     {

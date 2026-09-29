@@ -98,16 +98,110 @@ public sealed class GameFolderCheckTests : IDisposable
     public void CopyMissingGameFiles_CopiesTheRestOfTheGame_Once()
     {
         var vanilla = FakeGameFolder.Create(Sub("ww"));
+        File.WriteAllBytes(Path.Combine(vanilla, "The Wind Waker.iso"), [1, 2]); // lying next to sys/files: not game data
+        File.WriteAllText(Path.Combine(vanilla, "notes.txt"), "hi");
         var output = Sub("out");
-        Directory.CreateDirectory(Path.Combine(output, "sys"));
-        File.WriteAllBytes(Path.Combine(output, "sys", "main.dol"), [9]); // already there: left alone
 
-        Assert.Equal(4, GamePatcherService.CopyMissingGameFiles(vanilla, output));
+        // main.dol, bi2.bin and RELS.arc are the patch steps' job; sys/boot.bin and files/Stage/sea.arc are ours.
+        Assert.Equal(2, GamePatcherService.CopyMissingGameFiles(vanilla, output));
         Assert.True(File.Exists(Path.Combine(output, "files", "Stage", "sea.arc")));
         Assert.True(File.Exists(Path.Combine(output, "sys", "boot.bin")));
-        Assert.Equal(new byte[] { 9 }, File.ReadAllBytes(Path.Combine(output, "sys", "main.dol")));
+        Assert.False(File.Exists(Path.Combine(output, "sys", "main.dol")));
+        Assert.False(File.Exists(Path.Combine(output, "The Wind Waker.iso")));
+        Assert.False(File.Exists(Path.Combine(output, "notes.txt")));
+        Assert.Empty(Directory.EnumerateFiles(output, "*.partial", SearchOption.AllDirectories));
 
         Assert.Equal(0, GamePatcherService.CopyMissingGameFiles(vanilla, output));
+    }
+
+    [Fact]
+    public void CopyMissingGameFiles_RepairsAFileCutShort()
+    {
+        var vanilla = FakeGameFolder.Create(Sub("ww"));
+        var output = Sub("out");
+        GamePatcherService.CopyMissingGameFiles(vanilla, output);
+        var sea = Path.Combine(output, "files", "Stage", "sea.arc");
+        File.WriteAllBytes(sea, [4]); // an interrupted copy left it short
+
+        Assert.Equal(1, GamePatcherService.CopyMissingGameFiles(vanilla, output));
+        Assert.Equal(File.ReadAllBytes(Path.Combine(vanilla, "files", "Stage", "sea.arc")), File.ReadAllBytes(sea));
+    }
+
+    [Fact]
+    public void DriveRootOriginal_KeepsThePatchedFolderOffThatDrive()
+    {
+        Assert.NotNull(GameFolderCheck.CheckPatchedFolder(@"E:\", @"E:\WW-Patched"));
+        Assert.NotNull(GameFolderCheck.CheckPatchedFolder(@"E:\", @"E:\"));
+        Assert.NotNull(GameFolderCheck.CheckPatchedFolder(@"E:\Games\WW", @"E:\"));
+        Assert.Null(GameFolderCheck.CheckPatchedFolder(@"E:\", @"F:\WW-Patched"));
+        Assert.True(GameFolderCheck.IsSameOrInside(@"E:\WW-Patched", @"E:\"));
+        Assert.False(GameFolderCheck.IsSameOrInside(@"E:\Games2", @"E:\Games"));
+    }
+
+    [Fact]
+    public void PatchedFolder_ThatIsTheOriginalUnderAnotherName_IsRefused()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var vanilla = FakeGameFolder.Create(Sub("ww"));
+        var copy = FakeGameFolder.Create(Sub("copy"));
+        Assert.True(FileIdentity.SameFile(Path.Combine(vanilla, "sys", "main.dol"), Path.Combine(vanilla, "sys", "main.dol")));
+        Assert.False(FileIdentity.SameFile(Path.Combine(vanilla, "sys", "main.dol"), Path.Combine(copy, "sys", "main.dol")));
+
+        // A junction to the original (no admin rights needed) spells the same folder differently.
+        var junction = Sub("alias");
+        using (var mklink = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c mklink /J \"{junction}\" \"{vanilla}\"")
+               { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true }))
+        {
+            mklink!.WaitForExit(10_000);
+        }
+        if (!Directory.Exists(junction)) return; // couldn't make one here: nothing to test
+        try
+        {
+            Assert.Contains("different folder", GameFolderCheck.CheckPatchedFolder(vanilla, junction));
+            Assert.Null(GameFolderCheck.CheckPatchedFolder(vanilla, copy));
+        }
+        finally
+        {
+            Directory.Delete(junction); // removes the link only
+        }
+    }
+
+    [Fact]
+    public async Task OnlyOnePatchRunsAtATime()
+    {
+        var settings = new GameSettingsService(Sub("settings"));
+        var patcher = new GamePatcherService(new OptionalPatchCatalogService(settings, WWOnline.Patcher.Patches.OptionalPatchCatalog.Empty),
+            Sub("PatchData"));
+        var vanilla = FakeGameFolder.Create(Sub("ww"));
+        var progress = new BlockingProgress();
+
+        // The first run stops in its first progress report (copying the game), then fails there: it never
+        // reaches the compile or patch steps.
+        var first = Task.Run(() => patcher.PatchGameAsync(vanilla, Sub("out"), [], progress));
+        Assert.True(progress.Entered.Wait(TimeSpan.FromSeconds(10)));
+        Assert.True(patcher.IsPatching);
+
+        var second = await patcher.PatchGameAsync(vanilla, Sub("out2"), [], null);
+        Assert.Contains("already running", second);
+        Assert.False(Directory.Exists(Sub("out2")));
+
+        progress.Release.Set();
+        Assert.Contains("Couldn't copy the game", await first);
+        Assert.False(patcher.IsPatching);
+    }
+
+    /// <summary>Holds the first report until released, then fails it like a disk error.</summary>
+    private sealed class BlockingProgress : IProgress<string>
+    {
+        public ManualResetEventSlim Entered { get; } = new();
+        public ManualResetEventSlim Release { get; } = new();
+
+        public void Report(string value)
+        {
+            Entered.Set();
+            Release.Wait(TimeSpan.FromSeconds(10));
+            throw new IOException("disk full");
+        }
     }
 
     [Fact]

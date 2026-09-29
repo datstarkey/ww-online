@@ -53,7 +53,11 @@ public sealed class ProcessRunner : IProcessRunner
         }
         catch (OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); }
+            try
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(5000); // let it release its files (a cancelled extraction is cleaned up next)
+            }
             catch (InvalidOperationException) { /* already gone */ }
             throw;
         }
@@ -82,6 +86,9 @@ public sealed class DolphinTool
     private readonly IProcessRunner _runner;
 
     public DolphinTool(IProcessRunner runner) => _runner = runner;
+
+    /// <summary>How long <c>extract --help</c> may take before the tool counts as unusable.</summary>
+    public TimeSpan HelpTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
     /// <summary>DolphinTool.exe in the same folder as <paramref name="dolphinExe"/>, or null.</summary>
     public static string? FindNextTo(string? dolphinExe)
@@ -138,14 +145,22 @@ public sealed class DolphinTool
     }
 
     /// <summary>Can the DolphinTool at <paramref name="toolPath"/> extract discs? (Runs its extract help.)</summary>
+    /// <remarks>Gives up (false) after <see cref="HelpTimeout"/>, so a hung DolphinTool can't stall the setup.</remarks>
     public async Task<bool> SupportsExtractAsync(string toolPath, CancellationToken ct = default)
     {
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(HelpTimeout);
         try
         {
-            var help = await _runner.RunAsync(toolPath, HelpArguments, null, ct).ConfigureAwait(false);
+            var help = await _runner.RunAsync(toolPath, HelpArguments, null, timeout.Token).ConfigureAwait(false);
             var ok = HelpShowsExtract(help);
             Logger.Information("[setup] {Tool}: extract {Supported}", toolPath, ok ? "supported" : "not supported");
             return ok;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            Logger.Warning("[setup] {Tool} didn't answer within {Timeout}s; not using it", toolPath, HelpTimeout.TotalSeconds);
+            return false;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

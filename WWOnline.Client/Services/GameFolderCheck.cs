@@ -106,7 +106,8 @@ public static class GameFolderCheck
             try { vanilla = Normalize(vanillaPath); }
             catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException) { return null; }
 
-            if (IsSameOrInside(patched, vanilla) || IsSameOrInside(vanilla, patched))
+            if (IsSameOrInside(patched, vanilla) || IsSameOrInside(vanilla, patched) || FileIdentity.SameFile(
+                    Path.Combine(vanilla, "sys", "main.dol"), Path.Combine(patched, "sys", "main.dol")))
                 return "Use a different folder from the original game: patching writes into this folder, and the original must stay untouched.";
         }
         return null;
@@ -173,10 +174,15 @@ public static class GameFolderCheck
     private static string Normalize(string path) =>
         Path.TrimEndingDirectorySeparator(Path.GetFullPath(path.Trim()));
 
-    private static bool IsSameOrInside(string path, string folder)
+    /// <summary>
+    /// Is <paramref name="path"/> <paramref name="folder"/> or inside it? Both are normalised full paths. A root
+    /// ("E:\\") keeps its separator after trimming, so it is used as the prefix as is: everything on E: is inside it.
+    /// </summary>
+    public static bool IsSameOrInside(string path, string folder)
     {
         var cmp = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
-        return string.Equals(path, folder, cmp) ||
-               path.StartsWith(folder + Path.DirectorySeparatorChar, cmp);
+        if (string.Equals(path, folder, cmp)) return true;
+        var prefix = Path.EndsInDirectorySeparator(folder) ? folder : folder + Path.DirectorySeparatorChar;
+        return path.StartsWith(prefix, cmp);
     }
 }

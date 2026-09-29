@@ -19,6 +19,7 @@ public class DolphinService : IDolphinService
 
     public bool IsConnected => _memoryReader.IsConnected;
     public int? ConnectedProcessId => _memoryReader.ConnectedProcessId;
+    public long? EmulatedMemorySize => _memoryReader.Mem1Size;
 
     public event EventHandler<bool>? ConnectionChanged;
 

@@ -62,6 +62,7 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     private readonly DolphinTool _dolphinTool;
     private readonly Action<Action> _post;
     private CancellationTokenSource? _extractCts;
+    private readonly CancellationTokenSource _lifetime = new(); // cancels tool checks and extraction on Dispose
     private bool _disposed;
 
     /// <summary>The optional patch checklist (shared with Settings → Game patches).</summary>
@@ -574,23 +575,29 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
         if (CanExtract && string.Equals(DolphinToolPath, tool, StringComparison.OrdinalIgnoreCase)) return;
 
         IsCheckingTool = true;
-        bool supported;
+        bool supported = false;
         try
         {
-            supported = await _dolphinTool.SupportsExtractAsync(tool);
+            supported = await _dolphinTool.SupportsExtractAsync(tool, _lifetime.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // The setup closed.
         }
         catch (Exception ex)
         {
             Logger.Warning(ex, "[setup] checking DolphinTool failed");
-            supported = false;
         }
-        _post(() =>
+        finally
         {
-            IsCheckingTool = false;
-            DolphinToolPath = supported ? tool : null;
-            CanExtract = supported;
-            OnPropertyChanged(nameof(CanExtractNow));
-        });
+            _post(() =>
+            {
+                IsCheckingTool = false;
+                DolphinToolPath = supported ? tool : null;
+                CanExtract = supported;
+                OnPropertyChanged(nameof(CanExtractNow));
+            });
+        }
     }
 
     partial void OnDiscImagePathChanged(string value)
@@ -635,15 +642,21 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
 
         if (!File.Exists(Path.Combine(folder, "sys", "main.dol")))
         {
+            // A folder this extraction creates is ours to remove if it fails; one that was there isn't.
+            bool createdHere = !Directory.Exists(folder);
             IsExtracting = true;
             ExtractProgress = "Starting DolphinTool…";
             _extractCts?.Dispose();
-            _extractCts = new CancellationTokenSource();
+            var cts = _extractCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
             string? error;
             try
             {
-                var progress = new Progress<string>(line => _post(() => ExtractProgress = line));
-                error = await _dolphinTool.ExtractAsync(tool, image, folder, progress, _extractCts.Token);
+                // Lines that arrive after Cancel (DolphinTool's last words) are dropped.
+                var progress = new Progress<string>(line => _post(() =>
+                {
+                    if (IsExtracting && !cts.IsCancellationRequested) ExtractProgress = line;
+                }));
+                error = await _dolphinTool.ExtractAsync(tool, image, folder, progress, cts.Token);
             }
             catch (OperationCanceledException)
             {
@@ -658,6 +671,7 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
             ExtractProgress = "";
             if (error != null)
             {
+                if (createdHere) RemovePartialExtraction(folder);
                 ExtractError = error;
                 return;
             }
@@ -666,6 +680,19 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
         ExtractSucceeded = true;
         // DolphinTool puts a GameCube disc in folder\sys + folder\files; take a nested game folder too.
         UseVanillaPath(GameFolderCheck.CheckVanilla(folder).GameFolder ?? folder);
+    }
+
+    /// <summary>Delete what a failed or cancelled extraction left in the folder it created, so a retry can use it.</summary>
+    private static void RemovePartialExtraction(string folder)
+    {
+        try
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.Warning(ex, "[setup] couldn't remove the partial extraction in {Folder}", folder);
+        }
     }
 
     [RelayCommand]
@@ -726,7 +753,8 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
         if (_disposed) return;
         _disposed = true;
         PatchOptions.PropertyChanged -= OnPatchOptionsPropertyChanged;
-        _extractCts?.Cancel();
+        _lifetime.Cancel();
+        _lifetime.Dispose();
         _extractCts?.Dispose();
         _extractCts = null;
         GC.SuppressFinalize(this);

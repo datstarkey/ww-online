@@ -16,6 +16,10 @@ public class WindowsMemoryReader : IDisposable
 
     public int? ConnectedProcessId => _process != null && !_process.HasExited ? _process.Id : null;
 
+    /// <summary>Size of the emulated MEM1 region attached to (0x1800000 retail, 0x3000000 with Dolphin's 48 MB
+    /// override), or null when unknown (found through a pointer, not the region scan).</summary>
+    public long? Mem1Size { get; private set; }
+
     // Windows API imports
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
@@ -115,7 +119,7 @@ public class WindowsMemoryReader : IDisposable
             if (_dolphinBaseAddress == IntPtr.Zero)
             {
                 _logger.Error("Failed to get Dolphin base address");
-                CloseHandle(_processHandle);
+                Disconnect();
                 return false;
             }
             _logger.Information("Dolphin base address: 0x{Address:X}", _dolphinBaseAddress.ToInt64());
@@ -124,7 +128,7 @@ public class WindowsMemoryReader : IDisposable
             if (!await FindEmulatedMemory())
             {
                 _logger.Error("Failed to find emulated memory");
-                CloseHandle(_processHandle);
+                Disconnect();
                 return false;
             }
 
@@ -311,6 +315,7 @@ public class WindowsMemoryReader : IDisposable
             IntPtr address = IntPtr.Zero;
             int regionCount = 0;
             List<IntPtr> candidateRegions = new List<IntPtr>();
+            var regionSizes = new Dictionary<IntPtr, long>();
             
             // First pass: Find all regions that could be memory
             while (VirtualQueryEx(_processHandle, address, out memInfo, (uint)Marshal.SizeOf(typeof(MEMORY_BASIC_INFORMATION))))
@@ -322,7 +327,8 @@ public class WindowsMemoryReader : IDisposable
                     (memInfo.Protect & (PAGE_READWRITE | 0x40 | 0x20 | 0x04 | 0x02)) != 0)
                 {
                     long regionSize = memInfo.RegionSize.ToInt64();
-                    
+                    regionSizes[memInfo.BaseAddress] = regionSize;
+
                     // Check for exact sizes OR close matches
                     if (regionSize == MEM1_SIZE_48MB)
                     {
@@ -368,6 +374,7 @@ public class WindowsMemoryReader : IDisposable
                 if (foundValidGame)
                 {
                     _logger.Information("✓ Found valid Wind Waker game data in region at 0x{Address:X}", candidate.ToInt64());
+                    Mem1Size = regionSizes.TryGetValue(candidate, out var size) ? size : null;
                     return true;
                 }
             }
@@ -474,6 +481,7 @@ public class WindowsMemoryReader : IDisposable
                                 {
                                     _logger.Information("Using memory region at 0x{Address:X} ({Size}MB)", 
                                         memInfo.BaseAddress.ToInt64(), regionSize / (1024 * 1024));
+                                    Mem1Size = regionSize;
                                     return true;
                                 }
                                 else
@@ -578,6 +586,7 @@ public class WindowsMemoryReader : IDisposable
             _processHandle = IntPtr.Zero;
         }
         _emulatedMemoryAddress = IntPtr.Zero;
+        Mem1Size = null;
         _memoryOffset = 0;
         _dolphinBaseAddress = IntPtr.Zero;
         _process?.Dispose();

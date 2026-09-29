@@ -234,6 +234,7 @@ public partial class App : Application
             _serviceProvider.GetRequiredService<UpdateViewModel>().Dispose();
             _serviceProvider.GetRequiredService<UpdateService>().Dispose();
             _serviceProvider.GetRequiredService<SetupWizardViewModel>().Dispose();
+            _serviceProvider.GetRequiredService<SettingsViewModel>().Dispose();
             _serviceProvider.GetRequiredService<GameLaunchService>().Dispose();
 
             // Stops the hosted server process if this client was hosting.

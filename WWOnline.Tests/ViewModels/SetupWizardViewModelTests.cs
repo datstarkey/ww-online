@@ -245,6 +245,58 @@ public sealed class SetupWizardViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task GameStep_FailedExtraction_RemovesTheFolderItMade_SoARetryWorks()
+    {
+        using var vm = Vm();
+        await ToGameStep(vm, withTool: true);
+        var iso = Path.Combine(_dir, "ww.iso");
+        File.WriteAllBytes(iso, [0]);
+        vm.DiscImagePath = iso;
+        var folder = vm.ExtractFolder;
+        Assert.False(Directory.Exists(folder));
+
+        // Half an extraction, then an error.
+        _runner.Handler = (_, args) =>
+        {
+            if (args.Contains("--help")) return FakeProcessRunner.ExtractHelp;
+            var o = args[args.IndexOf("-o") + 1];
+            Directory.CreateDirectory(Path.Combine(o, "files"));
+            File.WriteAllBytes(Path.Combine(o, "files", "half.arc"), [1]);
+            return new ProcessResult(1, "Error: read failed");
+        };
+        await vm.ExtractDiscCommand.ExecuteAsync(null);
+        Assert.NotNull(vm.ExtractError);
+        Assert.False(Directory.Exists(folder)); // ours: cleaned up
+
+        _runner.Handler = (_, args) =>
+        {
+            if (args.Contains("--help")) return FakeProcessRunner.ExtractHelp;
+            FakeGameFolder.Create(args[args.IndexOf("-o") + 1]);
+            return new ProcessResult(0, "");
+        };
+        await vm.ExtractDiscCommand.ExecuteAsync(null);
+        Assert.Null(vm.ExtractError);
+        Assert.Equal(folder, vm.VanillaGamePath);
+    }
+
+    [Fact]
+    public async Task GameStep_FailedExtraction_NeverDeletesAFolderThatWasThere()
+    {
+        using var vm = Vm();
+        await ToGameStep(vm, withTool: true);
+        var iso = Path.Combine(_dir, "ww.iso");
+        File.WriteAllBytes(iso, [0]);
+        var mine = Directory.CreateDirectory(Path.Combine(_dir, "my empty folder")).FullName;
+        vm.DiscImagePath = iso;
+        vm.ExtractFolder = mine;
+        _runner.Handler = (_, args) => args.Contains("--help") ? FakeProcessRunner.ExtractHelp : new ProcessResult(1, "Error");
+
+        await vm.ExtractDiscCommand.ExecuteAsync(null);
+        Assert.NotNull(vm.ExtractError);
+        Assert.True(Directory.Exists(mine));
+    }
+
+    [Fact]
     public async Task GameStep_ExtractRefusesANonEmptyFolder_WithoutRunningTheTool()
     {
         using var vm = Vm();

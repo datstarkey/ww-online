@@ -139,6 +139,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void OpenSetup()
     {
+        if (_settingsViewModel.IsAnyPatchRunning) return; // the setup patches too: one at a time
         Wizard.Open();
         IsWizardOpen = true;
     }

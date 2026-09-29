@@ -94,7 +94,7 @@ Optional patches (`GameMod/src/patches/optional/*.asm`, betterww QoL + vanilla b
 
 ## First run and starting the game
 - **Setup wizard** (`SetupWizardViewModel`, Settings → Run setup again): Welcome → Dolphin → Game (extracts an ISO/RVZ with DolphinTool when its `extract --help` shows `-i`/`-o`, else Dolphin's Extract Entire Disc steps; `GameFolderCheck` wants GZLE01) → Patches (the shared `PatchOptionsView`) → You → Patch → Play. `FirstRun` shows it once (`GameSettings.SetupCompleted`); old settings with a patched game are marked done, and scripted starts (dev-test) skip it.
-- **Gating:** `GameLaunchService` is the one start/attach path (after Host/Join when `AutoLaunchDolphin`, the Dolphin page's Start game, CLI `--auto-attach`). It never starts or attaches to a game whose build check isn't fresh (`LaunchReadiness`); manual Attach stays allowed. It starts Dolphin with `-C` overrides for the 48 MB MEM1.
+- **Gating:** `GameLaunchService` is the one start/attach path (after Host/Join when `AutoLaunchDolphin`, the Dolphin page's Start game, CLI `--auto-attach`). It never starts or attaches to a game whose build check isn't fresh (`LaunchReadiness`), and before the sync starts it checks the running game (`PatchedGameCheck`: 48 MB MEM1, and the DOL draw hook's `STATUS_ADDR` FourCC), so a vanilla/PAL game or a Dolphin without the memory override is refused. Manual Attach still attaches, with a warning. Attaches are serialised (one `ConnectAsync` at a time). It starts Dolphin with `-C` overrides for the 48 MB MEM1.
 - `WWO_SETTINGS_DIR=<dir>` runs the client on a throwaway settings folder (screenshots, trying the setup) without touching %AppData%\WWOnline.
 
 ## Room sync model

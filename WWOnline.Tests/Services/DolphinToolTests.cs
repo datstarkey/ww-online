@@ -48,6 +48,29 @@ public sealed class DolphinToolTests : IDisposable
     }
 
     [Fact]
+    public async Task AHungDolphinTool_TimesOut_AsNotSupported()
+    {
+        var tool = new DolphinTool(new HangingRunner()) { HelpTimeout = TimeSpan.FromMilliseconds(50) };
+        var supported = await tool.SupportsExtractAsync("DolphinTool.exe").WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(supported);
+
+        // The caller's own cancellation still surfaces as cancellation.
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => tool.SupportsExtractAsync("DolphinTool.exe", cts.Token));
+    }
+
+    /// <summary>A process that never answers (until cancelled).</summary>
+    private sealed class HangingRunner : IProcessRunner
+    {
+        public async Task<ProcessResult> RunAsync(string exe, IReadOnlyList<string> arguments, Action<string>? onOutputLine, CancellationToken ct)
+        {
+            await Task.Delay(Timeout.Infinite, ct);
+            return new ProcessResult(0, "");
+        }
+    }
+
+    [Fact]
     public void ExtractArguments_AreInputThenOutput_OneArgumentEach()
     {
         Assert.Equal(["extract", "-i", @"C:\Games\The Wind Waker (USA).rvz", "-o", @"C:\Games\The Wind Waker (USA)"],

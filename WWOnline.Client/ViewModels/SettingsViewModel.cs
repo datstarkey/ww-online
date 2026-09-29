@@ -4,7 +4,7 @@ using WWOnline.Services;
 
 namespace WWOnline.ViewModels;
 
-public partial class SettingsViewModel : ViewModelBase
+public partial class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly GameSettingsService _gameSettingsService;
     private readonly GamePatcherService _gamePatcherService;
@@ -69,6 +69,7 @@ public partial class SettingsViewModel : ViewModelBase
         Updates = updates;
 
         ReloadFromSettings();
+        _gamePatcherService.IsPatchingChanged += OnPatcherBusyChanged;
     }
 
     /// <summary>Show the saved paths again (after the setup wizard changed them).</summary>
@@ -83,8 +84,17 @@ public partial class SettingsViewModel : ViewModelBase
         IsSaved = false;
     }
 
-    [RelayCommand]
+    /// <summary>A patch is running anywhere (this page, the banner or the setup): no second one, no setup.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(RunSetupCommand), nameof(PatchGameCommand))]
+    private bool _isAnyPatchRunning;
+
+    [RelayCommand(CanExecute = nameof(CanRunSetup))]
     private void RunSetup() => SetupRequested?.Invoke();
+
+    private bool CanRunSetup() => !IsAnyPatchRunning;
+
+    private void OnPatcherBusyChanged(bool busy) => Avalonia.Threading.Dispatcher.UIThread.Post(() => IsAnyPatchRunning = busy);
 
     [RelayCommand]
     private async Task BrowseDolphinPath()
@@ -143,7 +153,7 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
-    private bool CanPatchGame() => !IsPatching
+    private bool CanPatchGame() => !IsPatching && !IsAnyPatchRunning
         && !string.IsNullOrWhiteSpace(VanillaGamePath)
         && !string.IsNullOrWhiteSpace(GamePath);
 
@@ -186,4 +196,6 @@ public partial class SettingsViewModel : ViewModelBase
         IsSaved = true;
         SettingsSaved?.Invoke();
     }
+
+    public void Dispose() => _gamePatcherService.IsPatchingChanged -= OnPatcherBusyChanged;
 }

@@ -29,7 +29,7 @@
             <Border Classes="ww-card" Padding="18,14">
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                     <Button Grid.Column="4" Classes="ww-primary" Margin="10,0,0,0" Command="{Binding StartGameCommand}"
-                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding !IsLaunching}"
+                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding CanAttach}"
                             ToolTip.Tip="Start your patched game in Dolphin and attach to it">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Viewbox Width="15" Height="15" VerticalAlignment="Center">
@@ -49,7 +49,7 @@
                             Command="{Binding RefreshDolphinsCommand}" IsEnabled="{Binding !IsBusy}" />
                     <Button Grid.Column="3" Content="Attach" Classes="ww-accent"
                             Command="{Binding ConnectDolphinCommand}"
-                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding !IsBusy}" />
+                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding CanAttach}" />
                     <Button Grid.Column="3" Content="Detach" Classes="ww-danger"
                             Command="{Binding DisconnectDolphinCommand}"
                             IsVisible="{Binding IsDolphinConnected}" IsEnabled="{Binding !IsBusy}" />

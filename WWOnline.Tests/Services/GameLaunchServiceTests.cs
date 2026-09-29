@@ -18,19 +18,28 @@ public sealed class GameLaunchServiceTests : IDisposable
     private List<DolphinProcessInfo> _running = [];
     private int _attachedCount;
     private bool _connected;
+    private int? _connectedPid;
+    private long? _mem1 = 0x3000000;
+    private byte[]? _hookStatus = "HOOK"u8.ToArray();
+    private int _connects;
     private OptionalPatchBuildStatus _build = new(false, "up to date", []);
 
     public GameLaunchServiceTests()
     {
         _settings = new GameSettingsService(Path.Combine(_dir, "settings"));
         _dolphin.SetupGet(d => d.IsConnected).Returns(() => _connected);
-        _dolphin.SetupGet(d => d.ConnectedProcessId).Returns(() => _connected ? 7 : null);
+        _dolphin.SetupGet(d => d.ConnectedProcessId).Returns(() => _connected ? _connectedPid : null);
+        _dolphin.SetupGet(d => d.EmulatedMemorySize).Returns(() => _connected ? _mem1 : null);
+        _dolphin.Setup(d => d.ReadMemory(Data.PuppetLayout.STATUS_ADDR, 4)).Returns(() => _connected ? _hookStatus : null);
         _dolphin.Setup(d => d.EnumerateProcesses()).Returns(() => _running);
-        _dolphin.Setup(d => d.ConnectAsync(It.IsAny<int>())).ReturnsAsync(() =>
+        _dolphin.Setup(d => d.ConnectAsync(It.IsAny<int>())).Returns((int pid) =>
         {
+            Interlocked.Increment(ref _connects);
             _connected = true;
-            return true;
+            _connectedPid = pid;
+            return Task.FromResult(true);
         });
+        _dolphin.Setup(d => d.Disconnect()).Callback(() => { _connected = false; _connectedPid = null; });
     }
 
     public void Dispose()
@@ -168,6 +177,141 @@ public sealed class GameLaunchServiceTests : IDisposable
         var result = await launch.StartGameAsync();
         Assert.Equal(GameLaunchState.Failed, result.State);
         Assert.Contains("closed", result.Message);
+    }
+
+    [Fact]
+    public async Task RunningDolphinWithout48MB_IsRefused_AndLeftAlone()
+    {
+        SaveSetup();
+        _running = [new DolphinProcessInfo(99, "Dolphin")];
+        _mem1 = 0x1800000; // opened by the player without the memory override
+        using var launch = Service();
+
+        var result = await launch.StartGameAsync();
+
+        Assert.Equal(GameLaunchState.Blocked, result.State);
+        Assert.Contains("48 MB", result.Message);
+        Assert.Contains("let WW-Online start it", result.Message);
+        Assert.Equal(0, _attachedCount); // no sync writing into it
+        Assert.False(_connected);
+    }
+
+    [Fact]
+    public async Task RunningUnpatchedGame_IsRefused_WithoutSyncing()
+    {
+        SaveSetup();
+        _running = [new DolphinProcessInfo(99, "Dolphin")];
+        _hookStatus = [0, 0, 0, 0]; // vanilla / PAL: the draw hook never writes its status word
+        using var launch = new GameLaunchService(_settings, _ => _build, _dolphin.Object,
+            () => Interlocked.Increment(ref _attachedCount), _starter, TimeSpan.FromMilliseconds(1), maxAttachAttempts: 20);
+
+        var result = await launch.StartGameAsync();
+
+        Assert.Equal(GameLaunchState.Blocked, result.State);
+        Assert.Contains("isn't your patched", result.Message);
+        Assert.Equal(0, _attachedCount);
+        Assert.False(_connected);
+        Assert.Equal(5, _connects); // a few seconds' grace for Link to be drawn, then no
+    }
+
+    [Fact]
+    public async Task PatchedHook_ShowingUpAfterBoot_IsAccepted()
+    {
+        SaveSetup();
+        _hookStatus = null;
+        _dolphin.Setup(d => d.ConnectAsync(It.IsAny<int>())).Returns((int pid) =>
+        {
+            if (++_connects == 3) _hookStatus = "TITL"u8.ToArray(); // the title screen draws Link
+            _connected = true;
+            _connectedPid = pid;
+            return Task.FromResult(true);
+        });
+        using var launch = Service();
+
+        Assert.Equal(GameLaunchState.Attached, (await launch.StartGameAsync()).State);
+        Assert.Equal(1, _attachedCount);
+    }
+
+    [Fact]
+    public async Task ManualAttach_ToAnUnpatchedGame_AttachesWithAWarning()
+    {
+        _hookStatus = "GZLP"u8.ToArray();
+        using var launch = Service();
+
+        var (attached, warning) = await launch.AttachManuallyAsync(42);
+
+        Assert.True(attached);
+        Assert.Contains("isn't your patched", warning);
+        Assert.Equal(1, _attachedCount);
+
+        var again = await launch.AttachManuallyAsync(42); // already attached: no second sync start
+        Assert.True(again.Attached);
+        Assert.Equal(1, _attachedCount);
+    }
+
+    [Fact]
+    public async Task ConcurrentAttaches_ConnectAndStartSyncOnce()
+    {
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _dolphin.Setup(d => d.ConnectAsync(It.IsAny<int>())).Returns(async (int pid) =>
+        {
+            Interlocked.Increment(ref _connects);
+            await gate.Task;
+            _connected = true;
+            _connectedPid = pid;
+            return true;
+        });
+        using var launch = Service();
+
+        var first = launch.AttachManuallyAsync(42);
+        var second = launch.AttachManuallyAsync(42);
+        await Task.Delay(50);
+        gate.SetResult(true);
+        var results = await Task.WhenAll(first, second);
+
+        Assert.All(results, r => Assert.True(r.Attached));
+        Assert.Equal(1, _connects);
+        Assert.Equal(1, _attachedCount);
+    }
+
+    [Fact]
+    public async Task OnAttached_RunsThroughTheUiMarshaller()
+    {
+        int marshalled = 0;
+        using var launch = new GameLaunchService(_settings, _ => _build, _dolphin.Object,
+            () => Interlocked.Increment(ref _attachedCount), _starter, TimeSpan.FromMilliseconds(1), 3,
+            a => { marshalled++; a(); return Task.CompletedTask; });
+        await launch.AttachManuallyAsync(42);
+        Assert.Equal(1, marshalled);
+        Assert.Equal(1, _attachedCount);
+    }
+
+    [Fact]
+    public async Task LeavingTheRoom_CancelsTheWaitForTheGame()
+    {
+        SaveSetup();
+        _dolphin.Setup(d => d.ConnectAsync(It.IsAny<int>())).ReturnsAsync(false); // still booting
+        using var launch = new GameLaunchService(_settings, _ => _build, _dolphin.Object,
+            () => Interlocked.Increment(ref _attachedCount), _starter, TimeSpan.FromMilliseconds(20), maxAttachAttempts: 10_000);
+        using var cts = new CancellationTokenSource();
+
+        var start = launch.StartGameAsync(cts.Token);
+        await Task.Delay(100);
+        cts.Cancel();
+        var result = await start.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(GameLaunchState.Idle, result.State);
+        Assert.Equal(0, _attachedCount);
+    }
+
+    [Fact]
+    public void HookStatusWords_AreRecognised()
+    {
+        foreach (var s in PatchedGameCheck.HookStatuses)
+            Assert.True(PatchedGameCheck.IsHookStatus(System.Text.Encoding.ASCII.GetBytes(s)));
+        Assert.False(PatchedGameCheck.IsHookStatus([0, 0, 0, 0]));
+        Assert.False(PatchedGameCheck.IsHookStatus(null));
+        Assert.False(PatchedGameCheck.IsHookStatus("HOO"u8.ToArray()));
     }
 
     [Fact]

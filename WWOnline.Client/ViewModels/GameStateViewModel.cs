@@ -195,11 +195,11 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
         IsBusy = true;
         try
         {
-            var ok = await _launch.AttachAsync(SelectedDolphin.ProcessId);
+            var (ok, warning) = await _launch.AttachManuallyAsync(SelectedDolphin.ProcessId);
             if (!ok)
-            {
                 DolphinError = $"Failed to attach to PID {SelectedDolphin.ProcessId}. Is the game booted?";
-            }
+            else if (warning != null)
+                DolphinError = warning;
             SyncConnectionState();
         }
         catch (Exception ex)
@@ -239,7 +239,14 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
 
     /// <summary>Starting Dolphin / waiting for the game, or why it was refused ("" when idle).</summary>
     [ObservableProperty] private string _launchMessage = "";
-    [ObservableProperty] private bool _isLaunching;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanAttach))]
+    private bool _isLaunching;
+
+    /// <summary>Attach / Start game are available: nothing else is attaching (a Start game can wait minutes).</summary>
+    public bool CanAttach => !IsBusy && !IsLaunching;
+
+    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanAttach));
     [ObservableProperty] private bool _launchProblem;
 
     /// <summary>Start the patched game in Dolphin and attach (refused while the game needs patching).</summary>

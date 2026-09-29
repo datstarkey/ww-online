@@ -20,6 +20,12 @@ public interface IDolphinService : IDisposable
     int? ConnectedProcessId { get; }
 
     /// <summary>
+    /// Size of the attached game's MEM1 in bytes (0x1800000 retail, 0x3000000 with Dolphin's 48 MB override), or
+    /// null when not attached or not known.
+    /// </summary>
+    long? EmulatedMemorySize { get; }
+
+    /// <summary>
     /// Raised when IsConnected transitions. Argument is the new IsConnected value.
     /// Fires on an arbitrary thread — subscribers must marshal to UI thread if needed.
     /// </summary>

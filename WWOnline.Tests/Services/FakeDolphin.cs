@@ -28,6 +28,7 @@ internal sealed class FakeDolphin : IDolphinService
 
     public bool IsConnected => true;
     public int? ConnectedProcessId => 1;
+    public long? EmulatedMemorySize => null;
     public event EventHandler<bool>? ConnectionChanged { add { } remove { } }
 
     public byte[]? ReadMemory(uint address, int size)

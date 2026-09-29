@@ -34,6 +34,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     private readonly GameLaunchService _gameLaunchService;
     private readonly PuppetSyncService _puppetSyncService;
     private readonly StartupOptions _startupOptions;
+    private CancellationTokenSource? _gameStartCts;
     private Process? _serverProcess;
     private System.Timers.Timer? _diagnosticsTimer;
 
@@ -479,14 +480,24 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     {
         if (_startupOptions.AutoAttach || _dolphinService.IsConnected) return;
         if (!_gameSettingsService.Load().AutoLaunchDolphin) return;
-        _ = StartGameInBackgroundAsync();
+        CancelGameStart();
+        _gameStartCts = new CancellationTokenSource();
+        _ = StartGameInBackgroundAsync(_gameStartCts.Token);
     }
 
-    private async Task StartGameInBackgroundAsync()
+    /// <summary>Leaving the room (or closing the app) stops waiting for the game to boot.</summary>
+    private void CancelGameStart()
+    {
+        _gameStartCts?.Cancel();
+        _gameStartCts?.Dispose();
+        _gameStartCts = null;
+    }
+
+    private async Task StartGameInBackgroundAsync(CancellationToken ct)
     {
         try
         {
-            await _gameLaunchService.StartGameAsync();
+            await _gameLaunchService.StartGameAsync(ct);
         }
         catch (Exception ex)
         {
@@ -579,6 +590,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     {
         try
         {
+            CancelGameStart();
             await _signalRClient.DisconnectAsync();
             StopServerProcess();
             OwnerKey = ""; // the next server gets no key unless the player enters one
@@ -610,6 +622,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         _diagnosticsTimer?.Stop();
         _diagnosticsTimer?.Dispose();
         _diagnosticsTimer = null;
+        CancelGameStart();
         StopServerProcess();
     }
 }
