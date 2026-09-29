@@ -113,7 +113,8 @@ public partial class StoryFlagRow : ObservableObject
 
 /// <summary>
 /// An 8-bit event register (bytes 0x79-0xFF), edited in this game only. Never synced, except the 17
-/// Nintendo Gallery figurine bitfields (<see cref="IsSharedFigurines"/>), which Shared story merges.
+/// Nintendo Gallery figurine bitfields (<see cref="IsSharedFigurines"/>) and the 6 warp jar registers
+/// (<see cref="IsSharedWarpJars"/>), which Shared story merges.
 /// </summary>
 public partial class EventRegisterRow : ObservableObject
 {
@@ -125,6 +126,9 @@ public partial class EventRegisterRow : ObservableObject
 
     /// <summary>One of the figurine bitfields (<see cref="StoryFlags.FigurineRegisterBytes"/>): shared with Shared story on.</summary>
     public bool IsSharedFigurines { get; }
+
+    /// <summary>One of the warp jar registers (<see cref="StoryFlags.WarpJarRegisterBytes"/>): shared with Shared story on.</summary>
+    public bool IsSharedWarpJars { get; }
 
     /// <summary>Current value (byte &amp; mask), null while no game is loaded.</summary>
     [ObservableProperty]
@@ -141,7 +145,8 @@ public partial class EventRegisterRow : ObservableObject
         Info = info;
         Code = info.Id.ToString("X4", CultureInfo.InvariantCulture);
         IsSharedFigurines = StoryFlags.FigurineRegisterBytes.Contains((byte)info.ByteIndex);
-        PolicyText = IsSharedFigurines ? "Figurines (Shared story)" : info.Policy switch
+        IsSharedWarpJars = StoryFlags.WarpJarRegisterBytes.Contains((byte)info.ByteIndex) && info.Mask == StoryFlags.WarpJarMask;
+        PolicyText = IsSharedFigurines ? "Figurines (Shared story)" : IsSharedWarpJars ? "Warp jars (Shared story)" : info.Policy switch
         {
             EventRegisterPolicy.BitwiseOr => "Bitfield",
             EventRegisterPolicy.Max => "Progress state",
@@ -151,7 +156,9 @@ public partial class EventRegisterRow : ObservableObject
         Tooltip = $"{Name} · {Code}\nByte 0x{info.ByteIndex:X2}, value mask 0x{info.Mask:X2} (0 to {info.Mask})\n" +
                   (IsSharedFigurines
                       ? "Nintendo Gallery figurines Carlov has made, one bit each. With Shared story on, a figurine set here merges into the room and every player gets it."
-                      : "Registers are never synced: this changes your game only.");
+                      : IsSharedWarpJars
+                          ? "A dungeon's warp jars that are open, one bit each. With Shared story on, a jar opened here opens for every player."
+                          : "Registers are never synced: this changes your game only.");
     }
 }
 
