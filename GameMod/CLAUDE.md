@@ -8,7 +8,7 @@ This folder holds the game-side half of the mod. It is compiled by devkitPPC via
 3. **Put scratch/sync addresses in `src/puppet_link/puppet_shared.h`, never inline.** It is the memory map shared with C#: the client generates `PuppetLayout.g.cs` from its integer `#define`s. Put one integer literal in each `#define` and keep derived values as macros. Any change there needs a re-patch, which the build stamp enforces.
 4. **Keep the hook tiny and put new logic in the REL.** See the table below.
 5. **Guard global state.** `daPy_lk_c` code assumes `this` is the local player. Wrap `playerInit`/`playerDelete` (`puppet_saveGlobals`/`puppet_restoreGlobals` in puppet.c) and every proc init/execute (`puppet_guardBegin`/`puppet_guardEnd` in puppet_execute.c) so a puppet never changes the local player's status bits, event flow, hearts, magic, rumble, BGM, HUD or Z-target. Any new call into player code goes inside a guard.
-6. **Watch the ARAM budget.** RELS.arc is loaded into ARAM, which is nearly full in vanilla. Only the puppet REL may be replaced (the others stay Yaz0-compressed; `RelsArcReplaceTests`). Keep the REL lean: growth can make the first play scene's ARAM mount fail (`d_s_play.cpp:3439`).
+6. **Watch the ARAM budget.** All of RELS.arc stays in ARAM for the session, and too much growth makes the first play scene's ARAM mount fail (`d_s_play.cpp:3439`; about 1 MB is free in vanilla, see `ElfToRelConverter.MaxRelsArcGrowthBytes`). The build guards 64 KB of growth. The puppet REL and the profile list are stored Yaz0 like every vanilla REL (about 26 KB of growth today), only the puppet REL may be replaced, and the other RELs keep their compression (`RelsArcReplaceTests`). Keep the REL lean anyway.
 
 ## The two pieces
 | | Puppet REL (`puppet.c` + includes) | Draw hook (`link_draw_hook.c`) |
@@ -37,7 +37,7 @@ Code organisation: `puppet.c` holds the profile, create/delete and a thin dispat
 - **Peer equipment** is presented by swapping the save's select-equip bytes inside the guard. The swap is seqlocked for C# (`PUPPET_EQUIP_SWAP_SEQ_ADDR`), and End restores a byte only if it still holds the peer value.
 - **Delete path:** `daPuppet_Delete()` must call `daPy_lk_c__playerDelete()` or room transitions crash. Bounds-check slot indices against `PUPPET_MAX_SLOTS`. NULL-check `polyInfo` / `mpJoints`.
 - **Globals** like `l_puppetFollowState` are safe only because GameCube actors run single-threaded. Save and restore them per puppet.
-- Compile flags (`DevKitPpcToolchain`): `-mcpu=750 -std=c99 -fno-inline -Wall -Og -g -fshort-enums -fno-jump-tables`. `-fno-jump-tables` avoids R_PPC_REL32 relocations.
+- Compile flags (`DevKitPpcToolchain`): `-mcpu=750 -std=c99 -fno-inline -Wall -Og -g -fshort-enums -fno-jump-tables`. `-fno-jump-tables` avoids R_PPC_REL32 relocations. `-g` and `.eh_frame` never reach the REL (only `ElfToRelConverter.AllowedSections` are copied). `-Os` was measured: 20% smaller raw but only ~1.5 KB smaller once Yaz0-compressed, a new codegen for every function, and it needs libgcc's `_restgpr_*_x` and the DOL's memset/memcpy, so the REL stays `-Og`.
 
 ## ASM patches (`src/patches/`)
 WW_Hacking_API style (`.open "sys/main.dol"`, `.org <addr>`, `.close`). Every `.asm` file directly in `src/patches/` is a **required** patch picked up by `AssemblePatchesStep`: `use_extra_memory.asm` (48MB, which also needs bi2.bin) and the generated `link_draw_hook.asm`.

@@ -95,12 +95,26 @@ public class RarcFileEntry
     /// <summary>
     /// The file's contents, decompressed if Yaz0 — WITHOUT modifying the entry. Use this to
     /// inspect entries you don't intend to replace: DecompressDataIfNecessary would make them
-    /// save back uncompressed and bloat the archive (RELS.arc lives in ARAM, which is nearly full).
+    /// save back uncompressed and bloat the archive (all of RELS.arc stays in ARAM for the session).
     /// </summary>
     public byte[]? PeekDecompressedData()
     {
         if (Data == null || Data.Length < 4) return Data;
         return Yaz0Codec.CheckIsCompressed(Data) ? Yaz0Codec.Decompress(Data) : Data;
+    }
+
+    /// <summary>
+    /// Replaces the file's contents with <paramref name="contents"/> (uncompressed), Yaz0-compressing
+    /// it when the entry was stored compressed, so the entry keeps its form. Every vanilla REL in
+    /// RELS.arc is Yaz0 (the game expands it when it loads the module), and the archive is ARAM
+    /// resident, so storing a replaced REL uncompressed costs about twice the ARAM.
+    /// </summary>
+    public void ReplaceContents(byte[] contents)
+    {
+        var wasCompressed = Data != null && Yaz0Codec.CheckIsCompressed(Data);
+        Data = wasCompressed && !Yaz0Codec.CheckIsCompressed(contents)
+            ? new Yaz0Codec().Compress(contents)
+            : contents;
     }
 
     /// <summary>

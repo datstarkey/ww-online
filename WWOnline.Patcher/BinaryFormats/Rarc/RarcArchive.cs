@@ -184,9 +184,10 @@ public class RarcArchive
 
     /// <summary>
     /// Replace the REL whose module ID (first u32) is <paramref name="relId"/> with
-    /// <paramref name="relData"/>. Other entries are only peeked at, never decompressed in place,
-    /// so they keep their Yaz0 compression — RELS.arc is loaded into ARAM, and saving every REL
-    /// uncompressed doubled it (943KB → 1.97MB) and made later ARAM mounts (LkD00.arc) fail.
+    /// <paramref name="relData"/> (uncompressed). The replaced entry keeps its Yaz0 compression
+    /// (<see cref="RarcFileEntry.ReplaceContents"/>), and other entries are only peeked at, never
+    /// decompressed in place — RELS.arc is loaded into ARAM, and saving every REL uncompressed
+    /// doubled it (943KB → 1.97MB) and made later ARAM mounts (LkD00.arc) fail.
     /// Returns false if no entry has that module ID.
     /// </summary>
     public bool ReplaceRelById(uint relId, byte[] relData)
@@ -198,7 +199,7 @@ public class RarcArchive
             if (contents == null || contents.Length < 4) continue;
             if (BigEndianIO.ReadU32(contents, 0) != relId) continue;
 
-            entry.Data = relData;
+            entry.ReplaceContents(relData);
             return true;
         }
         return false;
