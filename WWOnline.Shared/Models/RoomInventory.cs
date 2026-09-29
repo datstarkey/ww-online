@@ -43,6 +43,11 @@ public class RoomInventory
     public const byte SongMask = 0x3F;      // mTact: 6 songs
     public const byte PearlMask = 0x07;     // mSymbol: Nayru, Din, Farore
 
+    /// <summary>The heart catalogue's source IDs (WWOnline.Patcher HeartCatalog.SourceIds: 44 Pieces of Heart and 6
+    /// Heart Containers, docs/hearts.md). Part of the wire format: IDs are never reordered, only appended.</summary>
+    public const int HeartSourceCount = 50;
+    public const ulong HeartSourceMask = (1UL << HeartSourceCount) - 1;
+
     // Level limits (validation)
     public const ushort MaxHealthLimit = 80; // 20 hearts, in quarter hearts
     public const byte MaxMagicLimit = 32;
@@ -74,8 +79,14 @@ public class RoomInventory
     public byte TriforceShards { get; set; }
     public byte Pearls { get; set; }
 
-    /// <summary>Heart containers + pieces, in quarter hearts.</summary>
+    /// <summary>Heart containers + pieces, in quarter hearts. Not merged by clients that derive it from
+    /// <see cref="HeartSources"/> (docs/hearts.md); kept for the room summary.</summary>
     public ushort MaxHealth { get; set; }
+
+    /// <summary>Grow-only set of heart sources anyone in the room has taken: bit N = catalogue source N
+    /// (<see cref="HeartSourceCount"/> bits). Max health is derived from it, so a piece two players both take
+    /// counts once.</summary>
+    public ulong HeartSources { get; set; }
     public byte MaxMagic { get; set; }
     /// <summary>Quiver capacity (dSv_player_item_max_c) — NOT the arrow count.</summary>
     public byte MaxArrows { get; set; }
@@ -136,6 +147,7 @@ public class RoomInventory
         Items is { Length: SlotCount } &&
         ItemGetFlags is { Length: SlotCount } &&
         MaxHealth <= MaxHealthLimit &&
+        (HeartSources & ~HeartSourceMask) == 0 &&
         MaxMagic <= MaxMagicLimit &&
         MaxArrows <= MaxAmmoLimit &&
         MaxBombs <= MaxAmmoLimit &&
@@ -158,6 +170,7 @@ public class RoomInventory
         HerosCharm &= CharmMask;
         Songs &= SongMask;
         Pearls &= PearlMask;
+        HeartSources &= HeartSourceMask;
         for (int i = FirstBottleSlot; i < FirstBottleSlot + BottleSlotCount; i++)
             if (Items[i] != NoItem) Items[i] = EmptyBottle;
         return this;
@@ -190,6 +203,8 @@ public class RoomInventory
         Songs = Or(Songs, other.Songs, ref changed);
         TriforceShards = Or(TriforceShards, other.TriforceShards, ref changed);
         Pearls = Or(Pearls, other.Pearls, ref changed);
+        ulong hearts = HeartSources | (other.HeartSources & HeartSourceMask);
+        if (hearts != HeartSources) { HeartSources = hearts; changed = true; }
 
         if (other.MaxHealth > MaxHealth) { MaxHealth = other.MaxHealth; changed = true; }
         MaxMagic = Max(MaxMagic, other.MaxMagic, ref changed);
@@ -224,6 +239,7 @@ public class RoomInventory
         g.Songs = (byte)(Songs & ~baseline.Songs);
         g.TriforceShards = (byte)(TriforceShards & ~baseline.TriforceShards);
         g.Pearls = (byte)(Pearls & ~baseline.Pearls);
+        g.HeartSources = HeartSources & ~baseline.HeartSources;
         g.MaxHealth = MaxHealth > baseline.MaxHealth ? MaxHealth : (ushort)0;
         g.MaxMagic = MaxMagic > baseline.MaxMagic ? MaxMagic : (byte)0;
         g.MaxArrows = MaxArrows > baseline.MaxArrows ? MaxArrows : (byte)0;
@@ -238,7 +254,7 @@ public class RoomInventory
     public bool IsEmpty =>
         Items.All(b => b == NoItem) && ItemGetFlags.All(b => b == 0) &&
         Swords == 0 && Shields == 0 && PowerBracelets == 0 && PiratesCharm == 0 && HerosCharm == 0 &&
-        Songs == 0 && TriforceShards == 0 && Pearls == 0 &&
+        Songs == 0 && TriforceShards == 0 && Pearls == 0 && HeartSources == 0 &&
         MaxHealth == 0 && MaxMagic == 0 && MaxArrows == 0 && MaxBombs == 0 && WalletSize == 0 &&
         EquippedSword == NoItem && EquippedShield == NoItem;
 
@@ -276,6 +292,8 @@ public class RoomInventory
         Bits(d, "triforce", before.TriforceShards, after.TriforceShards);
         Bits(d, "pearls", before.Pearls, after.Pearls);
         Level(d, "max health", before.MaxHealth, after.MaxHealth);
+        if (before.HeartSources != after.HeartSources)
+            d.Add($"heart sources {BitOperations.PopCount(before.HeartSources)}→{BitOperations.PopCount(after.HeartSources)} (+{string.Join(",", Bits64(after.HeartSources & ~before.HeartSources))})");
         Level(d, "max magic", before.MaxMagic, after.MaxMagic);
         Level(d, "quiver", before.MaxArrows, after.MaxArrows);
         Level(d, "bomb bag", before.MaxBombs, after.MaxBombs);
@@ -291,7 +309,7 @@ public class RoomInventory
     public string Summary() =>
         $"rev {Revision}: {Items.Count(b => b != NoItem)} item(s), swords {Swords:X2}, shields {Shields:X2}, " +
         $"bracelets {PowerBracelets:X2}, charms {PiratesCharm:X2}/{HerosCharm:X2}, songs {Songs:X2}, " +
-        $"triforce {BitOperations.PopCount(TriforceShards)}/8, pearls {Pearls:X2}, max health {MaxHealth}, " +
+        $"triforce {BitOperations.PopCount(TriforceShards)}/8, pearls {Pearls:X2}, max health {MaxHealth}, heart sources {BitOperations.PopCount(HeartSources)}, " +
         $"max magic {MaxMagic}, quiver {MaxArrows}, bomb bag {MaxBombs}, wallet size {WalletSize}, " +
         $"equipped {Hex(EquippedSword)}/{Hex(EquippedShield)}";
 
@@ -302,6 +320,12 @@ public class RoomInventory
     private static void Bits(List<string> d, string name, byte a, byte b)
     {
         if (a != b) d.Add($"{name} {a:X2}→{b:X2}");
+    }
+
+    private static IEnumerable<int> Bits64(ulong v)
+    {
+        for (int i = 0; i < 64; i++)
+            if ((v & (1UL << i)) != 0) yield return i;
     }
 
     private static void Level(List<string> d, string name, int a, int b)

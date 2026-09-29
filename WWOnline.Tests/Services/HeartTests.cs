@@ -39,7 +39,8 @@ public class HeartReconcilerTests
         public readonly HeartReconciler Reconciler = new();
         public readonly List<HeartLogLine> Log = [];
         public long Tick;
-        public HeartWrite? Step(HeartObservation obs) => Reconciler.Step(Table, obs, ++Tick, Log);
+        public ulong Room;
+        public HeartWrite? Step(HeartObservation obs) => Reconciler.Step(Table, obs, Room, ++Tick, Log);
 
         /// <summary>Step the same observation until it writes (or give up after <paramref name="ticks"/>).</summary>
         public HeartWrite? Settle(HeartObservation obs, int ticks = HeartReconciler.IdleTicksDown)
@@ -59,6 +60,20 @@ public class HeartReconcilerTests
         Assert.Equal(new HeartWrite(+1, 12, 13), h.Step(Obs(12, set: ChestPiece)));
         // The HUD applied it.
         Assert.Null(h.Settle(Obs(13, set: ChestPiece)));
+    }
+
+    [Fact]
+    public void APieceInTheRoomSet_CountsWithoutTheLocalFlag_AndOnceWithIt()
+    {
+        var h = new Harness();
+        Assert.Null(h.Settle(Obs(12)));
+        // Another player's sunken treasure / letter / chest: only its ID arrives, in the room's set.
+        h.Room = 1UL << HeartCatalog.IdOf(ChestPiece)!.Value;
+        Assert.Equal(new HeartWrite(+1, 12, 13), h.Step(Obs(12)));
+        // This game takes the same source too (its flag set): still one piece.
+        Assert.Null(h.Settle(Obs(13, set: ChestPiece)));
+        // And a second copy of that piece is taken back.
+        Assert.Equal(new HeartWrite(-1, 14, 13), h.Settle(Obs(14, set: ChestPiece)));
     }
 
     [Fact]
@@ -259,11 +274,65 @@ public class DerivedMaxHealthMergeTests
     }
 
     [Fact]
-    public void TheRule_NeedsSharedItemsAndSharedWorld()
+    public void TheRule_IsSharedItemsAlone()
     {
+        Assert.True(SharedHeartService.RuleApplies(new RoomSettings { SharedItems = true, SharedWorld = false, SharedStory = false }));
         Assert.True(SharedHeartService.RuleApplies(new RoomSettings { SharedItems = true, SharedWorld = true }));
-        Assert.False(SharedHeartService.RuleApplies(new RoomSettings { SharedItems = true, SharedWorld = false }));
-        Assert.False(SharedHeartService.RuleApplies(new RoomSettings { SharedItems = false, SharedWorld = true }));
+        Assert.False(SharedHeartService.RuleApplies(new RoomSettings { SharedItems = false, SharedWorld = true, SharedStory = true }));
+    }
+
+    [Fact]
+    public void DerivedHeartsState_HoldsTheLastTick()
+    {
+        var s = new DerivedHeartsState();
+        Assert.False(s.OwnsMaxHealth);
+        Assert.Null(s.DerivedMaxHealth);
+        s.Update(true, 17, 1UL << 49);
+        Assert.True(s.OwnsMaxHealth);
+        Assert.Equal(17, s.DerivedMaxHealth);
+        Assert.Equal(1UL << 49, s.LocalHeartSources);
+    }
+}
+
+/// <summary>The room's grow-only heart-source set (<see cref="RoomInventory.HeartSources"/>, protocol 6).</summary>
+public class HeartSourceSetTests
+{
+    [Fact]
+    public void TheCatalogue_HasOneIdPerSource_AsManyAsTheWireSetHolds()
+    {
+        Assert.Equal(RoomInventory.HeartSourceCount, HeartCatalog.SourceIds.Count);
+        Assert.Equal(HeartCatalog.SourceIds.Count, HeartCatalog.SourceIds.Distinct().Count());
+        for (int i = 0; i < HeartCatalog.SourceIds.Count; i++) Assert.Equal(i, HeartCatalog.IdOf(HeartCatalog.SourceIds[i]));
+        Assert.Null(HeartCatalog.IdOf(HeartFlag.Chest(0, 31)));
+        // IDs are the wire format: the first stage source and the first reward keep their numbers.
+        Assert.Equal(0, HeartCatalog.IdOf(HeartFlag.Chest(13, 12)));
+        Assert.Equal(34, HeartCatalog.IdOf(HeartFlag.Event(0x0F10)));
+    }
+
+    [Fact]
+    public void TheSet_OrMerges_GrowsOnly_AndCountsInGains()
+    {
+        var room = new RoomInventory { HeartSources = 0b0011 };
+        Assert.True(room.MergeGainsFrom(new RoomInventory { HeartSources = 0b0110 }));
+        Assert.Equal(0b0111UL, room.HeartSources);
+        Assert.False(room.MergeGainsFrom(new RoomInventory { HeartSources = 0b0001 }));
+
+        var local = new RoomInventory { HeartSources = 0b1101 };
+        var gains = local.GainsOver(new RoomInventory { HeartSources = 0b0101 });
+        Assert.Equal(0b1000UL, gains.HeartSources);
+        Assert.False(gains.IsEmpty);
+        Assert.True(local.GainsOver(local.Clone()).IsEmpty);
+        Assert.Contains(RoomInventory.Describe(new RoomInventory(), local), d => d.StartsWith("heart sources 0→3", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void UnknownBits_AreRejected_AndStrippedByNormalize()
+    {
+        var inv = new RoomInventory { HeartSources = RoomInventory.HeartSourceMask };
+        Assert.True(inv.IsValid());
+        inv.HeartSources |= 1UL << RoomInventory.HeartSourceCount;
+        Assert.False(inv.IsValid());
+        Assert.Equal(RoomInventory.HeartSourceMask, inv.Normalize().HeartSources);
     }
 }
 

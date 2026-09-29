@@ -16,10 +16,11 @@ namespace WWOnline.Services;
 ///     remove / downgrade) is written into the game where it differs, then re-baselined.
 /// Only synced fields are written (see <see cref="RoomInventoryMemory"/>), and only while the
 /// scene is stable (Link present, no stage change pending).
-/// Max health leaves the max-merge while <see cref="IMaxHealthOwner.OwnsMaxHealth"/> (derived hearts, Shared world
-/// on too: docs/hearts.md), since a piece two players pick up would count twice: the room's value is never applied
-/// then, a rise is never sent as a gain, and a join sends the derived value (so the room's field, which protocol-5
-/// clients without derived hearts still use, stays a real max health).
+/// Hearts (docs/hearts.md): this game's heart sources (<see cref="IMaxHealthOwner.LocalHeartSources"/>) grow the room's
+/// <see cref="RoomInventory.HeartSources"/> like any bitfield, and max health leaves the max-merge while
+/// <see cref="IMaxHealthOwner.OwnsMaxHealth"/>, since a piece two players pick up would count twice: SharedHeartService
+/// derives it from the set, the room's MaxHealth is never applied, a rise is never sent as a gain, and a join sends the
+/// derived value (the room's field stays a real max health for the summary).
 /// </summary>
 public class RoomInventorySyncService : IDisposable
 {
@@ -75,7 +76,7 @@ public class RoomInventorySyncService : IDisposable
         _signalR.Connected += OnConnectionReset;
     }
 
-    /// <summary>Max health is derived from the room's flags (<see cref="SharedHeartService"/>), not max-merged here.</summary>
+    /// <summary>Max health is derived from the room's heart sources (<see cref="SharedHeartService"/>), not max-merged here.</summary>
     public bool MaxHealthDerived => _maxHealthOwner?.OwnsMaxHealth == true;
 
     /// <summary>
@@ -237,6 +238,8 @@ public class RoomInventorySyncService : IDisposable
         if (!_scene.Check(_dolphin)) return; // title screen / loading / stage change
         var local = RoomInventoryMemory.Read(_dolphin);
         if (local == null) return;
+        // The heart sources this game's own flags show (not a memory field): they grow the room's set (docs/hearts.md).
+        local.HeartSources = _maxHealthOwner?.LocalHeartSources ?? 0;
 
         if (!_joined)
         {

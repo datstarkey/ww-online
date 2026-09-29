@@ -212,7 +212,7 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private int _maxHearts;
     [ObservableProperty] private string _maxHeartsText = "—";
     [ObservableProperty] private string _heartsText = "";
-    /// <summary>Max health is derived from the room's flags (Shared items + Shared world): no owner edit.</summary>
+    /// <summary>Max health is derived from the room's heart sources (Shared items): no owner edit.</summary>
     [ObservableProperty] private bool _heartsDerived;
     /// <summary>"Hearts: 2 of 6 containers, 13 of 44 pieces" (empty without a game or heart table).</summary>
     [ObservableProperty] private string _heartSourcesText = "";
@@ -564,8 +564,8 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
             ? $"Hearts: {h.Containers} of {h.ContainersTotal} containers, {h.Pieces} of {h.PiecesTotal} pieces"
             : "";
         HeartSourcesNote = !h.HasGame ? ""
-            : derived ? "Max hearts come from the shared world: a piece or container anyone finds counts once for everyone."
-            : "Found in your game (max hearts are only derived with Shared items and Shared world on).";
+            : derived ? "Max hearts come from the room: a piece or container anyone gets counts once for everyone."
+            : "Found in your game. With Shared items on, max hearts count every piece anyone in the room gets.";
         OnPropertyChanged(nameof(CanEditHearts));
     }
 

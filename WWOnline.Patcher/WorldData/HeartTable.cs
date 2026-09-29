@@ -36,7 +36,8 @@ public readonly record struct HeartFlag(HeartFlagKind Kind, int A, int B = 0)
     public static HeartFlag Register(int reg, int atLeast) => new(HeartFlagKind.EventRegAtLeast, reg, atLeast);
     public static HeartFlag MoblinsLetter { get; } = new(HeartFlagKind.MoblinsLetterDelivered, 0);
 
-    /// <summary>Whether the room's shared state carries the flag: world flags (Shared world), event bits (Shared story,
+    /// <summary>Whether a room rule syncs the flag itself (the heart count doesn't need it: the room's heart-source set
+    /// carries every source, docs/hearts.md): world flags (Shared world), event bits (Shared story,
     /// when the story sync mask has them) or neither (registers, charts, ocean bits and the delivery bag stay per player).</summary>
     public HeartFlagScope Scope => Kind switch
     {
@@ -85,6 +86,9 @@ public enum HeartSourceType
 public readonly record struct HeartSource(HeartFlag Flag, int Quarters, HeartSourceType Type, string Name, string Where)
 {
     public bool IsContainer => Quarters == HeartTable.ContainerQuarters;
+
+    /// <summary>The catalogue's source ID (bit of the room's heart-source set), or null for a source it doesn't know.</summary>
+    public int? Id => HeartCatalog.IdOf(Flag);
 }
 
 /// <summary>How many sources a save's flags show taken.</summary>
@@ -177,8 +181,9 @@ public sealed class HeartFlagState
 /// Every Piece of Heart and Heart Container and the flag that records it: chests, placed / dug-up items, salvage
 /// points and boss containers from the player's own stage files (<see cref="HeartTableBuilder"/>, never in the repo),
 /// plus the NPC rewards of <see cref="HeartCatalog"/>. A save's max health is
-/// <c>12 + 4 × containers taken + pieces taken</c> (<see cref="Tally"/>): the room shares the flags, so every player
-/// derives the same value and nothing is counted twice (docs/hearts.md).
+/// <c>12 + 4 × containers taken + pieces taken</c> (<see cref="Tally"/>), a source taken when its flag
+/// is set here or its catalogue ID is in the room's grow-only source set: every player derives the same value and
+/// nothing is counted twice (docs/hearts.md).
 /// </summary>
 public sealed class HeartTable
 {
@@ -202,13 +207,25 @@ public sealed class HeartTable
     public int PiecesTotal => Sources.Count(s => !s.IsContainer);
     public int ContainersTotal => Sources.Count(s => s.IsContainer);
 
-    /// <summary>The sources <paramref name="flags"/> show taken.</summary>
-    public HeartTally Tally(HeartFlagState flags)
+    /// <summary>The source IDs (bit N = catalogue source N) whose flag <paramref name="flags"/> shows taken: what this
+    /// game adds to the room's heart-source set.</summary>
+    public ulong SourceBits(HeartFlagState flags)
+    {
+        ulong bits = 0;
+        foreach (var s in Sources)
+            if (s.Id is int id && id < 64 && flags.IsSet(s.Flag)) bits |= 1UL << id;
+        return bits;
+    }
+
+    /// <summary>The sources taken: their flag set in <paramref name="flags"/>, or their ID in <paramref name="roomSources"/>
+    /// (the room's grow-only heart-source set). Each source counts once, however many players took it.</summary>
+    public HeartTally Tally(HeartFlagState flags, ulong roomSources = 0)
     {
         int containers = 0, pieces = 0, other = 0;
         foreach (var s in Sources)
         {
-            if (!flags.IsSet(s.Flag)) continue;
+            bool inRoom = s.Id is int id && id < 64 && (roomSources & (1UL << id)) != 0;
+            if (!inRoom && !flags.IsSet(s.Flag)) continue;
             if (s.IsContainer) containers++;
             else if (s.Quarters == 1) pieces++;
             else other += s.Quarters;

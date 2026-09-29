@@ -9,15 +9,15 @@ public readonly record struct HeartWrite(int Delta, int From, int To);
 public readonly record struct HeartLogLine(bool Warn, string Text);
 
 /// <summary>
-/// Derived max health: <c>12 + 4 × Heart Containers taken + Pieces of Heart taken</c>, each source counted when its
-/// flag is set (<see cref="HeartTable.Tally"/>). The flags are the ones this game holds, which the room's shared world
-/// (and shared story) OR-merge into it, so the players of a room derive the same value and a piece two players both
-/// pick up (its flag not synced yet, or a reward that isn't flag-gated for the second player) is counted once.
+/// Derived max health: <c>12 + 4 × Heart Containers taken + Pieces of Heart taken</c>, each source counted once when
+/// its flag is set in this game or its ID is in the room's grow-only heart-source set (<see cref="HeartTable.Tally"/>),
+/// so the players of a room derive the same value and a piece two players both pick up (its flag not synced, or a
+/// reward that isn't flag-gated for the second player) is counted once.
 /// Every tick this sets mMaxLife to the derived value, only while <see cref="HeartObservation.Idle"/> has held for a
 /// while: a pickup adds its max life during its get-item demo and some rewards set their flag at the end of it, so
 /// the game always finishes its own change first. A rise (a synced piece) waits <see cref="IdleTicksUp"/> ticks, a
 /// fall (a piece counted twice, or a save with too many hearts) <see cref="IdleTicksDown"/>.
-/// A rise of the game's own max that no heart flag explains (no source's flag set in the last
+/// A rise of the game's own max that no heart source explains (no source added, here or in the room, in the last
 /// <see cref="RecentFlagTicks"/> ticks) is logged loudly with the stage and room: either the same piece given twice
 /// or a source the catalogue doesn't know. It is not kept: the next write sets the derived value.
 /// Not thread-safe: one caller (the service's tick).
@@ -59,10 +59,10 @@ public sealed class HeartReconciler
     public void Unsettled() => _idleTicks = 0;
 
     /// <summary>One tick: the write (if any) that brings mMaxLife to the derived value. Log lines go to <paramref name="log"/>.</summary>
-    public HeartWrite? Step(HeartTable table, HeartObservation obs, long tick, List<HeartLogLine> log)
+    public HeartWrite? Step(HeartTable table, HeartObservation obs, ulong roomSources, long tick, List<HeartLogLine> log)
     {
         _idleTicks = obs.Idle ? _idleTicks + 1 : 0;
-        var tally = table.Tally(obs.Flags);
+        var tally = table.Tally(obs.Flags, roomSources);
         int derived = tally.MaxLife;
         int game = obs.MaxLife;
         if (_prevDerived is int pd && derived > pd) _lastFlagRise = tick;
@@ -74,12 +74,12 @@ public sealed class HeartReconciler
         if (!_reported)
         {
             _reported = true;
-            log.Add(new(false, $"this save has max health {game} ({Hearts(game)}); its flags derive {derived} ({Describe(table, tally)})" +
+            log.Add(new(false, $"this save has max health {game} ({Hearts(game)}); its flags and the room's heart sources derive {derived} ({Describe(table, tally)})" +
                                (game == derived ? "" : $" — {(game > derived ? "correcting it down" : "raising it")} to {derived} once the game is idle")));
         }
         else if (!ours && _prevGame is int pg && game > pg && game > derived && tick - _lastFlagRise > RecentFlagTicks)
         {
-            log.Add(new(true, $"max health rose {pg} → {game} in {Where(obs)} with no heart flag set in the last {RecentFlagTicks / 4} s: " +
+            log.Add(new(true, $"max health rose {pg} → {game} in {Where(obs)} with no heart source added in the last {RecentFlagTicks / 4} s: " +
                               $"a Piece of Heart / Heart Container given twice, or a source the heart catalogue doesn't know — " +
                               $"not kept, max health goes back to the derived {derived} ({Describe(table, tally)})"));
         }

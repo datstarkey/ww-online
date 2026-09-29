@@ -1,6 +1,6 @@
 # Derived max health (Pieces of Heart and Heart Containers)
 
-With **Shared items** and **Shared world** both on, a player's max health is no longer max-merged between players: it is derived from flags, the same way small keys are (`docs/small-keys.md`). §0 is what is built, §1 the catalogue (tick the list off in game), §2 the boss containers, §3 the research notes.
+With **Shared items** on, a player's max health is no longer max-merged between players: it is derived from the heart sources anyone in the room has taken, each counted once, in the spirit of the small keys (`docs/small-keys.md`). §0 is what is built, §1 the catalogue (tick the list off in game), §2 the boss containers, §3 the research notes.
 
 Target: GZLE01 (the GameCube game). Source: `tww-decomp/` (paths below are relative to it unless they start with a repo folder).
 
@@ -12,35 +12,29 @@ Target: GZLE01 (the GameCube game). Source: `tww-decomp/` (paths below are relat
 
 ### The rule
 
-> **max health = 12 (the 3 starting hearts) + 4 × Heart Containers whose flag is set + 1 × Pieces of Heart whose flag is set**
+> **max health = 12 (the 3 starting hearts) + 4 × Heart Containers in the room's source set + 1 × Pieces of Heart in the room's source set**
 
-in quarter hearts. The vanilla game has 44 pieces and 6 containers: 12 + 44 + 24 = 80 = 20 hearts (`RoomInventory.MaxHealthLimit`, and d_meter's own clamp at 0x50). The inputs are flags, so the result is idempotent: a piece two players both pick up has one flag and counts once. There is no count on the server, no delta, no hub method: **no protocol change** (`HubConstants.ProtocolVersion` stays 5, `RoomInventory` is unchanged).
+in quarter hearts. The vanilla game has 44 pieces and 6 containers: 12 + 44 + 24 = 80 = 20 hearts (`RoomInventory.MaxHealthLimit`, and d_meter's own clamp at 0x50).
+
+**The room's source set** is `RoomInventory.HeartSources`, a grow-only 50-bit set: bit N = catalogue source N (`HeartCatalog.SourceIds`: the 34 stage-file sources in `HeartCatalog.StageSources` order, then the 16 rewards; the IDs are the wire format, so they are never reordered, only appended). Every client computes which sources its **own** game's flags show taken (`HeartTable.SourceBits`: chests, items, bosses, event bits, registers, charts, ocean bits, Maggie) and sends them like any other gain; the server OR-merges them (`RoomInventory.MergeGainsFrom`) and pushes the room to everyone. A source counts when it is in the room's set or its flag is set in this game (`HeartTable.Tally(flags, roomSources)`), once either way. The set is keyed by source, so it is idempotent: a piece two players both take is one bit. The flags themselves still don't sync because of this (only the count uses the set), so the count doesn't depend on Shared world or Shared story. **Protocol 6** (`HubConstants.ProtocolVersion`: `RoomInventory` gained a field). The server rejects a set with bits above 49 (`RoomInventory.IsValid`) and `Normalize` strips them.
 
 **The heart table** (`WWOnline.Patcher/WorldData/HeartTable.cs`, `HeartTableBuilder.cs`, `HeartCatalog.cs`) is built like the small-key table: chests, placed and dug-up items, salvage points and boss containers come from the player's own stage files (`StageDataReader` + main.dol's object-name table), at runtime (`HeartTableProvider`, a `StageTableProvider<T>` like `SmallKeyTableProvider`, about 0.3 s on a background thread). Nothing built from game files is written anywhere or committed. `HeartCatalog` is our own hand-written data: the 16 NPC / minigame / letter rewards and their flags, the names of the 34 stage-file sources (by flag), and the three unreachable stages the builder skips (§3.4).
 
-**When it applies** (`SharedHeartService.RuleApplies`): connected, **Shared items AND Shared world** on, and the heart table built. Otherwise every game keeps its own max health and Shared items max-merges it as before.
+**When it applies** (`SharedHeartService.RuleApplies`): connected, **Shared items** on, and the heart table built (`DerivedHeartsState.OwnsMaxHealth`). Nothing is written until the room's inventory is known (joined), so a reconnect, which clears it, never takes hearts away. Otherwise every game keeps its own max health.
 
-**Which flags are shared.** The derivation reads *this game's* flags, which the room's sync rules OR-merge into it:
-
-| Scope | Sources | Shared by |
-|---|---|---|
-| World flags (memBit tbox / item / STAGE_LIFE) | 12 chests, 2 items, 6 boss containers | Shared world (always on while the rule applies) |
-| Event bits | 10 NPC rewards | Shared story. With it off, each player counts only the rewards they got themselves. All 10 are in the story sync mask (`DerivedMaxHealthMergeTests.EveryRewardEventBit_IsSharedByStorySync`) |
-| Never synced | 5 register rewards (3 letters, Battlesquid, barrel shooting), Maggie, 11 sunken treasures, 2 Big Octos, the gunboat | Nobody: each player counts their own |
-
-So 30 of the 50 sources are shared with Full sync, and 20 stay per player (§4.1 has the follow-up that would share them).
+All 50 sources are shared this way, whatever Shared world and Shared story say. Those rules still share the flags that some sources use (world flags: chests open empty for everyone; event bits: the NPC remembers), which keeps a second player from taking the same source; when they are off, the second player can take it again and the duplicate is taken back (below).
 
 **Writing it** (`SharedHeartService` at 4 Hz, `HeartReconciler`, `HeartMemory`). Only in a settled scene (`SceneStabilityGate`), and only while the game is idle: no max-life change queued (`play.mItemMaxLifeCount` = 0), no event (`mEvtCtrl.mMode` = 0: a get-item demo, a reward's talk), no pause menu, no minigame (`play.mMiniGameType` = 0). A rise waits 2 idle ticks (0.5 s), a fall 8 (2 s): a pickup adds its max life during its demo and a few rewards set their flag at the very end of it (a letter's READ state, the withered trees' flag), so the game always finishes its own change first.
 - The change is queued the way a Piece of Heart does it: `play.mItemMaxLifeCount` += delta (`GameMemoryAddresses.Hearts.PendingMaxLife`, only while it is 0, re-checked just before the write). `dMeter_LifeMove` (`src/d/d_meter.cpp:1405-1433`) adds it to mMaxLife clamped to 0..80, animates the heart row, refills health on a gain (exactly what a picked-up piece does) and **clamps current health** on a loss. mMaxLife is never written directly: that would leave the HUD's heart count stale until the next stage load (the HUD's own count, `i_Meter->mMaxHP`, is loaded from mMaxLife only in `dMeter_heartInit`, `d_meter.cpp:1394`).
 - One change at a time: after a write, nothing is written until it shows in mMaxLife (or 2 s pass).
 
-**A heart no flag explains** (the same piece given twice, or a source the catalogue doesn't know, e.g. a randomizer): the game's max rises with no heart flag set in the last 10 s. It is logged loudly (`[hearts] max health rose 13 → 14 in stage sea room 11 with no heart flag set ...`, a Warning) and **not kept**: after 2 idle seconds max health goes back to the derived value. Small keys keep an unknown-source key for the session; hearts can't, because the bug this fixes (a reward that isn't flag-gated for the second player) looks exactly like an unknown source.
+**A heart no source explains** (the same piece given twice, or a source the catalogue doesn't know, e.g. a randomizer): the game's max rises with no source added (by a flag here or the room's set) in the last 10 s. It is logged loudly (`[hearts] max health rose 13 → 14 in stage sea room 11 with no heart source added ...`, a Warning) and **not kept**: after 2 idle seconds max health goes back to the derived value. Small keys keep an unknown-source key for the session; hearts can't, because the bug this fixes (a reward that isn't flag-gated for the second player) looks exactly like an unknown source.
 
-**Correcting existing saves.** On the first tick with the rule on, the save is reported (`[hearts] this save has max health 15 (3 3/4 hearts); its flags derive 14 (...) — correcting it down to 14 once the game is idle`), then written like any other change (`[hearts] max health 15 → 14 (...), current health clamped by the game`). A save that got its hearts legitimately has every flag set, so it derives the same value and nothing is written.
+**Correcting existing saves.** On the first tick with the rule on, the save is reported (`[hearts] this save has max health 15 (3 3/4 hearts); its flags and the room's heart sources derive 14 (...) — correcting it down to 14 once the game is idle`), then written like any other change (`[hearts] max health 15 → 14 (...), current health clamped by the game`). A save that got its hearts legitimately has every flag set, so it derives at least the same value (plus the room's other sources).
 
-**Shared items** (`RoomInventorySyncService`): while `IMaxHealthOwner.OwnsMaxHealth`, the room's `MaxHealth` is never applied (the game keeps its own, which `SharedHeartService` sets), a rise is never sent as a gain, and a join sends the derived value. The room's field stays a real max health for protocol-5 clients without derived hearts (a mixed room still max-merges between those). With Shared world turned off, the old max-merge applies again from the next room push.
+**Shared items** (`RoomInventorySyncService`): each tick's local state carries `IMaxHealthOwner.LocalHeartSources` (written by `SharedHeartService` into `DerivedHeartsState`), so new sources go out as gains and a join sends them all. While `OwnsMaxHealth`, the room's `MaxHealth` is never applied (the game keeps its own, which `SharedHeartService` sets), a rise is never sent as a gain, and a join sends the derived value, so the room's field stays a real max health (the room summary).
 
-**Room items page** (`RoomItemsViewModel`, "Hearts and magic" card): the max hearts shown are the derived value while it applies, the − / + buttons are disabled (there is nothing to edit: the flags are the state), and a line reads **"Hearts: X of 6 containers, Y of 44 pieces"** (the flags this game holds, with or without the rule).
+**Room items page** (`RoomItemsViewModel`, "Hearts and magic" card): the max hearts shown are the derived value while it applies, the − / + buttons are disabled (there is nothing to edit: the flags are the state), and a line reads **"Hearts: X of 6 containers, Y of 44 pieces"** (the room's count while it applies, else this game's own flags).
 
 **Log lines:** `[hearts]` (client log). The table's summary when it is built (`44 piece(s), 6 container(s): 12 Chest, 2 PlacedItem, 14 Salvage, 6 Boss, 16 Reward`), a warning if a table doesn't have 44 and 6, and every untracked heart.
 
@@ -133,7 +127,7 @@ Checked by `HeartTableTests.VanillaGame_Has44PiecesAnd6Containers_AndEveryFlagDe
 
 A boss has two flags in its dungeon's `mDungeonItem`: bit 3 STAGE_BOSS_ENEMY (the boss is dead) and bit 4 STAGE_LIFE (`d_save.h:643-644`). **STAGE_LIFE is the one that counts**, because only `item_func_utuwa_heart` sets it (`src/d/d_item.cpp:587-603`), and that runs only when the Heart Container is picked up (execItemGet). The boss sets bit 3 when it dies and drops the container (`fopAcM_createDisappear(..., daDisItem_HEART_CONTAINER_e)` in `d_a_btd.cpp:1084`, `d_a_bmd.cpp:747`, `d_a_bpw.cpp:2856`, and the other bosses' equivalents).
 
-**Beaten but not collected** (warped out, or the game was reset before the pickup): bit 3 set, bit 4 not. `daBossItem_c` (the `Bitem` actor in each boss room, parameter = the dungeon's slot) re-creates the container on the next visit while `isStageBossEnemy && !isStageLife` (`d_a_boss_item.cpp:25-40`). The derivation counts nothing until someone picks it up, so a peer who never collected it doesn't get the heart early, and once anyone does, STAGE_LIFE syncs (Shared world OR-merges `mDungeonItem`) and the other players' Bitem no longer spawns it.
+**Beaten but not collected** (warped out, or the game was reset before the pickup): bit 3 set, bit 4 not. `daBossItem_c` (the `Bitem` actor in each boss room, parameter = the dungeon's slot) re-creates the container on the next visit while `isStageBossEnemy && !isStageLife` (`d_a_boss_item.cpp:25-40`). The derivation counts nothing until someone picks it up, so a peer who never collected it doesn't get the heart early, and once anyone does, its source ID joins the room's set and it counts for everyone. With Shared world on, STAGE_LIFE also syncs (`mDungeonItem` is OR-merged), so the other players' Bitem no longer spawns it; without it, a second pickup is logged and taken back.
 
 **Helmaroc King** is the one container that can be collected outside its dungeon: if it isn't taken in M2tower, `Bitem` also stands on the sea outside Forsaken Fortress (sea room 1), and `item_func_utuwa_heart` then sets STAGE_LIFE of STAGE_FF (slot 2) explicitly (`d_item.cpp:596-599`), the same flag. No container comes from anything but a boss in the vanilla game (the builder found no chest, item or salvage point with item 0x08).
 
@@ -184,9 +178,9 @@ The builder skips STAGE_TEST (slot 15: `Amos_T`, `I_TestM`, `K_Test*` hold heart
 
 ## 4. Limitations and follow-ups
 
-### 4.1 Per-player sources
+### 4.1 Per-player sources (resolved)
 
-Registers, charts, ocean bits and the delivery bag are never synced, so 20 of the 50 sources (§0) count only for the player who got them; with the old max-merge they were shared (with the double-count bug). Sharing them would need a room-level record of those flags. The idempotent way is a grow-only bitset of catalogue sources in `RoomInventory` (OR-merged like the other bitfields; each client ORs in the sources its own flags show), which changes the DTO: **protocol 6**. Not done here.
+The first version derived the count from this game's flags only, so the 20 sources whose flags never sync (registers, charts, ocean bits, the delivery bag) counted only for the player who got them. The room's grow-only source set (§0, protocol 6) shares all 50.
 
 ### 4.2 In-game checklist (dev-test, Full sync) — **unverified**
 
@@ -197,6 +191,7 @@ Registers, charts, ocean bits and the delivery bag are never synced, so 20 of th
 | H3 | P1 beats Gohma and picks up the container | Both: +4 (P2 via `[hearts]`); P2 entering Gohma's room finds no container |
 | H4 | P1 beats Gohma and warps out without the container | Nobody gets +4; the container is still there on the next visit |
 | H5 | A save with a double-counted piece joins | `[hearts] this save has max health 15 ...; its flags derive 14 ... correcting it down`, then `max health 15 → 14`, current health clamped |
-| H6 | The owner turns Shared world off, then on | `[hearts] derived max health off`, then on again with the save reported |
+| H6 | The owner turns Shared items off, then on | `[hearts] derived max health off`, then on again with the save reported |
 | H7 | Room items page | "Hearts: X of 6 containers, Y of 44 pieces"; max hearts − / + disabled while derived |
-| H8 | P1 reads the Baito's mother letter | Only P1's max rises (per player, §4.1) |
+| H8 | P1 reads the Baito's mother letter (or salvages a sunken treasure) | Both: +1 (P1 from the flag, P2 from the room's set: `[items] ... heart sources`) |
+| H9 | Shared world off, P1 and P2 open the same heart chest | One piece for the room: P2's second one is logged and taken back |

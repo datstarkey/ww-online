@@ -30,49 +30,62 @@ public static class HeartCatalog
         Reward("Flight Control Platform - Bird-Man Contest - First Prize", HeartFlag.Event(0x2B40), "d_a_npc_bmcon1 (first first prize)"),
     ];
 
-    /// <summary>The 34 vanilla sources found in the stage files, by flag: names for the logs and docs, and the list
-    /// the vanilla test checks the built table against (it must find exactly these).</summary>
-    public static IReadOnlyDictionary<HeartFlag, string> StageSourceNames { get; } = new Dictionary<HeartFlag, string>
-    {
+    /// <summary>The 34 vanilla sources found in the stage files, in source-ID order: names for the logs and docs, and
+    /// the list the vanilla test checks the built table against (it must find exactly these).</summary>
+    public static IReadOnlyList<(HeartFlag Flag, string Name)> StageSources { get; } =
+    [
         // Chests (daTbox_c): tbox bit of the stage's save slot
-        [HeartFlag.Chest(13, 12)] = "Outset Island - Savage Labyrinth - Floor 50",
-        [HeartFlag.Chest(0, 10)] = "Windfall Island - Transparent Chest",
-        [HeartFlag.Chest(0, 6)] = "Greatfish Isle - Hidden Chest",
-        [HeartFlag.Chest(2, 3)] = "Forsaken Fortress - Chest Inside Lower Jail Cell",
-        [HeartFlag.Chest(0, 3)] = "Needle Rock Isle - Chest",
-        [HeartFlag.Chest(0, 0)] = "Angular Isles - Peak",
-        [HeartFlag.Chest(0, 20)] = "Stone Watcher Island - Lookout Platform - Destroy the Cannons",
-        [HeartFlag.Chest(12, 26)] = "Pawprint Isle - Chuchu Cave - Chest",
-        [HeartFlag.Chest(12, 5)] = "Bomb Island - Cave",
-        [HeartFlag.Chest(12, 6)] = "Star Island - Cave",
-        [HeartFlag.Chest(10, 1)] = "Five-Star Isles - Submarine",
-        [HeartFlag.Chest(10, 0)] = "Six-Eye Reef - Submarine",
+        (HeartFlag.Chest(13, 12), "Outset Island - Savage Labyrinth - Floor 50"),
+        (HeartFlag.Chest(0, 10), "Windfall Island - Transparent Chest"),
+        (HeartFlag.Chest(0, 6), "Greatfish Isle - Hidden Chest"),
+        (HeartFlag.Chest(2, 3), "Forsaken Fortress - Chest Inside Lower Jail Cell"),
+        (HeartFlag.Chest(0, 3), "Needle Rock Isle - Chest"),
+        (HeartFlag.Chest(0, 0), "Angular Isles - Peak"),
+        (HeartFlag.Chest(0, 20), "Stone Watcher Island - Lookout Platform - Destroy the Cannons"),
+        (HeartFlag.Chest(12, 26), "Pawprint Isle - Chuchu Cave - Chest"),
+        (HeartFlag.Chest(12, 5), "Bomb Island - Cave"),
+        (HeartFlag.Chest(12, 6), "Star Island - Cave"),
+        (HeartFlag.Chest(10, 1), "Five-Star Isles - Submarine"),
+        (HeartFlag.Chest(10, 0), "Six-Eye Reef - Submarine"),
         // Placed (daItem_c) and dug-up (daTagKbItem_c) items: memory item bit
-        [HeartFlag.Item(0, 2)] = "Outset Island - Dig up Black Soil",
-        [HeartFlag.Item(0, 8)] = "Headstone Island - Top of the Island",
+        (HeartFlag.Item(0, 2), "Outset Island - Dig up Black Soil"),
+        (HeartFlag.Item(0, 8), "Headstone Island - Top of the Island"),
         // Salvage points (daSalvage_c): switch-gated ones save an ocean bit, sunken treasure the chart's bit
-        [HeartFlag.Ocean(17, 0)] = "Tingle Island - Big Octo",
-        [HeartFlag.Ocean(6, 0)] = "Seven-Star Isles - Big Octo",
-        [HeartFlag.Ocean(16, 0)] = "Rock Spire Isle - Southeast Gunboat",
-        [HeartFlag.Chart(9)] = "Crescent Moon Island - Sunken Treasure",
-        [HeartFlag.Chart(11)] = "Pawprint Isle - Sunken Treasure",
-        [HeartFlag.Chart(17)] = "Rock Spire Isle - Sunken Treasure",
-        [HeartFlag.Chart(18)] = "Three-Eye Reef - Sunken Treasure",
-        [HeartFlag.Chart(13)] = "Thorned Fairy Island - Sunken Treasure",
-        [HeartFlag.Chart(12)] = "Bomb Island - Sunken Treasure",
-        [HeartFlag.Chart(14)] = "Diamond Steppe Island - Sunken Treasure",
-        [HeartFlag.Chart(30)] = "Southern Fairy Island - Sunken Treasure",
-        [HeartFlag.Chart(15)] = "Forest Haven - Sunken Treasure",
-        [HeartFlag.Chart(10)] = "Angular Isles - Sunken Treasure",
-        [HeartFlag.Chart(16)] = "Five-Star Isles - Sunken Treasure",
+        (HeartFlag.Ocean(17, 0), "Tingle Island - Big Octo"),
+        (HeartFlag.Ocean(6, 0), "Seven-Star Isles - Big Octo"),
+        (HeartFlag.Ocean(16, 0), "Rock Spire Isle - Southeast Gunboat"),
+        (HeartFlag.Chart(9), "Crescent Moon Island - Sunken Treasure"),
+        (HeartFlag.Chart(11), "Pawprint Isle - Sunken Treasure"),
+        (HeartFlag.Chart(17), "Rock Spire Isle - Sunken Treasure"),
+        (HeartFlag.Chart(18), "Three-Eye Reef - Sunken Treasure"),
+        (HeartFlag.Chart(13), "Thorned Fairy Island - Sunken Treasure"),
+        (HeartFlag.Chart(12), "Bomb Island - Sunken Treasure"),
+        (HeartFlag.Chart(14), "Diamond Steppe Island - Sunken Treasure"),
+        (HeartFlag.Chart(30), "Southern Fairy Island - Sunken Treasure"),
+        (HeartFlag.Chart(15), "Forest Haven - Sunken Treasure"),
+        (HeartFlag.Chart(10), "Angular Isles - Sunken Treasure"),
+        (HeartFlag.Chart(16), "Five-Star Isles - Sunken Treasure"),
         // Boss Heart Containers (daBossItem_c marks the slot; item_func_utuwa_heart sets STAGE_LIFE there)
-        [HeartFlag.StageLife(3)] = "Dragon Roost Cavern - Gohma Heart Container",
-        [HeartFlag.StageLife(4)] = "Forbidden Woods - Kalle Demos Heart Container",
-        [HeartFlag.StageLife(5)] = "Tower of the Gods - Gohdan Heart Container",
-        [HeartFlag.StageLife(2)] = "Forsaken Fortress - Helmaroc King Heart Container",
-        [HeartFlag.StageLife(6)] = "Earth Temple - Jalhalla Heart Container",
-        [HeartFlag.StageLife(7)] = "Wind Temple - Molgera Heart Container",
-    };
+        (HeartFlag.StageLife(3), "Dragon Roost Cavern - Gohma Heart Container"),
+        (HeartFlag.StageLife(4), "Forbidden Woods - Kalle Demos Heart Container"),
+        (HeartFlag.StageLife(5), "Tower of the Gods - Gohdan Heart Container"),
+        (HeartFlag.StageLife(2), "Forsaken Fortress - Helmaroc King Heart Container"),
+        (HeartFlag.StageLife(6), "Earth Temple - Jalhalla Heart Container"),
+        (HeartFlag.StageLife(7), "Wind Temple - Molgera Heart Container"),
+    ];
+
+    public static IReadOnlyDictionary<HeartFlag, string> StageSourceNames { get; } = StageSources.ToDictionary(s => s.Flag, s => s.Name);
+
+    /// <summary>
+    /// Every vanilla source's flag by source ID (bit N of RoomInventory.HeartSources): the 34 stage-file sources, then
+    /// the 16 rewards. Part of the wire format: never reorder, only append (and raise RoomInventory.HeartSourceCount).
+    /// </summary>
+    public static IReadOnlyList<HeartFlag> SourceIds { get; } = StageSources.Select(s => s.Flag).Concat(Rewards.Select(r => r.Flag)).ToList();
+
+    private static readonly Dictionary<HeartFlag, int> IdByFlag = SourceIds.Select((f, i) => (f, i)).ToDictionary(x => x.f, x => x.i);
+
+    /// <summary>The source ID of a catalogue flag, or null for a source the catalogue doesn't know (modded stage data).</summary>
+    public static int? IdOf(HeartFlag flag) => IdByFlag.TryGetValue(flag, out int id) ? id : null;
 
     /// <summary>
     /// Stages no vanilla play reaches, whose hearts (or flags) would otherwise be counted: <c>Cave06</c> (a heart

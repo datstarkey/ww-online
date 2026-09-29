@@ -113,6 +113,20 @@ public class HeartTableTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void RoomSourceSet_CountsEachSourceOnce_WithOrWithoutTheLocalFlag()
+    {
+        var t = Table(0, Chest(10), Item(8), Boss(3));
+        var flags = new HeartFlagState();
+        flags.Set(HeartFlag.Chest(0, 10));
+        ulong chest = 1UL << HeartCatalog.IdOf(HeartFlag.Chest(0, 10))!.Value;
+        ulong gohma = 1UL << HeartCatalog.IdOf(HeartFlag.StageLife(3))!.Value;
+        Assert.Equal(chest, t.SourceBits(flags));
+        Assert.Equal(new HeartTally(0, 1), t.Tally(flags, chest));          // the same source locally and in the room: once
+        Assert.Equal(new HeartTally(1, 1), t.Tally(flags, chest | gohma));  // a container only the room has
+        Assert.Equal(new HeartTally(1, 0), t.Tally(new HeartFlagState(), gohma));
+    }
+
+    [Fact]
     public void FlagState_ReadsEveryKind()
     {
         var s = new HeartFlagState();
@@ -189,6 +203,11 @@ public class HeartTableTests(ITestOutputHelper output)
         Assert.Equal(new HeartTally(6, 44), tally);
         Assert.Equal(HeartTable.MaxQuarters, HeartTable.StartingQuarters + tally.Quarters);
         Assert.Equal(HeartTable.MaxQuarters, tally.MaxLife);
+
+        // Every source has its catalogue ID: the room's heart-source set covers all 50, and the set alone derives 80.
+        Assert.All(table.Sources, src => Assert.NotNull(src.Id));
+        Assert.Equal((1UL << 50) - 1, table.SourceBits(all));
+        Assert.Equal(HeartTable.MaxQuarters, table.Tally(none, table.SourceBits(all)).MaxLife);
 
         // Each source alone adds exactly its own quarters (no flag stands for two sources).
         foreach (var s in table.Sources)
