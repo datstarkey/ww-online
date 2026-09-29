@@ -1007,6 +1007,9 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define PROC_NAME_SWHIT0         0x1C9 // d_a_swhit0 (crystal switch)
 #define PROC_NAME_DOOR10         0x12E // d_a_door10
 #define PROC_NAME_DOOR12         0x12F // d_a_door12
+#define PROC_NAME_STONE2         0x1CD // d_a_stone2 (black boulder Ebrock / Ekao: covers DRC's and ET's warp jars)
+#define PROC_NAME_MKIEK          0x04E // d_a_obj_mkiek (wall that dissolves in mirror-shield light)
+#define PROC_NAME_OBJ_WARPT      0x043 // d_a_obj_warpt (warp jar)
 
 // daTbox_c (d_a_tbox.h:35-36, d_a_tbox.cpp:23-31): tbox no. = (prm >> 7) & 0x1F, swNo = (prm >> 12) & 0xFF,
 // funcType = prm & 0x7F. checkOpen (REL .text 0xCD8) reads STAGE_SEA2's tbox for funcs 7/8, else the live one.
@@ -1023,6 +1026,23 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define DOOR12_ACTION_OFF        0x314 // door12 actionInit: stb r0,0x314(r31)
 #define DOOR_ACTION_WAIT         1
 #define DOOR12_ARG1_TMPBIT       8     // door12 create: arg1 (home.angle.z >> 8) 8 clears tmp bit 0x0440 (d_a_door12.cpp:581)
+
+// daStone2::Act_c (d_a_stone2.h): swSave = (prm >> 8) & 0xFF (is_switch, REL .text 0x594: PrmAbstract(8, 8));
+// m648 mode s32 +0x648, 0 wait / 1 carried / 2 thrown / 3 breaking (mode_wait_init 0x1BB4: stw r0,0x648(r3)).
+// Read only: its low byte (big-endian).
+#define STONE2_MODE_OFF          0x64B
+#define STONE2_MODE_WAIT         0
+// daObj_Mkiek: swSave = prm & 0xFF (Mthd_Create, REL .text 0x414: PrmAbstract(8, 0)); create stops once it is set.
+
+// daObj_Warpt_c (d_a_obj_warpt.h, getArg REL .text 0x1D7C): type m2B4 = prm & 0xF (2-4: the three-way dungeon jars,
+// lid in an event register); a normal jar's lid switch m2AC = home.angle.x & 0xFF (lha 0x1DC; stw 0x2AC). m2C6 isHuta
+// byte +0x2C6 (isHuta 0x750: lbz r3,0x2C6(r3)): a lid is on. m290 mode s32 +0x290 (modeProc 0x1984: stw r5,0x290(r3)):
+// 0 open, 1 closed, 2 lid burning, 3 warp event, 4 open event. Read only: its low byte.
+#define WARPT_TYPE(prm)          ((prm) & 0xF)
+#define WARPT_TYPE_SP_FIRST      2     // types 2, 3, 4 (isSp)
+#define WARPT_LID_OFF            0x2C6
+#define WARPT_MODE_OFF           0x293
+#define WARPT_MODE_CLOSE         1
 /* PROJECTILES (puppet_fx.c) — the local Link's bombs / cannonballs and the    */
 /* copies of other players'. d_a_bomb (daBomb_c, d_a_bomb.h) is in main.dol;   */
 /* offsets verified in the GZLE01 DOL at the cited instructions.              */
