@@ -22,6 +22,8 @@
 #include "puppet_nametag.c"
 // Create-only actors follow bits other players set (chests, walls, crystals, key locks)
 #include "puppet_liveworld.c"
+// Animator pointers the puppet writes into Link's shared model data (swapped per window)
+#include "puppet_sharedanm.c"
 
 /* Process condition flags */
 #define PROC_CONDITION_INIT 0x08
@@ -77,6 +79,9 @@ typedef struct PUPPET_class
 
   // REL-drawn held boomerang / carried bomb (puppet_held.c).
   PuppetHeld held;
+
+  // This puppet's own values of the shared model data's animator slots (puppet_sharedanm.c).
+  PuppetSharedAnm shanm;
 } PUPPET_class;
 
 // ww_structs.h's daPy_lk_c must be at least as large as the real class (0x4C28) or
@@ -216,6 +221,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   puppet_nametag_onCreate();
   puppet_heldInit(&this->held);
   puppet_liveworld_onCreate();
+  puppet_shanmInit(&this->shanm, this->slotIndex);
 
   // Setup actor in stage layer system
   fopAcM_setStageLayer(base);
@@ -317,10 +323,19 @@ static int daPuppet_phase_2(PUPPET_class *this)
   // LOCAL game's restart state) and edits the local player-status words. Guard it so a
   // puppet spawning mid-cutscene can't cancel the local player's event (that froze the
   // local game at the Outset start event with no HUD).
+  //
+  // It also registers its own animator objects in the model data shared with the real Link
+  // (J3DMaterialAnm of the face materials, btk/brk animators of the effect models), which the
+  // real Link would then use forever (use-after-free once this puppet is deleted): the shared
+  // animator slots are snapshotted around it, and the puppet's values only go back in around
+  // its own execute and draw (puppet_sharedanm.h).
   PuppetGlobalSnapshot globals;
+  puppet_shanmRefresh();
+  puppet_shanmBegin(&this->shanm);
   puppet_saveGlobals(&globals);
   daPy_lk_c__playerInit(link);
   puppet_restoreGlobals(&globals);
+  puppet_shanmEnd(1);
 
   if (linktex)
   {
@@ -387,7 +402,10 @@ static int daPuppet_phase_3(PUPPET_class *this)
   // 1. Updating position on terrain
   // 2. Waiting for ground collision (returns cPhs_INIT_e if not ready)
   // 3. Initializing first process (procWait_init, etc.)
+  // makeBgWait sets the CL joints' mMtxCalc and calcs: a shared-animator window like execute.
+  puppet_shanmBegin(&this->shanm);
   int result = daPy_lk_c__makeBgWait(link);
+  puppet_shanmEnd(0);
 
   // OSReport("PUPPET: makeBgWait returned %d\n", result);
 
@@ -468,12 +486,51 @@ int daPuppet_Delete(PUPPET_class *this)
   // the local player's clothes texture. Clear the flag first.
   DAPY_PY_NO_RESET_FLG1((fopAc_ac_c *)&this->parent) &= ~daPyFlg1_CASUAL_CLOTHES;
 
+  // Where this puppet's objects live, for the shared-animator check below (read before the
+  // heaps go): actor heap, item heaps, item anime heap, the held-model heap, the instance.
+  // Also the anime heaps (m_anm_heap_under/upper, m_tex_anm_heap, m_tex_scroll_heap) and the boat's.
+  u32 ranges[2 * 15];
+  int rangeNum = 0;
+  {
+    void *heaps[13];
+    int h;
+    heaps[0] = FOPAC_HEAP((fopAc_ac_c *)&this->parent);
+    heaps[1] = DAPY_LK_MPITEMHEAPS(&this->parent)[0];
+    heaps[2] = DAPY_LK_MPITEMHEAPS(&this->parent)[1];
+    heaps[3] = DAPY_LK_MPITEMANIMEHEAP(&this->parent);
+    heaps[4] = this->held.heap;
+    heaps[5] = this->boat.heap;
+    heaps[6] = DAPY_LK_ANMHEAP_UNDER(&this->parent, 0);
+    heaps[7] = DAPY_LK_ANMHEAP_UNDER(&this->parent, 1);
+    heaps[8] = DAPY_LK_ANMHEAP_UPPER(&this->parent, 0);
+    heaps[9] = DAPY_LK_ANMHEAP_UPPER(&this->parent, 1);
+    heaps[10] = DAPY_LK_ANMHEAP_UPPER(&this->parent, 2);
+    heaps[11] = DAPY_LK_TEXANMHEAP(&this->parent);
+    heaps[12] = DAPY_LK_TEXSCROLLHEAP(&this->parent);
+    for (h = 0; h < 13; h++)
+    {
+      if (heaps[h] == NULL)
+        continue;
+      ranges[2 * rangeNum] = JKRHEAP_MSTART(heaps[h]);
+      ranges[2 * rangeNum + 1] = JKRHEAP_MEND(heaps[h]);
+      rangeNum++;
+    }
+    ranges[2 * rangeNum] = (u32)this;
+    ranges[2 * rangeNum + 1] = (u32)this + sizeof(PUPPET_class);
+    rangeNum++;
+  }
+
   // playerDelete also clears bits in the LOCAL player's status words (d_a_player_main.cpp
   // playerDelete: clearPlayerStatus0/1) — keep the local player's state intact.
+  // The shared model data holds the local Link's values outside this puppet's windows; drop
+  // the puppet's own and catch anything playerDelete itself writes there.
+  this->shanm.count = 0;
   PuppetGlobalSnapshot globals;
+  puppet_shanmBegin(&this->shanm);
   puppet_saveGlobals(&globals);
   daPy_lk_c__playerDelete(&this->parent);
   puppet_restoreGlobals(&globals);
+  puppet_shanmEnd(0);
 
   // Frees this puppet's tunic copy; the last puppet also settles the local Link's look for
   // the REL being unloaded. Packets live in this (about to be freed) instance.
@@ -482,6 +539,10 @@ int daPuppet_Delete(PUPPET_class *this)
 
   puppet_boatDelete(&this->boat);
   puppet_heldDelete(&this->held);
+
+  // Proof for the log: no shared animator slot points into this puppet (expect into-puppet=0).
+  puppet_shanmRefresh();
+  puppet_shanmScan(ranges, rangeNum, this->slotIndex);
 
   return 1;
 }
@@ -502,10 +563,19 @@ int daPuppet_Draw(PUPPET_class *this)
     daPy_lk_c__offBodyEffect(&this->parent);
     return 1;
   }
+  // Slot gone inactive between execute and draw: nothing to draw (puppet_drawBody would bail too).
+  if (puppet_slotIsParked(this->slotIndex))
+  {
+    daPy_lk_c__offBodyEffect(&this->parent);
+    return 1;
+  }
+  // The puppet's own animators in the shared model data for its entries only (puppet_sharedanm.h).
+  puppet_shanmBegin(&this->shanm);
   puppet_draw(&this->parent, this->slotIndex, &this->packets, &this->lookBlock);
   puppet_heldDraw(&this->parent, &this->held);
   puppet_boatDraw((fopAc_ac_c *)&this->parent, &this->boat);
   puppet_nametag_queue((fopAc_ac_c *)&this->parent, DAPY_LK_MPCLMODEL(&this->parent), this->slotIndex, &this->nameTag);
+  puppet_shanmEnd(0);
   return 1;
 }
 
@@ -565,8 +635,13 @@ int daPuppet_Execute(PUPPET_class *this)
   puppet_boatExecute((fopAc_ac_c *)link, &this->boat, this->slotIndex);
   l_puppetBoat = &this->boat;
 
+  // The player code (procs, item setters, joint calcs) registers the puppet's animators in the
+  // shared model data: its own values go in for it and come back out after (puppet_sharedanm.h).
+  // Parked puppets never get here, so they pay nothing.
+  puppet_shanmBegin(&this->shanm);
   puppet_execute(link);
   puppet_heldExecute(link, &this->held);
+  puppet_shanmEnd(0);
 
   l_puppetBoat = NULL;
   this->followState = (u32)l_puppetFollowState;

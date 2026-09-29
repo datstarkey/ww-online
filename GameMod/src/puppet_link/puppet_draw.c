@@ -10,8 +10,9 @@
  *     treated as 0 for every puppet decision; checkPlayerNoDraw is not used
  *   - equipment visibility comes from the peer's slot bytes (EQUIP_SWORD/EQUIP_SHIELD),
  *     not the local save
- *   - anything written into the J3DModelData shared with the real Link (texNo anims,
- *     texMtx anims, the linktexS3TC outfit/colour header) is restored right after the puppet's entry
+ *   - the face materials' J3DMaterialAnm objects are the puppet's own for the whole draw
+ *     (daPuppet_Draw's puppet_sharedanm window), so its texNo / texMtx animators go into its own
+ *     objects; the linktexS3TC outfit/colour header is swapped around the body entry only
  *
  * NOTE: This file is included directly by puppet.c - do not compile separately.
  * All necessary headers are included via puppet.c before this file.
@@ -156,10 +157,6 @@ void puppet_initPackets(PuppetDrawPackets *packets)
 #define CL_JNT_CL_HANA 0x14
 #define CL_JNT_CL_MAYU 0x15
 #define CL_JNT_CL_BACK 0x29
-
-// Max texNo-anim pointers the puppet may temporarily swap into shared materials
-// (Link's btp updates 5 materials; eyes/brows swap a pair each => 9)
-#define PUPPET_TEXNO_SAVE_MAX 16
 
 // ============================================================================
 // HANDS MODEL SHAPE VISIBILITY (shared with the real Link)
@@ -388,14 +385,10 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
   }
 
   // ============================================================================
-  // Texture pattern animations (eyes, brows, mouth)
-  //
-  // The J3DMaterialAnm objects live in the J3DModelData shared with the real Link, so the
-  // pointers swapped in here are recorded and restored right after the puppet's entry.
+  // Texture pattern animations (eyes, brows, mouth), as vanilla draw does every frame
+  // (d_a_player_main.cpp:1722-1738). The materials' J3DMaterialAnm objects are this puppet's
+  // own during its draw (puppet_sharedanm.h), so nothing here reaches the real Link.
   // ============================================================================
-  J3DTexNoAnm **texNoSlot[PUPPET_TEXNO_SAVE_MAX];
-  J3DTexNoAnm *texNoOld[PUPPET_TEXNO_SAVE_MAX];
-  int texNoSaved = 0;
   {
     J3DAnmTexPattern *texPat = DAPY_LK_MPANMTEXPATTERNDATA(link);
     J3DTexNoAnm *texNoAnms = DAPY_LK_M_TEXNOANMS(link);
@@ -422,7 +415,7 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
           for (int k = 0; k < count; k++)
           {
             u16 id = (u16)(matID + k);
-            if (id >= matCount || texNoSaved >= PUPPET_TEXNO_SAVE_MAX)
+            if (id >= matCount)
               break;
 
             J3DMaterial *mtl = J3DModelData__getMaterialNodePointer(modelData, id);
@@ -433,11 +426,7 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
             if (!mtlAnm || (u32)mtlAnm >= 0xC0000000)
               continue;
 
-            J3DTexNoAnm **slot = &((J3DTexNoAnm **)J3DMATERIALANM_MTEXNOANM(mtlAnm))[texNo];
-            texNoSlot[texNoSaved] = slot;
-            texNoOld[texNoSaved] = *slot;
-            texNoSaved++;
-            *slot = &texNoAnms[idx];
+            ((J3DTexNoAnm **)J3DMATERIALANM_MTEXNOANM(mtlAnm))[texNo] = &texNoAnms[idx];
           }
         }
       }
@@ -449,7 +438,6 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
   // ============================================================================
   J3DAnmTextureSRTKey *texScrollResData = DAPY_LK_MPTEXSCROLLRESDATA(link);
   J3DMaterialTable *matTable = (J3DMaterialTable *)J3DMODELDATA_MMATERIALTABLE(modelData);
-  int texMtxSwapped = 0;
   {
     J3DTexMtxAnm *texMtxAnm = DAPY_LK_M_TEXMTXANM(link);
     u16 m3530 = DAPY_LK_M3530(link);
@@ -458,7 +446,6 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
     if (texScrollResData && texMtxAnm)
     {
       J3DMaterialTable__setTexMtxAnimator(matTable, texScrollResData, texMtxAnm, NULL);
-      texMtxSwapped = 1;
     }
 
     J3DAnmTexPattern *texPat = DAPY_LK_MPANMTEXPATTERNDATA(link);
@@ -638,23 +625,7 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
       dMat_ice_c__entryDL(dMat_control_c__mIce, mpCLModel, -1, (void *)0);
     }
 
-    // Undo everything written into the shared model data for this draw
     puppet_appearance_end(&linktexSwap);
-    for (i = texNoSaved - 1; i >= 0; i--)
-    {
-      *texNoSlot[i] = texNoOld[i];
-    }
-    if (texMtxSwapped)
-    {
-      // Put the real Link's texMtx animator back (vanilla re-sets it every draw anyway;
-      // this stops the shared materials pointing into the puppet's heap after it dies).
-      if (DAPY_LK_MPCLMODELDATA(realPlayer) == modelData &&
-          DAPY_LK_MPTEXSCROLLRESDATA(realPlayer) && DAPY_LK_M_TEXMTXANM(realPlayer))
-      {
-        J3DMaterialTable__setTexMtxAnimator(matTable, DAPY_LK_MPTEXSCROLLRESDATA(realPlayer),
-                                            DAPY_LK_M_TEXMTXANM(realPlayer), NULL);
-      }
-    }
   }
 
   // Restore all link_root materials to visible
@@ -807,12 +778,9 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
     daPy_lk_c__drawMirrorLightModel(link);
     dComIfGd_setListP1();
 
-    // The held item's / bottle contents' btk and brk are registered on SHARED model data: use this
-    // puppet's for its entries below, the local Link's again after (puppet_held.c).
+    // The held item's / bottle contents' btk and brk (registered on SHARED model data by the
+    // puppet's item setters) are this puppet's during its draw (puppet_sharedanm.h).
     J3DModel *mpBottleContentsModel = DAPY_LK_MPBOTTLECONTENTSMODEL(link);
-    J3DModelData *heldItemData = DAPY_LK_MPHELDITEMMODEL(link) ? J3DMODEL_MPMODELDATA(DAPY_LK_MPHELDITEMMODEL(link)) : NULL;
-    J3DModelData *contentsData = mpBottleContentsModel ? J3DMODEL_MPMODELDATA(mpBottleContentsModel) : NULL;
-    puppet_heldEntryItemAnms(link, heldItemData, contentsData);
 
     // Bottle contents model
     if (mpBottleContentsModel)
@@ -902,7 +870,6 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
     {
       daPy_lk_c__updateDLSetLight(link, mpBottleCapModel, 0);
     }
-    puppet_heldEntryItemAnms(realPlayer, heldItemData, contentsData);
 
     // Magic armor aura (6 models, daPy_aura_c = {J3DModel*, f32 frame})
     void *auraBrkAnm = DAPY_LK_MYAURA00RBRK_ANM(link);

@@ -31,6 +31,9 @@ u32 fopAcM_SearchByID(fpc_ProcID actorPID, fopAc_ac_c **pDstActor);
 #define FOPAC_DRAW_TAG(ac)           ((create_tag_class*)((u8*)(ac) + 0x0D8))
 #define FOPAC_SUB_METHOD(ac)         (*(void**)((u8*)(ac) + 0x0EC))
 #define FOPAC_HEAP(ac)               (*(void**)((u8*)(ac) + 0x0F0))
+// JKRHeap.h: /* 0x30 */ u8* mStart; /* 0x34 */ u8* mEnd (JKRHeap::find DOL 0x802B09CC)
+#define JKRHEAP_MSTART(heap)         (*(u32*)((u8*)(heap) + 0x30))
+#define JKRHEAP_MEND(heap)           (*(u32*)((u8*)(heap) + 0x34))
 #define FOPAC_EVENT_INFO(ac)         ((dEvt_info_c*)((u8*)(ac) + 0x0F4))
 #define FOPAC_EVENT_COMMAND(ac)      (*(u16*)((u8*)(ac) + 0x0F4 + 0x04))
 #define FOPAC_EVENT_CONDITION(ac)    (*(u16*)((u8*)(ac) + 0x0F4 + 0x06))
@@ -178,6 +181,13 @@ u32 fopAcM_SearchByID(fpc_ProcID actorPID, fopAc_ac_c **pDstActor);
 #define DAPY_LK_MPHBOOTSMODELS(link)    ((J3DModel**)((u8*)(link) + 0x2E84))
 #define DAPY_LK_MPPRINGMODEL(link)      (*(J3DModel**)((u8*)(link) + 0x2E8C))
 #define DAPY_LK_MPITEMHEAPS(link)       ((void**)((u8*)(link) + 0x2E90))
+#define DAPY_LK_MPITEMANIMEHEAP(link)   (*(void**)((u8*)(link) + 0x2ECC)) // mpItemAnimeHeap (playerDelete DOL 0x80122F3C)
+// daPy_anmHeap_c (0x10 bytes): /* 0xC */ JKRSolidHeap* mpAnimeHeap. m_anm_heap_under[2] 0x2FDC,
+// m_anm_heap_upper[3] 0x2FFC, m_tex_anm_heap 0x31B8, m_tex_scroll_heap 0x31C8 (playerDelete DOL 0x80122EDC-0x80122F24)
+#define DAPY_LK_ANMHEAP_UNDER(link, i)  (*(void**)((u8*)(link) + 0x2FE8 + 0x10 * (i)))
+#define DAPY_LK_ANMHEAP_UPPER(link, i)  (*(void**)((u8*)(link) + 0x3008 + 0x10 * (i)))
+#define DAPY_LK_TEXANMHEAP(link)        (*(void**)((u8*)(link) + 0x31C4))
+#define DAPY_LK_TEXSCROLLHEAP(link)     (*(void**)((u8*)(link) + 0x31D4))
 #define DAPY_LK_MPEQUIPITEMMODEL(link)  (*(J3DModel**)((u8*)(link) + 0x2E98))
 #define DAPY_LK_MPHELDITEMMODEL(link)   (*(J3DModel**)((u8*)(link) + 0x2E98)) // Alias for mpEquipItemModel
 #define DAPY_LK_MSWORDANIM(link)        ((void*)((u8*)(link) + 0x2E9C))
