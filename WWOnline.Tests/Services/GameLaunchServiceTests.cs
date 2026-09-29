@@ -307,8 +307,10 @@ public sealed class GameLaunchServiceTests : IDisposable
     [Fact]
     public void HookStatusWords_AreRecognised()
     {
-        foreach (var s in PatchedGameCheck.HookStatuses)
-            Assert.True(PatchedGameCheck.IsHookStatus(System.Text.Encoding.ASCII.GetBytes(s)));
+        foreach (var s in new[] { "HOOK", "TITL", "NAME", "DONE" }) // as the game stores them: ASCII, big-endian
+            Assert.True(PatchedGameCheck.IsHookStatus(System.Text.Encoding.ASCII.GetBytes(s)), s);
+        Assert.Equal(4, PatchedGameCheck.HookStatuses.Distinct().Count());
+        Assert.False(PatchedGameCheck.IsHookStatus("KOOH"u8.ToArray())); // not little-endian
         Assert.False(PatchedGameCheck.IsHookStatus([0, 0, 0, 0]));
         Assert.False(PatchedGameCheck.IsHookStatus(null));
         Assert.False(PatchedGameCheck.IsHookStatus("HOO"u8.ToArray()));

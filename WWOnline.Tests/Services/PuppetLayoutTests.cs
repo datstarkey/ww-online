@@ -32,6 +32,18 @@ public class PuppetLayoutTests
     }
 
     [Fact]
+    public void HookStatusWords_AreGenerated_AsTheirFourCCs()
+    {
+        // puppet_shared.h STATUS_* are what link_draw_hook.c writes to STATUS_ADDR; PatchedGameCheck reads them.
+        static uint FourCc(string s) => System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(System.Text.Encoding.ASCII.GetBytes(s));
+        Assert.Equal((uint)PuppetLayout.STATUS_HOOK, FourCc("HOOK"));
+        Assert.Equal((uint)PuppetLayout.STATUS_TITLE, FourCc("TITL"));
+        Assert.Equal((uint)PuppetLayout.STATUS_NAME, FourCc("NAME"));
+        Assert.Equal((uint)PuppetLayout.STATUS_DONE, FourCc("DONE"));
+        Assert.True(PuppetLayout.STATUS_ADDR >= PuppetLayout.SCRATCH_REGION_START && PuppetLayout.STATUS_ADDR + 4 <= PuppetLayout.SCRATCH_REGION_END);
+    }
+
+    [Fact]
     public void Slots_DoNotOverlapHeaderOrTrackingArrays()
     {
         Assert.True(PuppetLayout.PUPPET_SYNC_BASE + PuppetLayout.PUPPET_HDR_SIZE <= PuppetLayout.PUPPET_SLOT_0);

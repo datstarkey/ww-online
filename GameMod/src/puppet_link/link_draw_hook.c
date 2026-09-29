@@ -18,11 +18,7 @@
 
 // Spawn state machine states (SPAWN_IDLE..SPAWN_FOUND) live in puppet_shared.h.
 
-// Status codes
-#define STATUS_HOOK  0x484F4F4B  // "HOOK"
-#define STATUS_TITLE 0x5449544C  // "TITL"
-#define STATUS_NAME  0x4E414D45  // "NAME"
-#define STATUS_DONE  0x444F4E45  // "DONE"
+// Status codes (STATUS_HOOK/TITLE/NAME/DONE) live in puppet_shared.h: the client reads them too.
 
 // Stage name constants
 #define STAGE_SEA  0x7365615F  // "sea_"

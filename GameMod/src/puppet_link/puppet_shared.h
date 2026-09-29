@@ -133,6 +133,13 @@
 #define FRAME_COUNTER_ADDR        0x803FD130  /* u32 — ++ every hook call */
 #define COUNTER_ADDR              0x803FD134  /* u32 — hook call counter */
 #define STATUS_ADDR               0x803FD138  /* u32 — HOOK/TITL/NAME/DONE */
+/* STATUS_ADDR values: big-endian ASCII FourCCs the DOL draw hook (link_draw_hook.c) writes every time it
+ * draws Link. An unpatched game never writes them, so C# (PatchedGameCheck) reads one as "our patched game
+ * is running" before it starts writing the scratch area. */
+#define STATUS_HOOK               0x484F4F4B  /* "HOOK" — drawing Link in a stage */
+#define STATUS_TITLE              0x5449544C  /* "TITL" — title screen (sea_T) */
+#define STATUS_NAME               0x4E414D45  /* "NAME" — file select / name entry */
+#define STATUS_DONE               0x444F4E45  /* "DONE" — drew Link with puppets active */
 #define DEBUG_PTR_ADDR            0x803FD13C  /* u32 — last daPy_lk_c* seen */
 #define RESULT_PTR_ADDR           0x803FD140  /* s32 — last daPy_lk_c::draw result */
 

@@ -110,6 +110,14 @@ public static class PuppetLayout
     public const uint COUNTER_ADDR = 0x803FD134;
     /// <summary>u32 — HOOK/TITL/NAME/DONE</summary>
     public const uint STATUS_ADDR = 0x803FD138;
+    /// <summary>"HOOK" — drawing Link in a stage</summary>
+    public const int STATUS_HOOK = 0x484F4F4B;
+    /// <summary>"TITL" — title screen (sea_T)</summary>
+    public const int STATUS_TITLE = 0x5449544C;
+    /// <summary>"NAME" — file select / name entry</summary>
+    public const int STATUS_NAME = 0x4E414D45;
+    /// <summary>"DONE" — drew Link with puppets active</summary>
+    public const int STATUS_DONE = 0x444F4E45;
     /// <summary>u32 — last daPy_lk_c* seen</summary>
     public const uint DEBUG_PTR_ADDR = 0x803FD13C;
     /// <summary>s32 — last daPy_lk_c::draw result</summary>
