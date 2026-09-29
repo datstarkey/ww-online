@@ -5,7 +5,7 @@ Other players appear as puppet Links, and a room can share world, items, story a
 It has two halves: C# apps (client, relay server, patcher) and the game-side mod (`GameMod/`, C + ASM injected into the game).
 
 ## Key rules
-- **Never compile or patch the game unless the user asks.** That means `dev-test.ps1 -Patch`, `--patch`, the UI's Patch Game button and `PipelineRunner.RunAsync`. Say when the C code is ready, then wait. Building and testing the C# code is fine.
+- **Never compile or patch the game unless the user asks.** That means `scripts\dev-test.ps1 -Patch`, `--patch`, the UI's Patch Game button and `PipelineRunner.RunAsync`. Say when the C code is ready, then wait. Building and testing the C# code is fine.
 - **When debugging a test session, read `logs/latest/` first** (see below), before theorising.
 - **`GameMod/src/puppet_link/puppet_shared.h` is the only place emulator scratch/sync addresses live.** Never hardcode a `0x803F....` address in `.c` or `.cs`.
 - **Game addresses in C# are `GameInfo`/`Play` base + the decomp's offset,** with the tww-decomp field in a comment (`GameMemoryAddresses`). `tww-decomp/` is the authority for offsets and behaviour.
@@ -22,15 +22,15 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj
 dotnet run --project WWOnline.Server/WWOnline.Server.csproj -- [port]   # default 6969
 dotnet run --project WWOnline.Client/WWOnline.Client.csproj -- --build-patchdata out/PatchData   # release PatchData
 ```
-- If a build fails with "file is locked", a running client or server (e.g. from dev-test) holds `bin/`. Run `.\dev-test.ps1 -Stop`, or build with `--artifacts-path <tmp>`.
+- If a build fails with "file is locked", a running client or server (e.g. from dev-test) holds `bin/`. Run `.\scripts\dev-test.ps1 -Stop`, or build with `--artifacts-path <tmp>`.
 - HotAvalonia reloads `.axaml` in Debug builds. `dotnet watch` handles C# changes.
 - **Version:** the release version comes from the git tag (`v1.2.3` means `-p:Version=1.2.3`). `Directory.Build.props` holds the dev version and `WwoRepositoryUrl`, the one place the GitHub owner/repo lives. Read them at runtime through `AppInfo` (Shared), never from a hardcoded string.
 - **Protocol:** bump `HubConstants.ProtocolVersion` whenever a hub method, callback or wire DTO changes. `GameHub.Join` refuses a client on a different protocol, and `SignalRClientService` surfaces the reason (`JoinRejected`, and the `ConnectAsync` failure message).
 - **Releases:** push a `v*` tag. `.github/workflows/release.yml` builds PatchData (`--build-patchdata` in devkitPro's Linux container, tag pinned to the local devkitPPC r47.1), packs the client with Velopack and publishes a GitHub Release. Installed apps update from it through `UpdateService`, which is a no-op in dev builds. CI (`ci.yml`) runs the Nintendo-files guard, a `-warnaserror` build and both test projects. See `docs/releasing.md`.
 - **Nintendo-files guard:** run `./scripts/check-no-nintendo-files.ps1` before any commit that adds binaries. With `-Path <dirs>` it checks build output and packages.
 
-## Multiplayer test cycle: `dev-test.ps1` (or `dev-test.bat`)
-- `.\dev-test.ps1` stops the old run, builds the C#, checks the game build stamp, then launches 2 Dolphins and 2 auto-connecting clients (Player1 hosts the server).
+## Multiplayer test cycle: `scripts\dev-test.ps1`
+- `.\scripts\dev-test.ps1` stops the old run, builds the C#, checks the game build stamp, then launches 2 Dolphins and 2 auto-connecting clients (Player1 hosts the server).
 - `-Patch` also recompiles the C code and re-patches the game. This is a compile, so only use it when asked. `-Stop` / `-Collect` stop everything / copy the live Dolphin logs. `-AllowStale` launches against a stale build. `-DedicatedServer` runs the server as a separate process.
 - **Logs** are in `logs/latest/`. Older runs are in `logs/sessions/<time>/`.
   - `session.txt`: git rev, PIDs, build-check result.
@@ -61,7 +61,7 @@ GameMod/                   game-side mod (see GameMod/CLAUDE.md)
   build/                   compiled output (gitignored)
   config.json              machine paths (gitignored; copy config.example.json)
 tww-decomp/                Wind Waker decompilation (submodule), the reference for offsets
-dev-test.ps1               local multiplayer test harness
+scripts/dev-test.ps1       local multiplayer test harness
 Directory.Build.props      app version + GitHub repo URL (all projects)
 .github/workflows/         ci.yml (every push/PR), release.yml (v* tags; docs/releasing.md)
 scripts/                   check-no-nintendo-files.ps1 (CI + release guard)

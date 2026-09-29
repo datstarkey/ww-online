@@ -115,7 +115,7 @@ compared (`CheckSelection`). See `docs/releasing.md` (PatchData).
   `@default`. Unknown ids are dropped.
 - Headless: `--patches a,b | none | default`. `--patch` without it applies the defaults.
   `--check-build` without it doesn't compare the selection.
-- dev-test: `.\dev-test.ps1 -Patch -Patches skip_intro,instant_text`. Without `-Patches` it uses the
+- dev-test: `.\scripts\dev-test.ps1 -Patch -Patches skip_intro,instant_text`. Without `-Patches` it uses the
   defaults.
 
 **Client API** (for the Settings page): `PatchOptionsViewModel`. `GamePatcherService.PatchGameAsync`
@@ -189,7 +189,7 @@ now places a few hundred bytes of helper code in main.dol free space. That adds 
 and moves the boot-thread stack (and the start of the heap arena) up by 0x4A0 bytes, or 0x650 with
 every free-space patch (see Free space above). The scratch region stays at its fixed addresses and
 is no longer part of any stack. Before the first multiplayer session on a new build, do one test run
-(`dev-test.ps1 -Patch`) to confirm puppets still spawn. If it misbehaves, try
+(`scripts\dev-test.ps1 -Patch`) to confirm puppets still spawn. If it misbehaves, try
 `-Patches skip_intro`, which uses no free space and matches the old build.
 
 ## Not yet
