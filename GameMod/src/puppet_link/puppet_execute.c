@@ -117,6 +117,38 @@
 #define PROC_MOVE_TURN   0x18
 #define PROC_SWIM_MOVE   0x37
 
+// Ledge procs (d_a_player_main.h daPyProc_*; d_a_player_hang.inc). How Link gets onto a ledge
+// (checkNextMode / front-wall handling, d_a_player_main.cpp:4152-4157, 4860-4876):
+//   low step (mFrontWallType 6)  -> SMALL_JUMP hop -> FALL -> LAND
+//   waist-high (type 7)          -> HANG_WALL_CATCH -> HANG_CLIMB
+//   tall (type 8/9)              -> VERTICAL_JUMP -> HANG_WALL_CATCH / HANG_START -> HANG_WAIT ...
+//   backing off an edge          -> HANG_FALL_START -> HANG_UP -> HANG_WAIT / HANG_MOVE / HANG_CLIMB
+#define PROC_SMALL_JUMP      0x29
+#define PROC_VERTICAL_JUMP   0x2A
+#define PROC_HANG_START      0x2B
+#define PROC_HANG_FALL_START 0x2C
+#define PROC_HANG_UP         0x2D
+#define PROC_HANG_WAIT       0x2E
+#define PROC_HANG_MOVE       0x2F
+#define PROC_HANG_CLIMB      0x30
+#define PROC_HANG_WALL_CATCH 0x31
+
+// procHangMove_init's direction (getHangDirectionFromAngle, d_a_player_hang.inc:23-38):
+// 2 = left (ANM_HANGMOVEL), 3 = right (ANM_HANGMOVER).
+#define HANG_DIR_LEFT  2
+#define HANG_DIR_RIGHT 3
+
+// procHangClimb_init's start frame: m_HIO->mWallCatch.m.field_0x2C after a hang
+// (d_a_player_hang.inc:259/412/448/483), field_0x30 after a wall catch (:624). Values from
+// daPy_HIO_wallCatch_c0::m (d_a_player_HIO_data.inc:167-168).
+#define HANG_CLIMB_START_FROM_HANG       0.0f
+#define HANG_CLIMB_START_FROM_WALL_CATCH 2.0f
+
+// dBgS_Acch::ROOF_HIT (d_bg_s_acch.h:75); procHangClimb_init refuses while it is set (:558).
+#define ACCH_ROOF_HIT 0x200
+
+#define PUPPET_DAPY_M352C(link) (*(s16 *)((u8 *)(link) + 0x352C))  // s16 m352C (front wall normal angle)
+
 // daPy_lk_c::DIR_FORWARD (d_a_player_main.h:959)
 #define DAPY_DIR_FORWARD 0
 
@@ -422,18 +454,146 @@ static void puppet_setSwordOut(daPy_lk_c *link, int wantOut)
   }
 }
 
+// ============================================================================
+// LEDGE HANG
+// ============================================================================
+//
+// No proc function ever runs for a puppet (see puppet_executeBody), so only the _init matters:
+// it picks the bck and sets mModeFlg (HANG), and animeUpdate plays it. The per-frame hang procs
+// (changeHangEndProc, setHangShapeOffset, the procHangMove wall line checks) never run, and the
+// position/facing an init writes is restored by puppet_applyProcInit, then overridden by the
+// network position every frame (FINAL POSITION OVERRIDE). What remains are the inits that
+// check the grabbed ledge before committing; for those the ledge is rebuilt from the peer's
+// network position and facing, and a failed check falls back to procHangWait_init (the same
+// VJMPCHA hang pose, frozen; no checks, d_a_player_hang.inc:423-432).
+
+/**
+ * puppet_netTargetPos - the peer's position from the slot (what the FINAL POSITION OVERRIDE
+ * converges to). While a grab starts the puppet can still be lerping up to the ledge, so ledge
+ * checks use this instead of the current position. Returns 0 (out untouched) if unusable.
+ */
+static int puppet_netTargetPos(daPy_lk_c *puppet, cXyz *out)
+{
+  u32 slotIndex = *(u32 *)((u8 *)puppet + sizeof(daPy_lk_c)); // PUPPET_class.slotIndex
+  u32 slotBase;
+  f32 x, y, z;
+
+  if (slotIndex >= PUPPET_MAX_SLOTS || *(volatile u32 *)PUPPET_SYNC_BASE != PUPPET_SYNC_MAGIC)
+    return 0;
+  slotBase = PUPPET_SLOT_BASE(slotIndex);
+  if (*(volatile u32 *)(slotBase + PUPPET_SLOT_OFF_ACTIVE) == 0)
+    return 0;
+  x = *(volatile f32 *)(slotBase + PUPPET_SLOT_OFF_POSX);
+  y = *(volatile f32 *)(slotBase + PUPPET_SLOT_OFF_POSY);
+  z = *(volatile f32 *)(slotBase + PUPPET_SLOT_OFF_POSZ);
+  if (!(x == x && y == y && z == z) ||
+      !(x > -1.0e6f && x < 1.0e6f && y > -1.0e6f && y < 1.0e6f && z > -1.0e6f && z < 1.0e6f))
+    return 0;
+  out->x = x;
+  out->y = y;
+  out->z = z;
+  return 1;
+}
+
+/**
+ * puppet_hangCatchInit - HANG_START (grab after a vertical jump) / HANG_WALL_CATCH (grab a
+ * waist-high ledge).
+ *
+ * Both inits (d_a_player_hang.inc:172-235, :587-620) read the ledge anchor m3724 and the wall
+ * normal angle m352C that the peer's front-wall check left behind; the puppet's are stale. They
+ * refuse unless |m3724 - pos|xz <= wallR + 20 and a GroundCross from m3724 - 1.5 * normal +
+ * (0, 10, 0) lands within 30.1 of m3724.y, then set pos = that ground point and
+ * shape_angle.y = m352C + 0x8000. The peer's network position IS that ground point (the ledge
+ * top) and its facing is m352C + 0x8000, so use them as the anchor: the distance check is 0 and
+ * the ground probe lands 1.5 units into the ledge top. mCurProc is never ROPE_UP(_HANG) for a
+ * puppet (unsupported -> WAIT), so HangStart's unchecked rope path isn't taken.
+ */
+static int puppet_hangCatchInit(daPy_lk_c *puppet, int proc)
+{
+  fopAc_ac_c *actor = (fopAc_ac_c *)puppet;
+  cXyz anchor = *FOPAC_CURRENT_POS(actor);
+  int ok;
+
+  puppet_netTargetPos(puppet, &anchor);
+  *DAPY_LK_M3724(puppet) = anchor;
+  PUPPET_DAPY_M352C(puppet) = (s16)(FOPAC_SHAPE_ANGLE(actor)->y + 0x8000);
+  *FOPAC_CURRENT_POS(actor) = anchor; // restored by puppet_applyProcInit
+
+  if (proc == PROC_HANG_START)
+    ok = daPy_lk_c__procHangStart_init(puppet);
+  else
+    ok = daPy_lk_c__procHangWallCatch_init(puppet);
+  if (!ok)
+    ok = daPy_lk_c__procHangWait_init(puppet);
+  return ok;
+}
+
+/**
+ * puppet_hangFallStartInit - HANG_FALL_START (backing off an edge and catching it).
+ *
+ * procHangFallStart_init(cM3dGPla*) (d_a_player_hang.inc:270-349) takes the wall polygon the
+ * peer backed over but only reads its normal (GetNP) before replacing it with its own line
+ * checks, so a stack plane whose normal points away from the facing is enough: atan2s of it is
+ * facing + 0x8000 and the init sets shape_angle.y = that + 0x8000 = the network facing, with a
+ * zero setOldRootQuaternion turn. Its ground probes (pos + 50 down, then +/-30 sideways) run from
+ * the peer's position, i.e. the ledge top it snapped to; if they miss, hang still.
+ */
+static int puppet_hangFallStartInit(daPy_lk_c *puppet)
+{
+  fopAc_ac_c *actor = (fopAc_ac_c *)puppet;
+  s16 facing = FOPAC_SHAPE_ANGLE(actor)->y;
+  cM3dGPla wall;
+  cXyz pos = *FOPAC_CURRENT_POS(actor);
+
+  wall.mNorm.x = -cM_ssin(facing);
+  wall.mNorm.y = 0.0f;
+  wall.mNorm.z = -cM_scos(facing);
+  wall.mDist = 0.0f; // never read by the init
+  wall.vtbl = 0;     // never called: GetNP is inline
+
+  puppet_netTargetPos(puppet, &pos);
+  *FOPAC_CURRENT_POS(actor) = pos; // restored by puppet_applyProcInit
+
+  if (daPy_lk_c__procHangFallStart_init(puppet, &wall))
+    return 1;
+  return daPy_lk_c__procHangWait_init(puppet);
+}
+
+/**
+ * puppet_hangMoveDir - the shimmy direction for HANG_MOVE, from the peer's stick like
+ * getHangDirectionFromAngle (m34E8 - shape_angle.y, d_a_player_hang.inc:23-38; the slot's
+ * STICK_ANGLE is the peer's m34E8, ROTY its shape_angle.y). Without a usable stick (released,
+ * or pushed toward/away from the wall) the previous direction is kept.
+ */
+static int puppet_hangMoveDir(int prevDir, f32 stickDistance, s16 stickAngle, s16 shapeY)
+{
+  s16 rel = (s16)(stickAngle - shapeY);
+
+  if (prevDir != HANG_DIR_LEFT && prevDir != HANG_DIR_RIGHT)
+    prevDir = HANG_DIR_LEFT;
+  if (!(stickDistance > 0.05f) || rel > 0x78E4 || rel < -0x78E4)
+    return prevDir;
+  if (rel >= 0x071C)
+    return HANG_DIR_LEFT;
+  if (rel <= -0x071C)
+    return HANG_DIR_RIGHT;
+  return prevDir;
+}
+
 /**
  * puppet_applyProcInit - the ONLY place procX_init functions are called from.
  *
  * Unsupported procs fall back to WAIT; if the puppet is already in WAIT that's a no-op.
  * The puppet's position and facing are network-authoritative, so they are restored after
- * the init (ladder/damage/cut inits reposition or re-aim Link).
+ * the init (ladder/damage/cut/hang inits reposition or re-aim Link).
  *
+ * @param param  extra per-proc data carried in bits 16-23 of the request key (HANG_MOVE:
+ *               HANG_DIR_*); 0 otherwise.
  * @return nonzero if the puppet is now in the requested (or fallback) proc. Several
  *         _init functions return FALSE without changing proc (e.g. procWait_init,
  *         procFall_init in demo modes); callers should retry on a later frame.
  */
-static int puppet_applyProcInit(daPy_lk_c *puppet, int proc)
+static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
 {
   fopAc_ac_c *actor = (fopAc_ac_c *)puppet;
   PuppetGlobalGuard guard;
@@ -506,6 +666,39 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc)
   {
     cXyz anchor = savedPos;
     ok = daPy_lk_c__procLadderMove_init(puppet, 0, DAPY_DIR_FORWARD, &anchor);
+    break;
+  }
+
+  // Ledges (see LEDGE HANG). One anim per proc change, like the ladder.
+  // SMALL_JUMP (d_a_player_main.cpp:7417-7440): param 0 derives speed.y from the stale m3724
+  // (sqrtf of a possibly negative height); param 1 is the fixed-speed variant. Both play
+  // ANM_JMPST; speed/mNormalSpeed don't move a puppet (posMove's displacement is discarded).
+  case PROC_SMALL_JUMP:      ok = daPy_lk_c__procSmallJump_init(puppet, 1); break;
+  // VERTICAL_JUMP (:7451-7466): ANM_VJMP; m352C / mFrontWallType only feed per-frame vars.
+  case PROC_VERTICAL_JUMP:   ok = daPy_lk_c__procVerticalJump_init(puppet); break;
+  case PROC_HANG_START:
+  case PROC_HANG_WALL_CATCH: ok = puppet_hangCatchInit(puppet, proc); break;
+  case PROC_HANG_FALL_START: ok = puppet_hangFallStartInit(puppet); break;
+  // HANG_UP (hang.inc:383-396): ANM_HANGUP, no checks; the param is the follow-up direction
+  // for the per-frame proc only.
+  case PROC_HANG_UP:         ok = daPy_lk_c__procHangUp_init(puppet, 0); break;
+  // HANG_WAIT (:423-432): the frozen hang pose, no checks.
+  case PROC_HANG_WAIT:       ok = daPy_lk_c__procHangWait_init(puppet); break;
+  // HANG_MOVE (:459-475): ANM_HANGMOVEL/R by direction; reads only the puppet's own hand
+  // positions. The anim rate follows the peer's stick per frame (puppet_executeBody).
+  case PROC_HANG_MOVE:
+    ok = daPy_lk_c__procHangMove_init(puppet, param == HANG_DIR_RIGHT ? HANG_DIR_RIGHT : HANG_DIR_LEFT);
+    break;
+  // HANG_CLIMB (:557-574): ANM_VJMPCL; refuses only on mAcch roof hit. The puppet's Acch sits
+  // wherever the network put it (can be inside the ledge lip) and CrrPos recomputes the flag
+  // every frame, so clear it for the init. Start frame as vanilla picks it.
+  case PROC_HANG_CLIMB:
+  {
+    dBgS_Acch *acch = (dBgS_Acch *)((u8 *)puppet + 0x46C); // mAcch
+    ACCH_M_FLAGS(acch) &= ~ACCH_ROOF_HIT;
+    ok = daPy_lk_c__procHangClimb_init(puppet, DAPY_LK_MCURPROC(puppet) == PROC_HANG_WALL_CATCH
+                                                   ? HANG_CLIMB_START_FROM_WALL_CATCH
+                                                   : HANG_CLIMB_START_FROM_HANG);
     break;
   }
 
@@ -846,9 +1039,7 @@ static int puppet_executeBody(daPy_lk_c *link)
     {
       // procAtnMove(): setSpeedAndAngleAtn() then setBlendAtnMoveAnime(-1.0f). The strafe
       // direction comes from current.angle.y (move dir) vs shape_angle.y (facing); use the
-      // network stick angle (m34E8) as the move direction. NOTE: the C# client currently
-      // writes the peer's facing into STICK_ANGLE, so this reads as "forward" until it sends
-      // the peer's m34E8 (Link +0x34E8) instead.
+      // network stick angle (STICK_ANGLE = the peer's m34E8, Link +0x34E8) as the move direction.
       if (DAPY_LK_MSTICKDISTANCE(link) > 0.05f)
         FOPAC_CURRENT_ANGLE(actor)->y = DAPY_LK_M34E8_EXEC(link);
       daPy_lk_c__setBlendAtnMoveAnime(link, -1.0f);
@@ -859,6 +1050,12 @@ static int puppet_executeBody(daPy_lk_c *link)
       // the stick is pushed, 0 otherwise. Backward crawling (negative rate) isn't mirrored.
       PUPPET_DAPY_UNDER0_RATE(link) =
           (DAPY_LK_MSTICKDISTANCE(link) > 0.05f) ? daPy_lk_c__getCrawlMoveAnmSpeed(link) : 0.0f;
+    }
+    else if (curProcNow == PROC_HANG_MOVE)
+    {
+      // procHangMove: frameCtrl.setRate(getHangMoveAnmSpeed()) every frame
+      // (d_a_player_hang.inc:485-486); a pure function of mStickDistance (the peer's stick).
+      PUPPET_DAPY_UNDER0_RATE(link) = daPy_lk_c__getHangMoveAnmSpeed(link);
     }
     else if (puppet_isSwordProc(curProcNow) && puppet_swordReady(link))
     {
@@ -1582,7 +1779,8 @@ int l_puppetFollowState = 0;
  * puppet_requestProc - init a proc once per transition.
  *
  * `key` is the daPyProc value in bits 0-7, plus (for one-shot procs, see
- * puppet_isRestartableProc) the peer's PROC_SEQ in bits 8-15. A new swing of a combo is a
+ * puppet_isRestartableProc) the peer's PROC_SEQ in bits 8-15, plus a per-proc init parameter
+ * in bits 16-23 (HANG_MOVE's direction, so a shimmy reversal re-inits). A new swing of a combo is a
  * re-init of the SAME proc (changeCutProc, d_a_player_sword.inc:404-467: standing combo is
  * CUT_L, CUT_L, CUT_L, CUT_EB with m34C4 = 1,2,3,4), so the proc id alone can't tell swings
  * apart; the sequence byte changes on every peer (re)start and forces a re-init.
@@ -1594,7 +1792,7 @@ static void puppet_requestProc(daPy_lk_c *puppet, int key, int slotIndex)
   if (l_puppetFollowState == key)
     return;
 
-  if (puppet_applyProcInit(puppet, key & 0xFF))
+  if (puppet_applyProcInit(puppet, key & 0xFF, (key >> 16) & 0xFF))
   {
     OSReport("[PUPPET] proc %04x -> %04x (slot %d)\n",
              l_puppetFollowState & 0xFFFF, key & 0xFFFF, slotIndex);
@@ -1741,9 +1939,10 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
   // matches), falling back to full stick when the slot doesn't carry a usable value
   // (old client / 0 / NaN). Keep it >= 0.05: setBlendMoveAnime treats < 0.05 as "no input"
   // and can switch to the slip/stop animation.
-  if (targetProc == PROC_CRAWL_MOVE || targetProc == PROC_CRAWL_AUTO_MOVE)
+  if (targetProc == PROC_CRAWL_MOVE || targetProc == PROC_CRAWL_AUTO_MOVE || targetProc == PROC_HANG_MOVE)
   {
     // Crawling: 0 means lying still (anim paused), so no "full stick" fallback here.
+    // Shimmying: getHangMoveAnmSpeed maps the stick to the anim rate (0 = its slowest rate).
     f32 stick = netStickDistance;
     if (!(stick > 0.0f))
       stick = 0.0f;
@@ -1810,6 +2009,11 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
       {
         u8 netSeq = *(volatile u8 *)(slotBase + PUPPET_SLOT_OFF_PROC_SEQ);
         key |= ((int)netSeq << 8);
+      }
+      if (wantProc == PROC_HANG_MOVE)
+      {
+        int prevDir = ((l_puppetFollowState & 0xFF) == PROC_HANG_MOVE) ? ((l_puppetFollowState >> 16) & 0xFF) : 0;
+        key |= puppet_hangMoveDir(prevDir, netStickDistance, targetStickAngle, targetRotY) << 16;
       }
       puppet_requestProc(puppet, key, slotIndex);
     }
