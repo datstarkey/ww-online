@@ -15,7 +15,13 @@
  * repeats daShip_c's body and head callbacks (d_a_ship.cpp:110-231) with the peer's sail,
  * tiller and head-look angles and mast scale.
  *
- * Not drawn yet: the sail cloth (d_a_grid), cannon / crane, wake effects, the talk mouth
+ * The sail cloth is not part of the hull: daShip_c spawns a daGrid_c (d_a_grid.cpp) whose own
+ * packet (daHo_packet_c) draws an 85-vertex cloth mesh with the "Ship" new_ho1.bti texture, moved
+ * procedurally by ho_move (wind, mSailAngle, the mast bck's SAIL1 / SAIL2 joint scales). Each
+ * puppet boat keeps an imitation daGrid_c in its heap and runs the game's own ho_move and packet
+ * draw on it (see puppet_boat.c, "Sail"), recoloured with the peer's tunic colour.
+ *
+ * Not drawn yet: cannon / crane, wake effects, the talk mouth
  * (headJointCallBack0's mAnmTransform swap) and the boat's shadow. The hull's water effect
  * texture matrix is shared material state that the local ship sets (d_a_ship.cpp:259-282), so
  * ours shows the local ship's projection. The boat has no collision.
@@ -65,7 +71,20 @@ typedef struct PuppetBoat
   s16 headY;                            /* m03A2 */
   s16 pad2;
   u32 tevStr[0xB0 / 4];                 /* dKy_tevstr_c (d_kankyo.h, size 0xB0) */
+  request_of_phase_process_class clothPhase; /* "Cloth" archive: the sail's toon texture */
+  u8 clothState;                        /* PUPPET_SAIL_CLOTH_* */
+  u8 sailShow;                          /* the sail is up this frame: enter its packet */
+  u8 sailCur;                           /* palette buffer the recolour key is in */
+  u8 pad3;
+  u8 *sail;                             /* imitation daGrid_c + palettes (in `heap`), NULL = none */
+  u32 sailKey;                          /* recoloured palette's colour | 0x01000000, 0 = none yet */
+  f32 sailScale;                        /* daGrid_c scale.y: SAIL1's length (d_a_ship.cpp:4066) */
 } PuppetBoat;
+
+/* PuppetBoat.clothState */
+#define PUPPET_SAIL_CLOTH_LOADING 0
+#define PUPPET_SAIL_CLOTH_READY   1
+#define PUPPET_SAIL_CLOTH_FAILED  2
 
 /* Zero the boat. Call once from the puppet's create. */
 void puppet_boatInit(PuppetBoat *boat);

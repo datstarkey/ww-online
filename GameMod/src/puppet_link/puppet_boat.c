@@ -12,6 +12,7 @@
  *   6. Pose both morfs like daShip_c::execute (d_a_ship.cpp:3960-3976): the peer's mast / head
  *      bck at the peer's frame, then our joint callback (boat_jointCallBack) for the sail,
  *      tiller, mast scale and head look.
+ *   7. Move the sail cloth on the posed mast (boat_sailExecute, see "Sail" below).
  *
  * The models share the "Ship" J3DModelData with the local King of Red Lions, and daShip_c
  * puts its joint callbacks on those shared joints (d_a_ship.cpp:4577-4619). They find their
@@ -34,6 +35,7 @@
 #define BOAT_JNT_STEER1           0x0A  /* FN_BODY_JNT_J_FN_STEER1_e: tiller */
 #define BOAT_HEAD_JNT_KUBI1       0x02  /* FN_HEAD_H_JNT_J_FN_KUBI1_e .. KUBI6_e: the neck */
 #define BOAT_HEAD_JNT_KUBI6       0x07
+#define BOAT_JNT_SAIL2            0x08  /* FN_BODY_JNT_J_FN_SAIL2_e: folds the sail (d_a_ship.cpp:4068) */
 
 /* daShip_c's morfs (createHeap, d_a_ship.cpp:4406-4467; setPartOnAnime/OffAnime :1328-1360;
  * setHeadAnm :3523-3538): J3DFrameCtrl::EMode_NONE, morf 3 for the mast, 5 for the head (0 for
@@ -154,6 +156,338 @@ static mDoExt_McaMorf *boat_createMorf(u32 bdl, u32 bck, u32 diffFlag)
   return MDOEXT_MCAMORF_MPMODEL(morf) != NULL ? morf : NULL;
 }
 
+/* ---- Sail --------------------------------------------------------------------------------
+ * Vanilla (d_a_grid.cpp): the sail cloth is its own actor, daGrid_c, spawned by daShip_c::create
+ * (d_a_ship.cpp:4693). It is not in fn_body.bdl: its daHo_packet_c draws an 85-vertex mesh (a 7x12
+ * grid plus a top vertex, rest shape l_pos) straight through GX with the "Ship" new_ho1.bti
+ * (C8 + RGB565 palette) and the "Cloth" clothtoon.bti ramp (daHo_packet_c::draw, :221-350),
+ * Z-sorted into the translucent list (daGrid_c::_draw, :822-843). There is no physics: ho_move
+ * (:359-607) recomputes every vertex each frame from sines of two running phases, the wind
+ * (dKyw_get_wind_vec/pow), l_ship's mSailAngle and SAIL_ON flag, and field_0x2200. The ship
+ * places it every frame (d_a_ship.cpp:4049-4074): position = J_FN_SAIL1's matrix, angles =
+ * shape_angle, scale.y = SAIL1's length (the mast bck shrinks it; under 0.06 it is neither moved
+ * nor drawn, d_a_grid.cpp:813/823) and field_0x2200 = 1 - SAIL2's X length (the fold).
+ *
+ * Spawning a daGrid_c isn't an option (it finds its l_ship by name: the local ship), but all its
+ * code is in main.dol. So each boat keeps an imitation daGrid_c in its heap (zeroed like a new
+ * actor, field_0x1b54 as _create fills it) and runs the game's ho_move on it with l_ship
+ * pointed, for that call only, at a stub holding the two fields ho_move reads (the peer's
+ * mSailAngle and SAIL_ON). Its packet (vtable in the REL) draws with the game's
+ * daHo_packet_c::draw, so the cloth looks and moves like the vanilla one.
+ *
+ * Colour: the cloth's colour is the new_ho1 texture (the TEV multiplies it by the lighting,
+ * d_a_grid.cpp:289-294; no material colour is involved), and the draw fetches the palette through
+ * the archive's ResTIMG header at draw time (:244-252). So our packet's draw points that header at
+ * a recoloured copy of the palette and restores it right after: the local sail, drawn by its own
+ * packet, never sees it. The canvas (cream) takes the peer's tunic colour at the canvas's
+ * shading; the teal emblem and orange corners stay (their anti-aliased edges blend). */
+
+/* daGrid_c (d_a_grid.h; sizeof 0x221C = g_profile_GRID's size) */
+#define GRID_SIZE                 0x221C
+#define GRID_OFF_PACKET           0x2A0   /* daHo_packet_c mPacket */
+#define GRID_OFF_AMP              0x1B54  /* f32 field_0x1b54[85]: per-vertex flutter amplitude */
+#define GRID_OFF_FOLD             0x2200  /* f32 field_0x2200: 1 - SAIL2's X length */
+#define GRID_VTX                  85      /* 7 x 12 grid + the top vertex */
+#define GRID_COLS                 7
+/* daHo_packet_c (d_a_grid.h) */
+/* J3DMatPacket::mpShapePacket. The decomp's J3DPacket.h offsets are 4 too high for TWW: the ctor
+ * (inlined in daGrid_c::_create, 800EAA98) stores it at +0x28 and entryZSort (802ECB18) reads +0x28. */
+#define HO_OFF_SHAPE_PACKET_PTR   0x28
+#define HO_OFF_SHAPE_PACKET       0x3C    /* mShapePacket */
+#define HO_OFF_MTX                0x80    /* mMtx: view * model */
+#define HO_OFF_TEVSTR             0xB0    /* mpTevStr */
+#define HO_OFF_ALPHA              0x18A3  /* mAlpha */
+#define HO_ALPHA_OPAQUE           0xFF    /* l_HIO.field_0x30: _execute's far / event value */
+/* daShip_c fields ho_move reads through l_ship: getSailOn / getSailAngle (d_a_ship.h:101, :165) */
+#define SHIP_OFF_STATE_FLAG       0x358
+#define SHIP_OFF_SAIL_ANGLE       0x364
+#define SHIP_SFLG_SAIL_ON         0x200   /* daSFLG_SAIL_ON_e */
+/* procSteerMove sets SAIL_ON once the MAST_ON2 bck reaches frame 7 with the sail part up
+ * (d_a_ship.cpp:1630-1632); setPartOffAnime clears it (:1360). */
+#define SHIP_SAIL_ON_FRAME        7
+#define SAIL_MIN_SCALE            0.06f
+/* J3DDrawBuffer::mpZMtx (J3DDrawBuffer.h), read by entryZSort */
+#define DRAWBUF_OFF_ZMTX          0x1C
+#define TEVSTR_WORDS              (0xB0 / 4)
+
+/* "Ship" new_ho1.bti (Ship.h dRes_INDEX_SHIP_BTI_NEW_HO1_e) and "Cloth" (Cloth.h) */
+#define BOAT_RES_BTI_NEW_HO1      0x17
+#define BOAT_CLOTH_ARC_NAME       "Cloth"
+/* ResTIMG (JUTTexture.h) */
+#define TIMG_FORMAT(t)            (*(u8 *)((u8 *)(t) + 0x00))
+#define TIMG_PAL_FORMAT(t)        (*(u8 *)((u8 *)(t) + 0x09))
+#define TIMG_NUM_COLORS(t)        (*(u16 *)((u8 *)(t) + 0x0A))
+#define TIMG_PAL_OFFSET(t)        (*(u32 *)((u8 *)(t) + 0x0C))
+#define TIMG_FMT_C8               0x09    /* GX_TF_C8 (vanilla new_ho1: 128x128, 96 colours) */
+#define TIMG_TLUT_RGB565          0x01    /* GX_TL_RGB565 */
+#define SAIL_TLUT_ENTRIES         0x100   /* the draw loads 0x100 entries (d_a_grid.cpp:245) */
+#define SAIL_PAL_BYTES            (SAIL_TLUT_ENTRIES * 2)
+
+/* Our sail block (boat heap, 32-aligned): the imitation daGrid_c, then the palette the draw shows
+ * (NULL = vanilla), the new_ho1 header, and two palettes (double-buffered like
+ * puppet_appearance.c's texture: the GPU may still be loading last frame's). */
+#define SAIL_OFF_SHOW             GRID_SIZE             /* u8 *: the daGrid_c's tail padding */
+#define SAIL_OFF_TIMG             0x2220                /* u32 *: new_ho1 header, NULL = no recolour */
+#define SAIL_OFF_PAL              0x2240                /* 32-aligned */
+#define SAIL_BLOCK_BYTES          (SAIL_OFF_PAL + 2 * SAIL_PAL_BYTES)
+#define SAIL_SHOW(s)              (*(u8 **)((s) + SAIL_OFF_SHOW))
+#define SAIL_TIMG(s)              (*(u32 **)((s) + SAIL_OFF_TIMG))
+#define SAIL_PAL(s, i)            ((u16 *)((s) + SAIL_OFF_PAL + (i) * SAIL_PAL_BYTES))
+
+/* Recolour: new_ho1's canvas is cream (main entry 231,215,189, luminance 216: that entry becomes
+ * the picked colour), the emblem teal (33,109,107), the corner patches orange (206,101,33). An
+ * entry's canvas weight = how far it is from teal along R-G (canvas >= 0, teal <= -70) times how
+ * far from orange along R-B (canvas <= 64, orange >= 96). */
+#define SAIL_CANVAS_LUM           216
+#define SAIL_TEAL_RG              70
+#define SAIL_ORANGE_RB            96
+#define SAIL_ORANGE_RAMP          32
+
+typedef void (*SailDrawFn)(u8 *packet);
+typedef void (*SailMoveFn)(u8 *grid);
+
+static void boat_sailDraw(u8 *packet);
+static void boat_sailNoop(u8 *packet) { (void)packet; }
+
+/* J3DPacket vtable {RTTI, this-offset, isSame, entry, draw, dtor}, as __vt__13daHo_packet_c
+ * (main.dol 0x8038BBE0) with our draw. Only draw is called (J3DDrawBuffer::drawHead/drawTail);
+ * the block goes with the boat heap, never through the dtor. */
+static const void *const l_sailVtbl[6] = {NULL, NULL, (const void *)J3DMatPacket__isSame,
+                                          (const void *)J3DMatPacket__entry, (const void *)boat_sailDraw,
+                                          (const void *)boat_sailNoop};
+
+/* daGrid_c::_create's field_0x1b54 (d_a_grid.cpp:674-759): each vertex's flutter amplitude, a sine
+ * bump across the width (z) and up the height (y) of the rest shape. The loop only reads l_pos
+ * (main.dol 0x8038B1D8, constant), so these are its results for GZLE01's l_pos, rounded to 4
+ * decimals (7 per grid row, then the top vertex). */
+static const f32 l_sailAmp[GRID_VTX] = {
+  0.0000f, 20.8999f, 35.6403f, 39.8767f, 35.6403f, 20.8999f, 0.0000f,
+  14.0262f, 44.9109f, 68.6507f, 76.9920f, 72.6832f, 54.2215f, 33.7220f,
+  25.7013f, 64.1262f, 89.3331f, 99.0883f, 96.9092f, 82.1124f, 63.3211f,
+  33.0682f, 75.5754f, 99.7258f, 109.4389f, 109.2104f, 98.9576f, 83.2043f,
+  34.8921f, 77.9729f, 101.4169f, 111.5892f, 112.8186f, 105.7061f, 91.6494f,
+  33.0682f, 73.9003f, 96.5564f, 107.5516f, 110.0354f, 105.6387f, 93.1919f,
+  25.7013f, 61.1313f, 84.6565f, 98.6156f, 103.2966f, 100.7826f, 88.7794f,
+  14.0262f, 41.8983f, 66.2014f, 83.1088f, 90.6425f, 89.9953f, 80.3832f,
+  0.0000f, 27.4212f, 51.5202f, 69.3770f, 78.8283f, 79.9817f, 74.5491f,
+  15.3616f, 26.0253f, 43.0499f, 58.8057f, 71.1327f, 78.9141f, 81.5267f,
+  19.5293f, 23.9177f, 33.6173f, 44.5511f, 55.0684f, 64.3923f, 72.0512f,
+  15.8186f, 17.1908f, 20.9891f, 26.0253f, 31.6009f, 37.3448f, 43.0499f,
+  0.0000f,
+};
+
+/* The imitation daGrid_c + palettes, in the boat heap. NULL if it doesn't fit. */
+static u8 *boat_createSail(JKRSolidHeap *heap)
+{
+  AppAllocFn alloc = (AppAllocFn)(u32)JKRHeap__alloc;
+  u8 *sail = (u8 *)alloc(SAIL_BLOCK_BYTES, 32, heap);
+  u8 *packet;
+  u32 *timg;
+  u32 i;
+
+  if (sail == NULL)
+    return NULL;
+  for (i = 0; i < SAIL_BLOCK_BYTES; i += 4)
+    *(u32 *)(sail + i) = 0; // like a new actor; the palettes' unused tails stay 0 too
+
+  // daHo_packet_c's ctor (d_a_grid.h): alpha 0xFF, and the shape packet entryZSort clears.
+  packet = sail + GRID_OFF_PACKET;
+  *(const void *const **)packet = l_sailVtbl;
+  *(u8 **)(packet + HO_OFF_SHAPE_PACKET_PTR) = packet + HO_OFF_SHAPE_PACKET;
+  packet[HO_OFF_ALPHA] = HO_ALPHA_OPAQUE;
+  for (i = 0; i < GRID_VTX; i++)
+    ((f32 *)(sail + GRID_OFF_AMP))[i] = l_sailAmp[i];
+
+  // Recolourable only while new_ho1 is what we expect.
+  timg = (u32 *)boat_getRes(BOAT_RES_BTI_NEW_HO1);
+  if (timg != NULL && TIMG_FORMAT(timg) == TIMG_FMT_C8 && TIMG_PAL_FORMAT(timg) == TIMG_TLUT_RGB565 &&
+      TIMG_NUM_COLORS(timg) <= SAIL_TLUT_ENTRIES)
+    SAIL_TIMG(sail) = timg;
+  return sail;
+}
+
+/* 0..256 as v goes 0..span */
+static int boat_ramp(int v, int span)
+{
+  if (v <= 0)
+    return 0;
+  if (v >= span)
+    return 256;
+  return (v * 256) / span;
+}
+
+/* new_ho1's palette with the canvas in rgb (see "Colour" above). */
+static void boat_sailRecolor(u16 *dst, const u32 *timg, u32 rgb)
+{
+  const u16 *src = (const u16 *)((const u8 *)timg + TIMG_PAL_OFFSET(timg));
+  u32 count = TIMG_NUM_COLORS(timg);
+  u32 i;
+  int k;
+
+  for (i = 0; i < SAIL_TLUT_ENTRIES; i++)
+  {
+    u32 c = i < count ? src[i] : 0;
+    int ch[3];
+    int lum, w, t;
+
+    ch[0] = (c >> 11) & 0x1F;
+    ch[1] = (c >> 5) & 0x3F;
+    ch[2] = c & 0x1F;
+    ch[0] = (ch[0] << 3) | (ch[0] >> 2);
+    ch[1] = (ch[1] << 2) | (ch[1] >> 4);
+    ch[2] = (ch[2] << 3) | (ch[2] >> 2);
+    w = (boat_ramp(ch[0] - ch[1] + SAIL_TEAL_RG, SAIL_TEAL_RG) *
+         boat_ramp(SAIL_ORANGE_RB - (ch[0] - ch[2]), SAIL_ORANGE_RAMP)) / 256;
+    lum = (77 * ch[0] + 150 * ch[1] + 29 * ch[2]) >> 8;
+    for (k = 0; k < 3; k++)
+    {
+      t = (int)((rgb >> (16 - 8 * k)) & 0xFF) * lum / SAIL_CANVAS_LUM;
+      if (t > 255)
+        t = 255;
+      ch[k] += ((t - ch[k]) * w) / 256;
+    }
+    dst[i] = (u16)(((ch[0] >> 3) << 11) | ((ch[1] >> 2) << 5) | (ch[2] >> 3));
+  }
+}
+
+/* The slot's tunic colour on the sail: a recoloured palette, or NULL (vanilla) for the default. */
+static void boat_sailColor(PuppetBoat *boat, u32 slotIndex)
+{
+  volatile u8 *slot = (volatile u8 *)PUPPET_SLOT_BASE(slotIndex);
+  u32 rgb = ((u32)slot[PUPPET_SLOT_OFF_COLOR_R] << 16) | ((u32)slot[PUPPET_SLOT_OFF_COLOR_G] << 8) |
+            (u32)slot[PUPPET_SLOT_OFF_COLOR_B];
+  u8 *sail = boat->sail;
+  AppStoreFn store = (AppStoreFn)(u32)os__DCStoreRange;
+  u16 *pal;
+
+  if (SAIL_TIMG(sail) == NULL || rgb == 0 || rgb == APP_DEFAULT_RGB)
+  {
+    SAIL_SHOW(sail) = NULL;
+    return;
+  }
+  if (boat->sailKey != APP_KEY(rgb))
+  {
+    if (boat->sailKey != 0)
+      boat->sailCur ^= 1; // leave the palette the GPU may still be loading
+    pal = SAIL_PAL(sail, boat->sailCur);
+    boat_sailRecolor(pal, SAIL_TIMG(sail), rgb);
+    store(pal, SAIL_PAL_BYTES);
+    boat->sailKey = APP_KEY(rgb);
+  }
+  SAIL_SHOW(sail) = (u8 *)SAIL_PAL(sail, boat->sailCur);
+}
+
+/* daShip_c's grid placement (d_a_ship.cpp:4049-4070) on our posed hull, then daGrid_c::_execute's
+ * ho_move (d_a_grid.cpp:813-817) with l_ship standing for the peer's ship. */
+static void boat_sailExecute(PuppetBoat *boat, u32 base, u32 flags, u32 slotIndex)
+{
+  u8 *sail = boat->sail;
+  MTX34 *sail1;
+  MTX34 *sail2;
+  cXyz col;
+  csXyz *angle;
+  u32 ship[4]; /* daShip_c 0x358..0x367: mStateFlag .. mSailAngle */
+  u32 savedShip;
+  SailMoveFn move = (SailMoveFn)(u32)d_a_grid__ho_move;
+
+  boat->sailShow = 0;
+  if (sail == NULL || boat->clothState != PUPPET_SAIL_CLOTH_READY)
+    return;
+
+  sail1 = &J3DMODEL_MPNODEMTX(boat->body)[BOAT_JNT_SAIL1];
+  col.x = sail1->m[0][2]; // |SAIL1 * (0, 0, -365)| / 365
+  col.y = sail1->m[1][2];
+  col.z = sail1->m[2][2];
+  boat->sailScale = PSVECMag(&col);
+  if (boat->sailScale < SAIL_MIN_SCALE)
+    return; // mast down, or hidden for the cannon / crane
+
+  sail2 = &J3DMODEL_MPNODEMTX(boat->body)[BOAT_JNT_SAIL2];
+  col.x = sail2->m[0][0]; // 1 - |SAIL2 * (265, 0, 0)| / 265
+  col.y = sail2->m[1][0];
+  col.z = sail2->m[2][0];
+  *(f32 *)(sail + GRID_OFF_FOLD) = 1.0f - PSVECMag(&col);
+
+  FOPAC_CURRENT_POS(sail)->x = sail1->m[0][3];
+  FOPAC_CURRENT_POS(sail)->y = sail1->m[1][3];
+  FOPAC_CURRENT_POS(sail)->z = sail1->m[2][3];
+  angle = FOPAC_CURRENT_ANGLE(sail);
+  angle->x = boat->pitch;
+  angle->y = boat->rotY;
+  angle->z = boat->roll;
+
+  ship[0] = ((flags & PUPPET_BOAT_FLAG_MAST_ON) && !(flags & PUPPET_BOAT_FLAG_MAST_HIDE) &&
+             *(volatile u8 *)(base + PUPPET_BOAT_OFF_MAST_FRAME) >= SHIP_SAIL_ON_FRAME)
+                ? SHIP_SFLG_SAIL_ON
+                : 0;
+  *(s16 *)((u8 *)ship + (SHIP_OFF_SAIL_ANGLE - SHIP_OFF_STATE_FLAG)) = boat->sailAngle;
+
+  // ho_move reads only mStateFlag and mSailAngle through l_ship, and only during this call.
+  savedShip = d_a_grid__l_ship;
+  d_a_grid__l_ship = (u32)ship - SHIP_OFF_STATE_FLAG;
+  move(sail);
+  d_a_grid__l_ship = savedShip;
+
+  boat_sailColor(boat, slotIndex);
+  boat->sailShow = 1;
+}
+
+/* Our packet's draw: the game's, with the new_ho1 header pointing at the peer's palette. */
+static void boat_sailDraw(u8 *packet)
+{
+  u8 *sail = packet - GRID_OFF_PACKET;
+  u32 *timg = SAIL_TIMG(sail);
+  u8 *pal = SAIL_SHOW(sail);
+  SailDrawFn draw = (SailDrawFn)(u32)daHo_packet_c__draw;
+  u32 saved;
+
+  if (timg == NULL || pal == NULL)
+  {
+    draw(packet);
+    return;
+  }
+  saved = TIMG_PAL_OFFSET(timg);
+  TIMG_PAL_OFFSET(timg) = (u32)pal - (u32)timg; // wraps, like appearance's imageOffset
+  draw(packet);
+  TIMG_PAL_OFFSET(timg) = saved;
+}
+
+/* daGrid_c::_draw (d_a_grid.cpp:822-843): T(pos) * YXZrot(shape_angle) * Yrot(mSailAngle) *
+ * scale(1, scale.y, 1), lit by a copy of the ship's tevStr (the draw writes its C0.a), Z-sorted
+ * into the translucent list. */
+static void boat_sailEntry(PuppetBoat *boat)
+{
+  u8 *sail = boat->sail;
+  u8 *packet = sail + GRID_OFF_PACKET;
+  J3DDrawBuffer *xlu = DDLST_LIST_MPXLULIST(GAMEINFO_DRAWLIST(&g_dComIfG_gameInfo));
+  u32 *tev = (u32 *)FOPAC_TEV_STR(sail);
+  MTX34 m;
+  void **zMtx;
+  void *savedZ;
+  int i;
+
+  if (xlu == NULL)
+    return;
+  mDoMtx_ZXYrotS(&m, boat->pitch, boat->rotY, boat->roll);
+  mDoMtx_YrotM(&m, boat->sailAngle);
+  for (i = 0; i < 3; i++)
+    m.m[i][1] *= boat->sailScale;
+  m.m[0][3] = FOPAC_CURRENT_POS(sail)->x;
+  m.m[1][3] = FOPAC_CURRENT_POS(sail)->y;
+  m.m[2][3] = FOPAC_CURRENT_POS(sail)->z;
+  PSMTXConcat((MTX34 *)&J3DGraphBase__j3dSys, &m, (MTX34 *)(packet + HO_OFF_MTX)); // j3dSys.mViewMtx is at 0
+
+  for (i = 0; i < TEVSTR_WORDS; i++)
+    tev[i] = boat->tevStr[i];
+  *(u32 **)(packet + HO_OFF_TEVSTR) = tev;
+
+  zMtx = (void **)((u8 *)xlu + DRAWBUF_OFF_ZMTX);
+  savedZ = *zMtx;
+  *zMtx = &m; // entryZSort reads it right away
+  J3DDrawBuffer__entryZSort(xlu, (J3DMatPacket *)packet);
+  *zMtx = savedZ;
+}
+
 /* Build the hull and head in a solid heap of our own (the puppet's actor heap belongs to
  * playerInit). As daShip_c::createHeap, minus the cannon, crane and rope. */
 static int boat_createModels(PuppetBoat *boat)
@@ -171,6 +505,8 @@ static int boat_createModels(PuppetBoat *boat)
     boat->bodyAnm = NULL;
   if (boat->bodyAnm != NULL)
     boat->headAnm = boat_createMorf(BOAT_RES_BDL_FN_HEAD_H, SHIP_BCK_FN_LOOK_L, BOAT_HEAD_DIFF_FLAG);
+  // The sail is optional: a boat without one still draws.
+  boat->sail = boat->headAnm != NULL ? boat_createSail(heap) : NULL;
   mDoExt_restoreCurrentHeap();
 
   if (boat->bodyAnm == NULL || boat->headAnm == NULL)
@@ -178,6 +514,7 @@ static int boat_createModels(PuppetBoat *boat)
     mDoExt_destroySolidHeap(heap);
     boat->bodyAnm = NULL;
     boat->headAnm = NULL;
+    boat->sail = NULL;
     return 0;
   }
 
@@ -194,10 +531,23 @@ static int boat_createModels(PuppetBoat *boat)
   return 1;
 }
 
-/* Load the archive (async, polled every frame) and build the models once. */
+/* Load the archives (async, polled every frame) and build the models once. "Cloth" (the sail's
+ * toon ramp, which daHo_packet_c::draw fetches at draw time) only gates the sail. */
 static int boat_ready(fopAc_ac_c *actor, PuppetBoat *boat)
 {
   int phs;
+
+  if (boat->clothState == PUPPET_SAIL_CLOTH_LOADING)
+  {
+    phs = dComIfG_resLoad(&boat->clothPhase, BOAT_CLOTH_ARC_NAME);
+    if (phs == BOAT_PHS_COMPLEATE)
+      boat->clothState = PUPPET_SAIL_CLOTH_READY;
+    else if (phs == BOAT_PHS_ERROR)
+    {
+      OSReport("[PUPPET] boat: Cloth archive load failed (no sail)\n");
+      boat->clothState = PUPPET_SAIL_CLOTH_FAILED;
+    }
+  }
 
   if (boat->state == PUPPET_BOAT_STATE_READY)
     return 1;
@@ -521,6 +871,7 @@ void puppet_boatExecute(fopAc_ac_c *actor, PuppetBoat *boat, u32 slotIndex)
   boat_calcModel(boat, boat->bodyAnm, 0);
   PSMTXCopy(&J3DMODEL_MPNODEMTX(boat->body)[BOAT_JNT_GATTAI], (MTX34 *)J3DMODEL_MBASETRMTX(boat->head));
   boat_calcModel(boat, boat->headAnm, 1);
+  boat_sailExecute(boat, base, flags, slotIndex);
 
   boat->hasPose = 1;
   boat->visible = 1;
@@ -561,6 +912,20 @@ void puppet_boatDraw(fopAc_ac_c *actor, PuppetBoat *boat)
   mDoExt_modelEntryDL(boat->body);
   mDoExt_modelEntryDL(boat->head);
   dComIfGd_setList();
+
+  if (boat->sailShow)
+    boat_sailEntry(boat);
+}
+
+/* dComIfG_resDelete for a phase we may have started; resDelete asserts mid-load, so a reference
+ * taken while loading is never dropped and that archive stays loaded for the session (harmless at
+ * sea, where d_s_play preloads "Ship"; "Cloth" is tiny). */
+static void boat_releaseRes(request_of_phase_process_class *phase, char *name)
+{
+  if (phase->mStep == BOAT_PHASE_LOADED)
+    dComIfG_resDelete(phase, name);
+  else if (phase->mStep == BOAT_PHASE_LOADING)
+    OSReport("[PUPPET] boat: deleted while %s was loading; its reference stays\n", name);
 }
 
 void puppet_boatDelete(PuppetBoat *boat)
@@ -574,15 +939,14 @@ void puppet_boatDelete(PuppetBoat *boat)
     boat->headAnm = NULL;
     boat->body = NULL;
     boat->head = NULL;
+    boat->sail = NULL; // was in the heap
   }
 
-  if (boat->phase.mStep == BOAT_PHASE_LOADED)
-    dComIfG_resDelete(&boat->phase, BOAT_ARC_NAME);
-  else if (boat->phase.mStep == BOAT_PHASE_LOADING)
-    // resDelete asserts mid-load, so this reference is never dropped and the archive stays
-    // loaded for the session. Harmless at sea (d_s_play preloads "Ship" there anyway).
-    OSReport("[PUPPET] boat: deleted while the Ship archive was loading; its reference stays\n");
+  boat_releaseRes(&boat->phase, BOAT_ARC_NAME);
+  boat_releaseRes(&boat->clothPhase, BOAT_CLOTH_ARC_NAME);
 
   boat->state = PUPPET_BOAT_STATE_NONE;
+  boat->clothState = PUPPET_SAIL_CLOTH_LOADING;
   boat->visible = 0;
+  boat->sailShow = 0;
 }
