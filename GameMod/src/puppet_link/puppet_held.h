@@ -64,11 +64,7 @@ void puppet_heldFinishSwap(daPy_lk_c *puppet);
 // Per frame before the model calc: item bck frame (m35EC) and the peer's aim angles.
 void puppet_heldPose(daPy_lk_c *puppet);
 
-// ---- shared item anims (puppet_draw.c) ----
-// Point the held item's / bottle contents' SHARED model data at `who`'s btk/brk (entry-time
-// evaluated), so each Link draws its own bottle liquid / Wind Waker glow.
-void puppet_heldEntryItemAnms(daPy_lk_c *who, J3DModelData *heldData, J3DModelData *contentsData);
-
+// ---- shared model data (puppet_draw.c) ----
 // Around the puppet's held-item entry: its Picto Box's flash shape (hidden for the regular one) on
 // the SHARED camera model data. Returns the shape to restore to *saved afterwards, or NULL.
 J3DShape *puppet_heldFlashBegin(daPy_lk_c *who, u32 *saved);

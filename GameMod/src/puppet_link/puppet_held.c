@@ -610,36 +610,6 @@ void puppet_heldPose(daPy_lk_c *puppet)
 }
 
 // ============================================================================
-// SHARED ITEM ANIMS
-// ============================================================================
-//
-// setBottleModel / setTactModel register their btk / brk on the item's SHARED model data
-// (entryTexMtxAnimator / entryTevRegAnimator, bottle.inc:38,65,74; tact.inc:48). The animator is
-// read when the model is entered, and the anm lives in that Link's item heap: re-register the
-// drawer's own right before its entry, then the local Link's right after (it only re-registers on
-// its own take-out), so no Link draws with another's (possibly freed) anm.
-
-void puppet_heldEntryItemAnms(daPy_lk_c *who, J3DModelData *heldData, J3DModelData *contentsData)
-{
-  J3DModel *held = DAPY_LK_MPHELDITEMMODEL(who);
-  J3DModel *contents = DAPY_LK_MPBOTTLECONTENTSMODEL(who);
-  J3DAnmTextureSRTKey *btk = HELD_DAPY_EQUIPITEMBTK(who);
-  J3DAnmTevRegKey *brk = HELD_DAPY_EQUIPITEMBRK(who);
-
-  if (heldData != NULL && held != NULL && J3DMODEL_MPMODELDATA(held) == heldData)
-  {
-    if (btk != NULL) // bottle glass
-      J3DMaterialTable__entryTexMtxAnimator((J3DMaterialTable *)J3DMODELDATA_MMATERIALTABLE(heldData), btk);
-    // Baton glow. On the ship the conducting Link holds the same TAKT model as daPyItem_UNK10A
-    // (changeDemoProc, d_a_player_main.cpp:5381-5387).
-    if (brk != NULL && (PUPPET_DAPY_MEQUIPITEM(who) == ITEM_WIND_WAKER || PUPPET_DAPY_MEQUIPITEM(who) == DAPY_ITEM_SHIP_TACT))
-      J3DMaterialTable__entryTevRegAnimator((J3DMaterialTable *)J3DMODELDATA_MMATERIALTABLE(heldData), brk);
-  }
-  if (contentsData != NULL && contents != NULL && brk != NULL && J3DMODEL_MPMODELDATA(contents) == contentsData)
-    J3DMaterialTable__entryTevRegAnimator((J3DMaterialTable *)J3DMODELDATA_MMATERIALTABLE(contentsData), brk);
-}
-
-// ============================================================================
 // REL MODELS: held boomerang, carried bomb
 // ============================================================================
 
