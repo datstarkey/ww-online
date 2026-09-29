@@ -373,6 +373,24 @@ public static class GameMemoryAddresses
     /// Per-stage persistent world flags (dSv_memBit_c inside dSv_memory_c), used by shared-world
     /// sync. g_dComIfG_gameInfo = 0x803C4C08; dSv_info_c starts at +0 (tww-decomp d_save.h).
     /// </summary>
+    /// <summary>
+    /// daSalvage_c::mTagData_p (symbols.txt .sbss 0x803F6B44): the dSalvage_control_c holding the salvage points
+    /// registered for the loaded sea (d_salvage.h). Entry i is at +4 + i * 0x38; offsets checked in main.dol's
+    /// getters (getRoomNo 0x800CCE28: lbz 0x30, getSaveNo lbz 0x31, getKind lbz 0x33, checkUsed / setFlag 0x35).
+    /// </summary>
+    public static class Salvage
+    {
+        public const uint TagDataPtr = 0x803F6B44;
+        public const int InfoBase = 0x04;
+        public const int InfoSize = 0x38;
+        public const int InfoCount = 160;        // MAX_TOTAL: 128 sea + 32 room
+        public const int OffRoomNo = 0x2C;       // s8 mRoomNo, -1 = not registered (checkRegist)
+        public const int OffSaveNo = 0x2D;       // u8 mSaveNo
+        public const int OffKind = 0x2F;         // u8 mKind
+        public const int OffFlag = 0x31;         // u8 mFlag
+        public const byte FlagDone = 0x01;       // set = not salvageable (checkUsed false; end_salvage sets it)
+    }
+
     public static class WorldFlags
     {
         /// <summary>dSv_save_c::mMemory[16] — saved flags per stage slot (gameInfo + 0x380).</summary>
@@ -389,6 +407,13 @@ public static class GameMemoryAddresses
         public const int OffVisitedRoom = 0x18; // u32[2]
         public const int OffKeyNum = 0x20;      // u8 mKeyNum — not a flag: derived from the flags (SmallKeyReconciler)
         public const int OffDungeonItem = 0x21; // u8
+
+        /// <summary>dSv_save_c /* 0x5C0 */ mOcean: dSv_ocean_c u16 field_0x0[50] (the salvage points emptied per sea square).</summary>
+        public const uint Ocean = GameInfo + 0x5C0;
+        public const int OceanLength = WWOnline.Shared.Models.StageFlags.OceanWords * 2;
+        /// <summary>dSv_player_map_c field_0x0[3] (onCompleteMap, d_save.cpp:882-885): the treasure charts salvaged.</summary>
+        public const uint SalvagedCharts = Inventory.SeaMapBase + 0x30;
+        public const int SalvagedChartsLength = WWOnline.Shared.Models.StageFlags.ChartWords * 4;
 
         public static uint SavedSlot(int slot) => SavedMemoryBase + (uint)(slot * MemorySize);
 
