@@ -39,6 +39,7 @@
 **See each other**
 - Other players appear as real Links: running, rolling, crouching, sword combos, shield, sheathing and the Master Sword glow.
 - They climb like you do: ledge grabs, hanging and shimmying, ladders and vine walls, sidling along walls, pushing and pulling blocks, and crawling.
+- Everything else Link does plays too: Z-target side hops and strafing, knock-backs, slides, swimming up, parries, ice slips, rope swings, boarding the boat, and poses like talking, opening chests and holding up items. Anything WW-Online has no special handling for is copied straight from their game (body, arms, face and hands).
 - Their equipment shows: sword, shield (including the Mirror Shield) and hero's clothes or pajamas.
 - They hold and use their items: bow (with aim), boomerang, hookshot, Deku Leaf, Skull Hammer, Wind Waker, bottles, telescope, Picto Box, Tingle Tuner, and a carried bomb with a burning fuse.
 - Each player picks their own tunic colour (black Link, purple Link, anything), and everyone sees it change live.
