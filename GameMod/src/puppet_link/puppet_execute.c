@@ -581,8 +581,10 @@ static int puppet_swordReady(daPy_lk_c *link)
 
 static int puppet_isSwordProc(int proc)
 {
-  return (proc >= 0x41 && proc <= 0x4A) || // CUT_A .. CUT_KESA
-         (proc >= 0x55 && proc <= 0x5C);   // CUT_TURN .. JUMP_CUT_LAND
+  // CUT_REVERSE 0x5A is left out: it also bounces the hammer, the Deku Leaf and a Boko weapon
+  // (changeCutReverseProc callers), its init needs no blade, and the held item follows the peer.
+  return (proc >= 0x41 && proc <= 0x4A) ||                   // CUT_A .. CUT_KESA
+         (proc >= 0x55 && proc <= 0x5C && proc != 0x5A);     // CUT_TURN .. JUMP_CUT_LAND
 }
 
 /**
@@ -595,7 +597,8 @@ static int puppet_isRestartableProc(int proc)
   return (proc >= 0x41 && proc <= 0x4A) ||                       // CUT_A .. CUT_KESA
          proc == 0x55 || proc == 0x56 || proc == 0x5B ||          // CUT_TURN, CUT_ROLL, JUMP_CUT
          proc == 0x1E || proc == 0x21 || proc == 0x22 ||          // FRONT_ROLL, SIDE_ROLL, BACK_JUMP
-         proc == 0x24 || proc == 0x66 ||                          // AUTO_JUMP, DAMAGE
+         proc == 0x24 || proc == 0x66 || proc == 0x67 ||          // AUTO_JUMP, DAMAGE, POLY_DAMAGE
+         proc == 0x0A || proc == 0x0B ||                          // SIDE_STEP, SIDE_STEP_LAND (hop after hop)
          proc == 0x0D || proc == 0x6D || proc == 0x65 ||          // CROUCH_DEFENSE_SLIP, GUARD_SLIP, GUARD_CRASH
          proc == 0x51 || proc == 0x92 || proc == 0xA5;            // HAMMER_SIDE_SWING, FAN_SWING, BOTTLE_SWING
 }
@@ -761,7 +764,8 @@ static int puppet_sideDir(int prevDir, f32 stickDistance, s16 stickAngle, s16 sh
  * the init (ladder/damage/cut/hang inits reposition or re-aim Link).
  *
  * @param param  extra per-proc data carried in bits 16-23 of the request key (HANG_MOVE,
- *               WHIDE_MOVE, WHIDE_PEEP: HANG_DIR_* in bits 0-3; WHIDE_WAIT..PEEP: +
+ *               WHIDE_MOVE, WHIDE_PEEP, and SIDE_STEP(_LAND) / BT_ROLL(_CUT) via
+ *               puppet_extraKey: HANG_DIR_* in bits 0-3; WHIDE_WAIT..PEEP: +
  *               PUPPET_PARAM_WHIDE_CROUCH); 0 otherwise.
  * @return nonzero if the puppet is now in the requested (or fallback) proc. Several
  *         _init functions return FALSE without changing proc (e.g. procWait_init,
@@ -803,6 +807,10 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
 
   // Item procs (puppet_held.c): real inits, or relabelled poses where the init is unsafe.
   ok = puppet_heldInitProc(puppet, proc);
+  // Z-target, side hops, slides, knock-backs, parries, rope, boarding, demo poses... the same way
+  // (puppet_procs_extra.c).
+  if (ok < 0)
+    ok = puppet_extraInitProc(puppet, proc, param);
 
   // Extra parameters: 0 / current facing = the common "no special setup" default.
   if (ok < 0)
@@ -950,9 +958,10 @@ static int puppet_applyProcInit(daPy_lk_c *puppet, int proc, int param)
   case 0x59: ok = daPy_lk_c__procCutTurnMove_init(puppet); break;
   case 0x5B: ok = daPy_lk_c__procJumpCut_init(puppet, 0); break;
   case 0x5C: ok = daPy_lk_c__procJumpCutLand_init(puppet); break;
-  // Not supported -> WAIT: 0x5A CUT_REVERSE (needs the daPy_ANM of the interrupted cut),
-  // 0x4B-0x50 Boko weapon (needs the weapon actor; the hammer 0x51-0x54 is in puppet_held.c),
-  // 0x5D-0x64 parry BT_* (need the target enemy actor).
+  // CUT_REVERSE 0x5A, the Boko weapon 0x4B-0x50 and the parries 0x5D-0x64 are in
+  // puppet_procs_extra.c (the hammer 0x51-0x54 is in puppet_held.c). Whatever neither file
+  // handles falls to default: e.g. BT_SLIDE 0x5F (no _init in the game), DEMO_TOOL 0xA9 (its anim
+  // comes from the cutscene data) and the other demo procs.
 
   // Damage
   case 0x66:           ok = daPy_lk_c__procDamage_init(puppet); break;
@@ -1230,6 +1239,12 @@ static int puppet_executeBody(daPy_lk_c *link)
   // Demo/dead/swim/damage proc changes, item actions and attack checks are skipped: proc
   // transitions come from the network.
 
+  // Except changeDamageProc's hit-flash countdown (d_a_player_main.cpp:5056-5058): the damage
+  // inits set mDamageWaitTimer (:7504 etc.) and puppet_draw tints the puppet red while it is
+  // > 0, so without this the puppet stays red forever after its first hit.
+  if ((DAPY_LK_MMODEFLG(link) & 0x8) == 0 && DAPY_PY_DAMAGE_WAIT_TIMER(link) > 0) // !ModeFlg_DAMAGE
+    DAPY_PY_DAMAGE_WAIT_TIMER(link)--;
+
   // Network-driven movement. PUPPET_class.slotIndex is the first field after the
   // embedded daPy_lk_c. sizeof(daPy_lk_c) here is the GCC size (0x4C30), which is
   // >= the real Metrowerks size (0x4C28), so the field never overlaps game data;
@@ -1307,6 +1322,11 @@ static int puppet_executeBody(daPy_lk_c *link)
       // (e.g. procCutA, d_a_player_sword.inc:591); setItemModel uses m35EC as the blade's
       // bck frame (mSwordAnim.entry, d_a_player_main.cpp:1211).
       PUPPET_DAPY_M35EC(link) = PUPPET_DAPY_UNDER0_FRAME(link);
+    }
+    else
+    {
+      // Z-target strafes, follow-up anims, knock-back tilt, root pinning (puppet_procs_extra.c).
+      puppet_extraStep(link, curProcNow);
     }
   }
 
@@ -1687,6 +1707,7 @@ static int puppet_executeBody(daPy_lk_c *link)
 
   // Held item's bck frame and the peer's aim angles (puppet_held.c), before the model calc.
   puppet_heldPose(link);
+  puppet_extraPose(link);
 
   // Neck and hat angles. Make the puppet look at the local PLAYER's face: setNeckAngle
   // targets mpAttnActorLockOn->eyePos, so point it at the player and temporarily raise the
@@ -2199,7 +2220,8 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
     puppet_setStickData(puppet, stick, targetStickAngle);
   }
   else if (targetProc == PROC_MOVE || targetProc == PROC_ATN_MOVE || targetProc == PROC_MOVE_TURN ||
-           targetProc == PROC_SWIM_MOVE || puppet_heldIsAtnMoveProc(targetProc))
+           targetProc == PROC_SWIM_MOVE || puppet_heldIsAtnMoveProc(targetProc) ||
+           puppet_extraIsAtnMoveProc(targetProc))
   {
     f32 stick = netStickDistance;
     if (!(stick > 0.05f))
@@ -2246,6 +2268,8 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
       if (wantProc >= PROC_WHIDE_WAIT && wantProc <= PROC_WHIDE_PEEP &&
           (*(volatile u32 *)(slotBase + PUPPET_SLOT_OFF_NO_RESET_FLG0) & DAPY_FLG0_WHIDE_CROUCH) != 0)
         key |= PUPPET_PARAM_WHIDE_CROUCH << 16;
+      // Side of a Z-target hop / parry roll, kept through its landing / cut.
+      key = puppet_extraKey(key, l_puppetFollowState, netStickDistance, targetStickAngle, targetRotY);
       puppet_requestProc(puppet, key, slotIndex);
     }
 
