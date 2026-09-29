@@ -27,4 +27,24 @@ public static class GameActions
         int pending = dolphin.Read(GameMemoryAddresses.Player.PendingRupeeDelta) ?? 0;
         return AddRupees(dolphin, target - (current + pending));
     }
+
+    /// <summary>
+    /// Set arrows to <paramref name="target"/> via dComIfGp_setItemArrowNumCount's pending count,
+    /// so d_meter updates the HUD counter (and clamps to the quiver's max) like a pickup does.
+    /// </summary>
+    public static bool SetArrows(IDolphinService dolphin, int target) =>
+        SetAmmo(dolphin, GameMemoryAddresses.Player.CurrentArrowCount, GameMemoryAddresses.Player.PendingArrowDelta, target);
+
+    /// <summary>Set bombs to <paramref name="target"/> via the HUD path (see <see cref="SetArrows"/>).</summary>
+    public static bool SetBombs(IDolphinService dolphin, int target) =>
+        SetAmmo(dolphin, GameMemoryAddresses.Player.CurrentBombCount, GameMemoryAddresses.Player.PendingBombDelta, target);
+
+    private static bool SetAmmo(IDolphinService dolphin, MemoryAddress<byte> count, MemoryAddress<short> pendingDelta, int target)
+    {
+        if (!dolphin.IsConnected) return false;
+        int current = dolphin.Read(count) ?? 0;
+        int pending = dolphin.Read(pendingDelta) ?? 0;
+        int delta = Math.Clamp(target, 0, 99) - (current + pending);
+        return delta == 0 || dolphin.Write(pendingDelta, (short)(pending + delta));
+    }
 }

@@ -32,6 +32,13 @@ public static class GameMemoryAddresses
         public static readonly MemoryAddress<ushort> CurrentOxygen = new(0x803C4C1E, "CurrentOxygen", "Current oxygen meter");
         public static readonly MemoryAddress<byte> CurrentArrowCount = new(0x803C4C71, "CurrentArrowCount", "Current arrow count");
         public static readonly MemoryAddress<byte> CurrentBombCount = new(0x803C4C72, "CurrentBombCount", "Current bomb count");
+        // play.mItemArrowNumCount / mItemBombNumCount (d_com_inf_game.h "/* 0x48E0 */ s16",
+        // "/* 0x48E4 */ s16"; gameInfo+0x5B80 / +0x5B84, the pending counts the puppet guard also
+        // saves). What dComIfGp_setItemArrowNumCount / setItemBombNumCount add to; d_meter applies
+        // them (clamped to the max) and updates the save value AND the HUD counter. Writing the
+        // save count directly leaves the HUD showing the old number until the next pickup.
+        public static readonly MemoryAddress<short> PendingArrowDelta = new(Play + 0x48E0, "PendingArrowDelta", "Arrow change queued for the HUD (dComIfGp_setItemArrowNumCount)");
+        public static readonly MemoryAddress<short> PendingBombDelta = new(Play + 0x48E4, "PendingBombDelta", "Bomb change queued for the HUD (dComIfGp_setItemBombNumCount)");
         
         // Equipment
         public static readonly MemoryAddress<byte> XButtonItem = new(0x803C4C11, "XButtonItem", "X button equipped item");

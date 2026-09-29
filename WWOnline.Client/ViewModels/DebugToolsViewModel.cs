@@ -390,19 +390,28 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
     private void SetMaxMagic() => WriteStatValue<byte>(EditMaxMagic, GameMemoryAddresses.Player.MaxMagicMeter, "max magic");
 
     [RelayCommand]
-    private void SetArrows()
-    {
-        var value = WriteStatValue<byte>(EditArrows, GameMemoryAddresses.Player.CurrentArrowCount, "arrows");
-        if (value.HasValue)
-            _dolphinService.Write(GameMemoryAddresses.Inventory.MaxArrows, value.Value);
-    }
+    private void SetArrows() => SetAmmo(EditArrows, GameMemoryAddresses.Inventory.MaxArrows, GameActions.SetArrows, "arrows");
 
     [RelayCommand]
-    private void SetBombs()
+    private void SetBombs() => SetAmmo(EditBombs, GameMemoryAddresses.Inventory.MaxBombs, GameActions.SetBombs, "bombs");
+
+    // The max first (d_meter clamps to it), then the count through the HUD's pending counter so
+    // the on-screen number updates — writing the save count directly left the HUD stale.
+    private void SetAmmo(string input, MemoryAddress<byte> max, Func<IDolphinService, int, bool> set, string label)
     {
-        var value = WriteStatValue<byte>(EditBombs, GameMemoryAddresses.Player.CurrentBombCount, "bombs");
-        if (value.HasValue)
-            _dolphinService.Write(GameMemoryAddresses.Inventory.MaxBombs, value.Value);
+        if (!_dolphinService.IsConnected) return;
+        if (!byte.TryParse(input, out var value) || value > 99)
+        {
+            StatusMessage = $"Invalid {label} value (0-99)";
+            return;
+        }
+        try
+        {
+            _dolphinService.Write(max, value);
+            set(_dolphinService, value);
+            StatusMessage = $"Set {label} to {value}";
+        }
+        catch (Exception ex) { StatusMessage = $"Failed to set {label}: {ex.Message}"; }
     }
 
     [RelayCommand]
@@ -421,10 +430,10 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
             GameActions.SetRupees(_dolphinService, 5000); // HUD path; game clamps to wallet size
             _dolphinService.Write(GameMemoryAddresses.Player.MaxMagicMeter, (byte)32);
             _dolphinService.Write(GameMemoryAddresses.Player.CurrentMagicMeter, (byte)32);
-            _dolphinService.Write(GameMemoryAddresses.Player.CurrentArrowCount, (byte)99);
-            _dolphinService.Write(GameMemoryAddresses.Player.CurrentBombCount, (byte)99);
             _dolphinService.Write(GameMemoryAddresses.Inventory.MaxArrows, (byte)99);
             _dolphinService.Write(GameMemoryAddresses.Inventory.MaxBombs, (byte)99);
+            GameActions.SetArrows(_dolphinService, 99); // HUD path, after the max
+            GameActions.SetBombs(_dolphinService, 99);
             _dolphinService.Write(GameMemoryAddresses.Player.CurrentWallet, (byte)2); // Biggest wallet
             StatusMessage = "Maxed all stats";
         }
