@@ -51,6 +51,11 @@ public partial class App : Application
         services.AddSingleton<StorySyncService>();
         services.AddSingleton<SmallKeyTableProvider>();
         services.AddSingleton<SharedSmallKeyService>();
+        services.AddSingleton<HeartTableProvider>();
+        services.AddSingleton<DerivedHeartsState>();
+        services.AddSingleton<IMaxHealthOwner>(sp => sp.GetRequiredService<DerivedHeartsState>());
+        services.AddSingleton<SharedHeartService>();
+        services.AddSingleton<IHeartsSource>(sp => sp.GetRequiredService<SharedHeartService>());
         services.AddSingleton<PlayerEventService>();
         services.AddSingleton<RoomSettingsService>();
         services.AddSingleton<WarpService>();
