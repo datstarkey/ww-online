@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace WWOnline.Shared.Models;
 
 /// <summary>
@@ -48,7 +50,8 @@ public sealed class SpoilsCounts : IBagCounts<SpoilsCounts>
     public bool IsValidDelta() =>
         WellFormed && Counts.Any(c => c != 0) && Counts.All(c => c >= -MaxCount && c <= MaxCount);
 
-    public bool IsEmpty => Counts.All(c => c == 0);
+    [JsonIgnore]
+    public bool IsEmpty => WellFormed && Counts.All(c => c == 0);
 
     public SpoilsCounts Clone() => new(Counts);
 

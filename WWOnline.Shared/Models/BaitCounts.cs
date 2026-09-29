@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace WWOnline.Shared.Models;
 
 /// <summary>
@@ -36,6 +38,7 @@ public sealed class BaitCounts : IBagCounts<BaitCounts>
     /// <summary>Bag slots these counts need: partial bait slots packed into full ones, one per pear.</summary>
     public static int SlotsNeeded(int bait, int pears) => (bait + UsesPerSlot - 1) / UsesPerSlot + pears;
 
+    [JsonIgnore]
     public bool FitsTheBag => SlotsNeeded(Bait, Pears) <= SlotCount;
 
     /// <summary>A room total (or a game's bag): in range and fits the 8 slots.</summary>
@@ -47,6 +50,7 @@ public sealed class BaitCounts : IBagCounts<BaitCounts>
         (Bait != 0 || Pears != 0) &&
         Bait >= -MaxBait && Bait <= MaxBait && Pears >= -MaxPears && Pears <= MaxPears;
 
+    [JsonIgnore]
     public bool IsEmpty => Bait == 0 && Pears == 0;
 
     public BaitCounts Clone() => new(Bait, Pears);
