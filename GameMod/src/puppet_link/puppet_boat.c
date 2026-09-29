@@ -190,7 +190,9 @@ static mDoExt_McaMorf *boat_createMorf(u32 bdl, u32 bck, u32 diffFlag)
 #define GRID_VTX                  85      /* 7 x 12 grid + the top vertex */
 #define GRID_COLS                 7
 /* daHo_packet_c (d_a_grid.h) */
-#define HO_OFF_SHAPE_PACKET_PTR   0x2C    /* J3DMatPacket::mpShapePacket (setShapePacket in the ctor) */
+/* J3DMatPacket::mpShapePacket. The decomp's J3DPacket.h offsets are 4 too high for TWW: the ctor
+ * (inlined in daGrid_c::_create, 800EAA98) stores it at +0x28 and entryZSort (802ECB18) reads +0x28. */
+#define HO_OFF_SHAPE_PACKET_PTR   0x28
 #define HO_OFF_SHAPE_PACKET       0x3C    /* mShapePacket */
 #define HO_OFF_MTX                0x80    /* mMtx: view * model */
 #define HO_OFF_TEVSTR             0xB0    /* mpTevStr */
