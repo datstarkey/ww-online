@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using WWOnline.Services;
@@ -8,6 +9,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
 {
     private readonly GameSettingsService _gameSettingsService;
     private readonly GamePatcherService _gamePatcherService;
+    private readonly ItemIconService _iconService;
 
     [ObservableProperty]
     private string _dolphinPath = "";
@@ -60,17 +62,60 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     public Func<Task<string?>>? BrowseForFolderAsync { get; set; }
     public Func<Task<string?>>? BrowseForVanillaFolderAsync { get; set; }
 
+    /// <summary>The game's item icons (Settings → Item icons shows a few and their status).</summary>
+    public ItemIcons Icons { get; }
+
+    /// <summary>Where the item icons stand ("116 item icons, read from your game files", or why not).</summary>
+    [ObservableProperty]
+    private string _iconStatusText = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ExtractIconsCommand))]
+    private bool _isExtractingIcons;
+
+    /// <summary>A few icons shown beside the status once they exist (empty until then).</summary>
+    public IReadOnlyList<IImage> IconPreview => PreviewItems
+        .Select(Icons.Get).OfType<IImage>().ToList();
+
+    // Telescope, Wind Waker, Hero's Bow, Hookshot, Compass, Boss Key
+    private static readonly byte[] PreviewItems = [0x20, 0x22, 0x27, 0x2F, 0x4D, 0x4E];
+
     public SettingsViewModel(GameSettingsService gameSettingsService, GamePatcherService gamePatcherService,
-        PatchOptionsViewModel patchOptions, UpdateViewModel updates)
+        PatchOptionsViewModel patchOptions, UpdateViewModel updates, ItemIconService iconService, ItemIcons icons)
     {
         _gameSettingsService = gameSettingsService;
         _gamePatcherService = gamePatcherService;
+        _iconService = iconService;
         PatchOptions = patchOptions;
         Updates = updates;
+        Icons = icons;
 
         ReloadFromSettings();
         _gamePatcherService.IsPatchingChanged += OnPatcherBusyChanged;
+        _iconService.Changed += OnIconServiceChanged;
+        Icons.Refreshed += OnIconsRefreshed;
+        OnIconServiceChanged();
     }
+
+    private void OnIconServiceChanged() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    {
+        IconStatusText = _iconService.IsExtracting ? "Reading the item icons from your game files..." : _iconService.StatusText;
+        IsExtractingIcons = _iconService.IsExtracting;
+    });
+
+    private void OnIconsRefreshed() => OnPropertyChanged(nameof(IconPreview));
+
+    /// <summary>Read the icons again from the vanilla game folder (else the patched one) in Settings.</summary>
+    [RelayCommand(CanExecute = nameof(CanExtractIcons))]
+    private async Task ExtractIcons()
+    {
+        // The folders on screen, saved or not: vanilla first, as at startup.
+        string? folder = new[] { VanillaGamePath, GamePath }
+            .FirstOrDefault(f => Patcher.Icons.ItemIconExtractor.FindArchive(f) != null);
+        await _iconService.ExtractAsync(folder);
+    }
+
+    private bool CanExtractIcons() => !IsExtractingIcons;
 
     /// <summary>Show the saved paths again (after the setup wizard changed them).</summary>
     public void ReloadFromSettings()
@@ -197,5 +242,10 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         SettingsSaved?.Invoke();
     }
 
-    public void Dispose() => _gamePatcherService.IsPatchingChanged -= OnPatcherBusyChanged;
+    public void Dispose()
+    {
+        _gamePatcherService.IsPatchingChanged -= OnPatcherBusyChanged;
+        _iconService.Changed -= OnIconServiceChanged;
+        Icons.Refreshed -= OnIconsRefreshed;
+    }
 }

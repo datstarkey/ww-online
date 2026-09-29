@@ -19,6 +19,11 @@ bi2.bin
 # Built at patch time from the player's own stage data (Nintendo-derived)
 wwo-switch-table.json
 
+# Item icons decoded from the player's game files (the client's cache is outside the repo; this
+# catches a copy, and the extractor's GameIcons.new-* / GameIcons.old-* folders).
+# scripts/check-no-nintendo-files.ps1 rejects them too.
+GameIcons*/
+
 # Per-user IDE state
 *.DotSettings.user
 .idea/

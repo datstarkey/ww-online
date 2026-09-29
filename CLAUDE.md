@@ -10,6 +10,7 @@ It has two halves: C# apps (client, relay server, patcher) and the game-side mod
 - **`GameMod/src/puppet_link/puppet_shared.h` is the only place emulator scratch/sync addresses live.** Never hardcode a `0x803F....` address in `.c` or `.cs`.
 - **Game addresses in C# are `GameInfo`/`Play` base + the decomp's offset,** with the tww-decomp field in a comment (`GameMemoryAddresses`). `tww-decomp/` is the authority for offsets and behaviour.
 - **Never commit Nintendo files** (`main.dol`, `RELS.arc`, `bi2.bin`) or build output. They are gitignored.
+- **Item icons come from the player's own game, never the repo.** `ItemIconService` decodes `files/res/Msg/itemicon.arc` (BTI → PNG, `WWOnline.Patcher/Icons`, `BinaryFormats/Bti`) into `AppPaths.IconCacheDirectory` (`%LocalAppData%\WWOnline\GameIcons`, or under `WWO_SETTINGS_DIR`): at startup and after a successful patch when missing or out of date, and on demand from Settings → Item icons. A named mutex per folder serialises extraction across clients. Views bind `ItemIcons` and fall back to their placeholders while it's null. Never download icon rips or put icons in the repo, PatchData or a release: the guard rejects `GameIcons/` folders and our marked PNGs. The item → texture table is `ItemIconCatalog` (from tww-decomp `dItem_data::item_resource`).
 - Edit files in place. Never create `_fixed` / `_v2` copies.
 - C/ASM rules for the injected code are in `GameMod/CLAUDE.md`. Read it before touching `GameMod/`.
 

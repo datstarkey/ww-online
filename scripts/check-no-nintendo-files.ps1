@@ -7,6 +7,11 @@
     This guard checks file NAMES, EXTENSIONS and a few file-format MAGIC numbers (RARC archives,
     Yaz0-compressed data, J3D models, GameCube disc headers), so a renamed file is caught too.
 
+    It also catches the client's item icons, which are decoded from the player's own game files
+    into a local cache (ItemIconService): any path through a folder named like the cache
+    ($ForbiddenFolders), and any PNG carrying the extractor's marker chunk (PngWriter.GameAssetKeyword,
+    written right after IHDR), whatever it is called.
+
     The one exception is our own compiled puppet REL (GameMod/src/puppet_link -> d_a_puppet.rel),
     which ships inside PatchData/. It is allowed only at the exact paths in $AllowedPaths below and
     only if its header carries our module id (0x58).
@@ -47,6 +52,11 @@ $ForbiddenNames = @(
     'wwo-switch-table.json'   # built at patch time from the player's own stage data
 )
 
+# Folder names that only ever hold game-derived files: the icon cache (AppPaths.IconCacheFolderName)
+# and the extractor's GameIcons.new-* / GameIcons.old-* folders. -like patterns, matched
+# case-insensitively against every folder in a path (and a folder passed to -Path itself).
+$ForbiddenFolders = @('gameicons*')
+
 # Our own compiled REL, and only at these exact relative paths ('/'-separated, case-sensitive):
 #   PatchData/d_a_puppet.rel           client build/publish output
 #   lib/app/PatchData/d_a_puppet.rel   inside a Velopack .nupkg
@@ -64,9 +74,13 @@ $Magics = @(
     @{ Name = 'Yaz0-compressed data'; Offset = 0;    Bytes = [byte[]](0x59, 0x61, 0x7A, 0x30) },   # 'Yaz0'
     @{ Name = 'J3D model/animation';  Offset = 0;    Bytes = [byte[]](0x4A, 0x33, 0x44) },         # 'J3D' (bmd/bdl/bck...)
     @{ Name = 'BMG message text';     Offset = 0;    Bytes = [byte[]](0x4D, 0x45, 0x53, 0x47, 0x62, 0x6D, 0x67) },  # 'MESGbmg'
-    @{ Name = 'GameCube disc image';  Offset = 0x1C; Bytes = [byte[]](0xC2, 0x33, 0x9F, 0x3D) }    # GC disc magic
+    @{ Name = 'GameCube disc image';  Offset = 0x1C; Bytes = [byte[]](0xC2, 0x33, 0x9F, 0x3D) },   # GC disc magic
+    # PNG decoded from the game by WW-Online's icon extractor: 'tEXt' + 'WWOnline-GameAsset' right after IHDR
+    # (PngWriter.MarkerOffset = 37). The PNG signature itself is checked too, so only our marked PNGs match.
+    @{ Name = 'game image extracted by WW-Online (PNG marker)'; Offset = 0; Bytes = [byte[]](
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A) + (,0) * 29 + [byte[]][System.Text.Encoding]::ASCII.GetBytes('tEXtWWOnline-GameAsset'); Wildcard = 8..36 }
 )
-$HeaderLength = 0x20
+$HeaderLength = 0x40
 
 $violations = New-Object System.Collections.Generic.List[string]
 $checked = 0
@@ -75,8 +89,10 @@ function Test-Header([byte[]] $header, [string] $display) {
     foreach ($m in $Magics) {
         $end = $m.Offset + $m.Bytes.Length
         if ($header.Length -lt $end) { continue }
+        $skip = if ($m.ContainsKey('Wildcard')) { $m.Wildcard } else { @() }
         $match = $true
         for ($i = 0; $i -lt $m.Bytes.Length; $i++) {
+            if ($skip -contains $i) { continue }   # bytes that vary (the PNG's IHDR chunk)
             if ($header[$m.Offset + $i] -ne $m.Bytes[$i]) { $match = $false; break }
         }
         if ($match) { $violations.Add("${display}: looks like a $($m.Name) (file magic)") }
@@ -93,6 +109,13 @@ function Read-Header([System.IO.Stream] $stream) {
     }
     if ($read -lt $HeaderLength) { return $buffer[0..([Math]::Max(0, $read - 1))] }
     return $buffer
+}
+
+function Test-ForbiddenFolder([string] $folder) {
+    foreach ($pattern in $ForbiddenFolders) {
+        if ($folder.ToLowerInvariant() -like $pattern) { return $true }
+    }
+    return $false
 }
 
 # $relative: '/'-separated path used for the allow-list; $display: what to print.
@@ -112,6 +135,14 @@ function Test-Entry([string] $relative, [string] $display, [byte[]] $header) {
             $violations.Add($message)
         }
         return
+    }
+
+    $folders = @($relative.Split('/') | Select-Object -SkipLast 1)
+    foreach ($folder in $folders) {
+        if (Test-ForbiddenFolder $folder) {
+            $violations.Add("${display}: inside a '$folder' folder (item icons decoded from the game)")
+            break
+        }
     }
 
     if ($ForbiddenNames -contains $name.ToLowerInvariant()) {
@@ -173,6 +204,11 @@ if ($Path.Count -eq 0) {
 else {
     foreach ($p in $Path) {
         $item = Get-Item -LiteralPath $p
+        # A cache folder passed directly (or a file inside one): its own name isn't in the relative paths.
+        $container = if ($item.PSIsContainer) { $item } else { $item.Directory }
+        if ($null -ne $container -and (Test-ForbiddenFolder $container.Name)) {
+            $violations.Add("$($container.FullName): a '$($container.Name)' folder (item icons decoded from the game)")
+        }
         if ($item.PSIsContainer) {
             $base = $item.FullName.TrimEnd('\', '/')
             foreach ($f in Get-ChildItem -LiteralPath $base -Recurse -File -Force) {

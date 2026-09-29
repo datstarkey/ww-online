@@ -12,6 +12,9 @@ public class Yaz0Codec
     public const int MaxRunLength = 0xFF + 0x12; // 273
     public const int DefaultSearchDepth = 0x1000;
 
+    /// <summary>Largest decompressed size <see cref="Decompress"/> accepts (64 MB).</summary>
+    public const int MaxDecompressedSize = 64 * 1024 * 1024;
+
     private static readonly byte[] Yaz0Magic = "Yaz0"u8.ToArray();
 
     // Lookahead state for compression (reset each call to Compress).
@@ -47,8 +50,15 @@ public class Yaz0Codec
     {
         if (!CheckIsCompressed(compData))
             return compData;
+        if (compData.Length < 0x10)
+            throw new InvalidDataException("Yaz0: data is shorter than its 0x10-byte header");
 
-        int uncompSize = (int)Math.Min(BinaryPrimitives.ReadUInt32BigEndian(compData.AsSpan(4, 4)), (uint)Math.Max(maxLength, 0));
+        // The header's size decides the allocation: refuse a corrupt one before allocating it. Nothing
+        // on the disc comes close (the whole GameCube has 24 MB of main RAM).
+        uint declaredSize = BinaryPrimitives.ReadUInt32BigEndian(compData.AsSpan(4, 4));
+        if (declaredSize > MaxDecompressedSize)
+            throw new InvalidDataException($"Yaz0: declared size {declaredSize} bytes is over the {MaxDecompressedSize}-byte limit");
+        int uncompSize = (int)Math.Min(declaredSize, (uint)Math.Max(maxLength, 0));
 
         var output = new byte[uncompSize];
         int outputLen = 0;

@@ -88,6 +88,17 @@ public class RarcArchive
         Unknown2 = BigEndianIO.ReadU8(data, dh + 0x1B);
         Unknown3 = BigEndianIO.ReadU32(data, dh + 0x1C);
 
+        // Counts come from the file: bound them by the data before sizing anything from them, so a
+        // corrupt archive fails fast instead of allocating gigabytes.
+        if (NumNodes > (uint)data.Length / RarcNode.ENTRY_SIZE
+            || NodeListOffset < 0 || NodeListOffset > data.Length - (long)NumNodes * RarcNode.ENTRY_SIZE)
+            throw new InvalidDataException($"RARC: {NumNodes} nodes don't fit in {data.Length} bytes");
+        if (TotalNumFileEntries > (uint)data.Length / RarcFileEntry.ENTRY_SIZE
+            || FileEntriesListOffset < 0 || FileEntriesListOffset > data.Length - (long)TotalNumFileEntries * RarcFileEntry.ENTRY_SIZE)
+            throw new InvalidDataException($"RARC: {TotalNumFileEntries} file entries don't fit in {data.Length} bytes");
+        if (StringListOffset < 0 || StringListOffset > data.Length || FileDataListOffset < 0 || FileDataListOffset > data.Length)
+            throw new InvalidDataException("RARC: string table or file data offset is outside the file");
+
         // --- Read nodes ---
         Nodes = new List<RarcNode>((int)NumNodes);
         for (int i = 0; i < (int)NumNodes; i++)

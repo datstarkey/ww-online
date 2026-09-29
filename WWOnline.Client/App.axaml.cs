@@ -55,6 +55,9 @@ public partial class App : Application
         services.AddSingleton<OptionalPatchCatalogService>();
         services.AddSingleton<GamePatcherService>();
         services.AddSingleton<GameLaunchService>();
+        // Item icons decoded from the player's own game files into a local cache (never shipped).
+        services.AddSingleton(sp => new ItemIconService(
+            sp.GetRequiredService<GameSettingsService>(), sp.GetRequiredService<GamePatcherService>()));
         services.AddSingleton(UpdateServiceOptions.FromEnvironment());
         services.AddSingleton<IAppUpdater, VelopackAppUpdater>();
         services.AddSingleton<UpdateService>();
@@ -73,11 +76,15 @@ public partial class App : Application
         services.AddSingleton<AppearanceViewModel>();
         services.AddSingleton<UpdateViewModel>();
         services.AddSingleton<SetupWizardViewModel>();
+        services.AddSingleton(sp => new ItemIcons(sp.GetRequiredService<ItemIconService>()));
 
         _serviceProvider = services.BuildServiceProvider();
 
         // Background update checks (a no-op for dev builds that Velopack didn't install).
         _serviceProvider.GetRequiredService<UpdateService>().Start();
+
+        // Item icons: read them from the game folders in Settings if the cache has none yet (never throws).
+        _ = _serviceProvider.GetRequiredService<ItemIconService>().EnsureExtractedAsync();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -241,6 +248,8 @@ public partial class App : Application
             _serviceProvider.GetRequiredService<SetupWizardViewModel>().Dispose();
             _serviceProvider.GetRequiredService<SettingsViewModel>().Dispose();
             _serviceProvider.GetRequiredService<GameLaunchService>().Dispose();
+            _serviceProvider.GetRequiredService<ItemIcons>().Dispose();
+            _serviceProvider.GetRequiredService<ItemIconService>().Dispose();
 
             // Stops the hosted server process if this client was hosting.
             _serviceProvider.GetRequiredService<ServerViewModel>().Dispose();

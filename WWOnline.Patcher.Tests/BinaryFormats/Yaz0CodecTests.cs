@@ -35,6 +35,19 @@ public class Yaz0CodecTests
     }
 
     [Fact]
+    public void Decompress_RefusesAnAbsurdDeclaredSize_BeforeAllocating()
+    {
+        var data = new byte[0x20];
+        "Yaz0"u8.CopyTo(data);
+        data[4] = 0xFF; data[5] = 0xFF; data[6] = 0xFF; data[7] = 0xFF; // 4 GB
+        Assert.Throws<InvalidDataException>(() => Yaz0Codec.Decompress(data));
+    }
+
+    [Fact]
+    public void Decompress_RefusesATruncatedHeader() =>
+        Assert.Throws<InvalidDataException>(() => Yaz0Codec.Decompress(new byte[] { 0x59, 0x61, 0x7A, 0x30, 0, 0, 0, 0x10 }));
+
+    [Fact]
     public void CompressDecompress_RoundTrip()
     {
         // Create some test data with repetition (good for compression)
