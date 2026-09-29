@@ -49,8 +49,17 @@ public class PuppetData
     {
         if (Position == null) return false;
         if (Boat != null && !Boat.IsValid()) return false;
-        if (Equipment != null && Equipment.GrabKind > EquipmentState.MaxGrabKind) return false;
         return Position.IsFinite() && float.IsFinite(Rotation);
+    }
+
+    /// <summary>
+    /// Drop values this build doesn't know rather than the whole update: a grab kind from a newer
+    /// client (say a pot) becomes "nothing drawn", so its puppet keeps moving.
+    /// </summary>
+    public void ClampUnknownValues()
+    {
+        if (Equipment != null && Equipment.GrabKind > EquipmentState.MaxGrabKind)
+            Equipment.GrabKind = 0;
     }
 }
 

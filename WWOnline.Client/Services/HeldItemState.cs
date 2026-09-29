@@ -42,7 +42,7 @@ public static class HeldItemState
             : (byte)PuppetLayout.PUPPET_GRAB_KIND_NONE;
     }
 
-    /// <summary>Only grab kinds the REL knows reach the slot (the server also rejects others).</summary>
+    /// <summary>Only grab kinds the REL knows reach the slot (the server clamps others to 0 too).</summary>
     public static byte SanitizeGrabKind(byte kind) =>
         kind <= PuppetLayout.PUPPET_GRAB_KIND_MAX ? kind : (byte)PuppetLayout.PUPPET_GRAB_KIND_NONE;
 }

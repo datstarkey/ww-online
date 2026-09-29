@@ -45,6 +45,7 @@
 #define ITEM_EMPTY_BOTTLE     0x50
 #define ITEM_WATER_BOTTLE     0x56
 #define ITEM_FOREST_WATER     0x59  // last bottle
+#define DAPY_ITEM_SHIP_TACT   0x10A // daPyItem_UNK10A_e: the Wind Waker while conducting on the ship (d_a_player_main.h:941)
 
 // m3562 while a take-out anim runs toward an item this file builds itself (see top).
 #define PUPPET_HELD_PENDING_TAG  0x1000
@@ -295,9 +296,45 @@ static u32 held_slotBase(daPy_lk_c *puppet)
 /**
  * held_make - put `item` in the puppet's hand now (DAPY_ITEM_NONE: empty it). Never makes an actor.
  */
+static void *held_getRes(u32 index);
+
+// setPhotoBoxModel hides / shows the flash (CAMERA_JNT_FRASH_e, Link.h) on the SHARED camera model
+// data for the regular / Deluxe Picto Box (d_a_player_main.cpp:3747-3756). J3DShpFlag_Hide is read at
+// entry, so the puppet sets it only around its own entry (puppet_heldFlashBegin) and never leaves
+// its choice on the local Link's camera.
+#define HELD_RES_BDL_CAMERA  0x17  // dRes_INDEX_LINK_BDL_CAMERA_e (GZLE01 Link.h)
+#define HELD_CAMERA_JNT_FRASH 0x02 // CAMERA_JNT_FRASH_e
+
+static J3DShape *held_flashShape(J3DModelData *camera)
+{
+  return J3DMaterial__getShape(J3DJoint__getMesh(J3DModelData__getJointNodePointer(camera, HELD_CAMERA_JNT_FRASH)));
+}
+
+J3DShape *puppet_heldFlashBegin(daPy_lk_c *who, u32 *saved)
+{
+  u16 item = PUPPET_DAPY_MEQUIPITEM(who);
+  J3DModel *model = DAPY_LK_MPHELDITEMMODEL(who);
+  J3DShape *flash;
+
+  if ((item != ITEM_PICTO_BOX && item != ITEM_DELUXE_PICTO_BOX) || model == NULL)
+    return NULL;
+  flash = held_flashShape(J3DMODEL_MPMODELDATA(model));
+  if (flash == NULL)
+    return NULL;
+  *saved = J3DSHAPE_MVISFLAGS(flash);
+  if (item == ITEM_PICTO_BOX)
+    J3DShape__hide(flash);
+  else
+    J3DShape__show(flash);
+  return flash;
+}
+
 static void held_make(daPy_lk_c *puppet, u16 item)
 {
   int fam = held_family(item);
+  J3DModelData *camera = NULL;
+  J3DShape *flash = NULL;
+  u32 flashFlags = 0;
 
   // deleteEquipItem resets a boomerang anim when it deletes a boomerang (d_a_player_main.cpp:3599); the peer's hand
   // empties mid-BOOMTHROW (throwBoomerang, d_a_player_boomerang.inc:34), so keep the throw playing.
@@ -317,7 +354,18 @@ static void held_make(daPy_lk_c *puppet, u16 item)
   if (fam == HELD_FAM_HOOKSHOT)
     daPy_lk_c__setHookshotModel(puppet); // makeItemType's hookshot branch minus the actor (:3685-3688)
   else if (fam != HELD_FAM_BOOMERANG)
+  {
+    if (item == ITEM_PICTO_BOX || item == ITEM_DELUXE_PICTO_BOX)
+    {
+      camera = (J3DModelData *)held_getRes(HELD_RES_BDL_CAMERA);
+      flash = camera != NULL ? held_flashShape(camera) : NULL;
+      if (flash != NULL)
+        flashFlags = J3DSHAPE_MVISFLAGS(flash);
+    }
     daPy_lk_c__makeItemType(puppet); // model-only branches (:3704-3729); the Wind Waker's resets mEquipItem itself
+    if (flash != NULL)
+      J3DSHAPE_MVISFLAGS(flash) = flashFlags; // the local Link's camera keeps its flash
+  }
 }
 
 // ============================================================================
@@ -582,7 +630,9 @@ void puppet_heldEntryItemAnms(daPy_lk_c *who, J3DModelData *heldData, J3DModelDa
   {
     if (btk != NULL) // bottle glass
       J3DMaterialTable__entryTexMtxAnimator((J3DMaterialTable *)J3DMODELDATA_MMATERIALTABLE(heldData), btk);
-    if (brk != NULL && PUPPET_DAPY_MEQUIPITEM(who) == ITEM_WIND_WAKER) // baton glow
+    // Baton glow. On the ship the conducting Link holds the same TAKT model as daPyItem_UNK10A
+    // (changeDemoProc, d_a_player_main.cpp:5381-5387).
+    if (brk != NULL && (PUPPET_DAPY_MEQUIPITEM(who) == ITEM_WIND_WAKER || PUPPET_DAPY_MEQUIPITEM(who) == DAPY_ITEM_SHIP_TACT))
       J3DMaterialTable__entryTevRegAnimator((J3DMaterialTable *)J3DMODELDATA_MMATERIALTABLE(heldData), brk);
   }
   if (contentsData != NULL && contents != NULL && brk != NULL && J3DMODEL_MPMODELDATA(contents) == contentsData)

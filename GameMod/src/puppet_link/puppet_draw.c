@@ -860,9 +860,14 @@ static int puppet_drawBody(daPy_lk_c *link, u32 slotIndex, PuppetDrawPackets *pa
               J3DShape__hide(bladeShape);
           }
         }
+        // Picto Box flash shape: this puppet's regular / Deluxe choice, entry only (puppet_held.c).
+        u32 savedFlashFlags = 0;
+        J3DShape *flashShape = puppet_heldFlashBegin(link, &savedFlashFlags);
         daPy_lk_c__entryDLSetLight(link, mpHeldItemModel, frozenFlag);
         if (bladeShape != NULL)
           J3DSHAPE_MVISFLAGS(bladeShape) = savedBladeFlags;
+        if (flashShape != NULL)
+          J3DSHAPE_MVISFLAGS(flashShape) = savedFlashFlags;
 
         // Sword glow (vanilla :1987-1989: chance mode || soup || checkFinalMasterSwordEquip;
         // the puppet uses the peer's sword byte). updateDLSetLight calcs the glow model, whose

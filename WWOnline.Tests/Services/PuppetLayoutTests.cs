@@ -212,7 +212,7 @@ public class PuppetLayoutTests
     [Fact]
     public void GrabKinds_MatchTheSharedModel()
     {
-        // The server validates PuppetData against EquipmentState.MaxGrabKind (WWOnline.Shared can't see PuppetLayout).
+        // The server clamps PuppetData grab kinds above EquipmentState.MaxGrabKind to 0 (WWOnline.Shared can't see PuppetLayout).
         Assert.Equal(PuppetLayout.PUPPET_GRAB_KIND_MAX, (int)EquipmentState.MaxGrabKind);
         Assert.Equal(0, PuppetLayout.PUPPET_GRAB_KIND_NONE);
         Assert.InRange(PuppetLayout.PUPPET_GRAB_KIND_BOMB, 1, PuppetLayout.PUPPET_GRAB_KIND_MAX);

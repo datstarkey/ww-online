@@ -159,14 +159,14 @@ Code: `GameMod/src/puppet_link/puppet_held.c` (REL), called from `puppet_execute
 
 ### Protocol and layout
 - Slot `0x48 → 0x50` (3 slots now end exactly at `PUPPET_PROC_IDS_ADDR`): `BODY_ANGLE_X` s16 `+0x48`, `BODY_ANGLE_Y` s16 `+0x4A` (`mBodyAngle`, Link `+0x2B4`), `GRAB_KIND` u8 `+0x4C` (`PUPPET_GRAB_KIND_NONE/BOMB`: `mActorKeepGrab.mActor`'s `mProcName == fpcNm_BOMB_e`). Needs a re-patch (build stamp).
-- `PuppetData`: `Action.BodyAngleX/Y`, `Equipment.GrabKind` (the server rejects `GrabKind > EquipmentState.MaxGrabKind`), `Animation.UpperBodyAnimation` now set. JSON-additive, so `HubConstants.ProtocolVersion` is unchanged: an older peer just shows no aim, no carried bomb and instant item swaps.
+- `PuppetData`: `Action.BodyAngleX/Y`, `Equipment.GrabKind` (the server clamps a kind above `EquipmentState.MaxGrabKind` to 0 instead of dropping the update, so a newer client's puppet keeps moving), `Animation.UpperBodyAnimation` now set. `HubConstants.ProtocolVersion` 1 → 2: an old server would silently strip the new fields.
 - `ItemInHand` is `m3562` during REST **and** TAKE/TAKEBOTH/TAKEL/TAKER, so both Links start the same anim together.
 
 ### Stage 0: held models
 `puppet_heldMirror` (replaces the sword-only mirror). Items: bow (3 ids, one model), telescope, Picto Box (both), Tingle Tuner, Deku Leaf, Wind Waker, Skull Hammer, bottles `0x50-0x59` (liquid/fairy/firefly + cap via `setBottleModel`; Forest Water shown as water, no emitter), hookshot (body only: `setHookshotModel` without the actor), boomerang (REL-drawn). Built in the puppet's own item heaps.
 - The peer in a draw/put-away anim → the same vanilla anim (`setAnimeUnequipItem` / `setAnimeUnequip`), with `m3562 = 0x1000 | item`: `checkItemAction`'s swap then hands `makeItemType` a value it ignores, and `puppet_heldFinishSwap` builds the item (never an actor). Otherwise (a throw, an item proc ending, an old client) the change is instant.
 - The sword keeps its REST draw/sheathe.
-- Shared model data: bottle btk/brk and the Wind Waker brk are re-registered around each puppet's entry and put back for the local Link (`puppet_heldEntryItemAnms`), so no Link draws with another's (possibly freed) anm.
+- Shared model data: bottle btk/brk and the Wind Waker brk are re-registered around each puppet's entry and put back for the local Link (`puppet_heldEntryItemAnms`; the local Link's baton is also `daPyItem_UNK10A` while conducting on the ship), so no Link draws with another's (possibly freed) anm. The Picto Box flash shape (hidden for the regular box, shown for the Deluxe) is set only around each puppet's entry, and `setPhotoBoxModel`'s change is undone right after the build.
 
 ### Stage 1: use poses
 - Real `_init`s (safe: anims, mode flags, guarded status/magic, AT bits cleared): BOOMERANG_SUBJECT/MOVE/CATCH, HOOKSHOT_SUBJECT, BOW_SUBJECT/MOVE (only once `setBowModel` has built `mSwordAnim`), FAN_SWING, FAN_GLIDE, the four hammer procs (only once `setHammerModel` has). Each item proc first puts its item in hand (`puppet_heldForProc`).
@@ -179,7 +179,7 @@ Code: `GameMod/src/puppet_link/puppet_held.c` (REL), called from `puppet_execute
 - Global guard: pending arrow (`+0x5B80`) and bomb (`+0x5B84`) counts added (no puppet path should reach them).
 
 ### Size
-REL 38,028 → 44,432 bytes (+6,404; `.text` +4.8 KB, `.rodata` +0.6 KB, ~120 relocations). RELS.arc growth ≈ 53.8 KB of the 64 KB guard.
+Measured on origin/main 0f6baa1: REL 40,904 → 47,308 bytes (+6,404; `.text` +4.8 KB, `.rodata` +0.6 KB, ~120 relocations), RELS.arc growth 58,304 of the 65,536-byte guard. The review fixes (ship baton, Picto flash) add 372 bytes (REL 47,680), so about 58.7 KB with ~6.9 KB left. The boat cannon/crane PR adds ~2.6 KB more, so stage 2 needs space reclaimed first.
 
 ### Verify in game
 1. Take out / put away each item on one Link; the other shows the same model and anim at the same time; swap item → item and sword ↔ item.

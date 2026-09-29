@@ -70,14 +70,19 @@ public class HeldItemStateTests
     }
 
     [Fact]
-    public void UnknownGrabKinds_AreDroppedAndRejected()
+    public void UnknownGrabKinds_AreClampedToNothing_NotRejected()
     {
         Assert.Equal((byte)PuppetLayout.PUPPET_GRAB_KIND_BOMB, HeldItemState.SanitizeGrabKind((byte)PuppetLayout.PUPPET_GRAB_KIND_BOMB));
         Assert.Equal((byte)PuppetLayout.PUPPET_GRAB_KIND_NONE, HeldItemState.SanitizeGrabKind(200));
 
-        var puppet = new PuppetData { Equipment = new EquipmentState { GrabKind = EquipmentState.MaxGrabKind } };
+        // A newer client's kind (e.g. a pot) keeps the update: only the kind is dropped.
+        var puppet = new PuppetData { Equipment = new EquipmentState { GrabKind = (byte)(EquipmentState.MaxGrabKind + 1) } };
         Assert.True(puppet.IsValid());
-        puppet.Equipment.GrabKind = (byte)(EquipmentState.MaxGrabKind + 1);
-        Assert.False(puppet.IsValid());
+        puppet.ClampUnknownValues();
+        Assert.Equal((byte)PuppetLayout.PUPPET_GRAB_KIND_NONE, puppet.Equipment.GrabKind);
+
+        puppet.Equipment.GrabKind = EquipmentState.MaxGrabKind;
+        puppet.ClampUnknownValues();
+        Assert.Equal(EquipmentState.MaxGrabKind, puppet.Equipment.GrabKind);
     }
 }
