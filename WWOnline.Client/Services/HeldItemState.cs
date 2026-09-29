@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using WWOnline.Data;
 
 namespace WWOnline.Services;
@@ -36,10 +37,18 @@ public static class HeldItemState
         uint actor = (uint)(p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]);
         if (actor < 0x80000000 || actor >= PuppetNameTags.Mem1End || actor % 4 != 0)
             return PuppetLayout.PUPPET_GRAB_KIND_NONE;
-        byte[]? name = dolphin.ReadMemory(actor + PuppetLayout.FPC_OFF_PROC_NAME, 2);
-        return name is { Length: 2 } && (name[0] << 8 | name[1]) == PuppetLayout.FPC_NAME_BOMB
+        // A bag bomb (daBomb_c) or a Bomb Flower's (daBomb2::Act_c): the puppet draws either as a bomb.
+        return GrabbedBombName(dolphin, actor) != 0
             ? (byte)PuppetLayout.PUPPET_GRAB_KIND_BOMB
             : (byte)PuppetLayout.PUPPET_GRAB_KIND_NONE;
+    }
+
+    /// <summary>The actor's proc name if it is a bomb of either kind, else 0.</summary>
+    private static int GrabbedBombName(IDolphinService dolphin, uint actor)
+    {
+        byte[]? name = dolphin.ReadMemory(actor + PuppetLayout.FPC_OFF_PROC_NAME, 2);
+        int proc = name is { Length: 2 } ? name[0] << 8 | name[1] : 0;
+        return proc is PuppetLayout.FPC_NAME_BOMB or PuppetLayout.FPC_NAME_BOMB2 ? proc : 0;
     }
 
     /// <summary>
@@ -55,6 +64,16 @@ public static class HeldItemState
         if (p is not { Length: 4 })
             return 0;
         uint actor = (uint)(p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]);
+        if (GrabbedBombName(dolphin, actor) == PuppetLayout.FPC_NAME_BOMB2)
+        {
+            // daBomb2::Act_c::mBombTimer (s32 frames); 0 once exploding.
+            byte[]? state = dolphin.ReadMemory(actor + PuppetLayout.DABOMB2_OFF_STATE, 4);
+            byte[]? timer = dolphin.ReadMemory(actor + PuppetLayout.DABOMB2_OFF_TIMER, 4);
+            if (state is not { Length: 4 } || timer is not { Length: 4 } ||
+                BinaryPrimitives.ReadInt32BigEndian(state) == PuppetLayout.DABOMB2_STATE_EXPLODE)
+                return 0;
+            return FuseByte((short)Math.Clamp(BinaryPrimitives.ReadInt32BigEndian(timer), 0, short.MaxValue));
+        }
         byte[]? rest = dolphin.ReadMemory(actor + PuppetLayout.DABOMB_OFF_REST_TIME, 2);
         if (rest is not { Length: 2 })
             return 0;

@@ -555,6 +555,13 @@ public static class PuppetLayout
     public const int FPC_NAME_BOMB = 0x128;
     /// <summary>s16 — daBomb_c::mRestTime, the fuse (d_a_bomb.h:233; setBombRestTime DOL 0x800681EC: sth r31,0x6FC)</summary>
     public const int DABOMB_OFF_REST_TIME = 0x6FC;
+    /// <summary>fpcNm_Bomb2_e (f_pc_name.h:309)</summary>
+    public const int FPC_NAME_BOMB2 = 0x129;
+    /// <summary>int — Act_c::mState: 0 wait, 1 carry, 2 explode, 3 sink (d_a_bomb2.h; mode_*_init)</summary>
+    public const int DABOMB2_OFF_STATE = 0x694;
+    /// <summary>int — Act_c::mBombTimer: the fuse in frames, counted down each execute; mode_explode_init zeroes it</summary>
+    public const int DABOMB2_OFF_TIMER = 0x738;
+    public const int DABOMB2_STATE_EXPLODE = 2;
     public const int DAPY_PROC_GUARD_0 = 0x0C;
     public const int DAPY_PROC_GUARD_1 = 0x0D;
     public const int DAPY_PROC_GUARD_2 = 0x6D;
