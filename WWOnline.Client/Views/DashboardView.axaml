@@ -479,10 +479,10 @@
                                         <Grid ColumnDefinitions="*,4,*,4,*">
                                             <Button Grid.Column="0" Classes="ww-seg" Classes.active="{Binding IsFullSyncPreset}" Content="Full sync"
                                                     MinHeight="44" HorizontalAlignment="Stretch" Command="{Binding ApplyFullSyncPresetCommand}"
-                                                    ToolTip.Tip="Share everything: wallet, world, items and story." />
+                                                    ToolTip.Tip="Share everything: wallet, world, items and story, and other players' projectiles are real." />
                                             <Button Grid.Column="2" Classes="ww-seg" Classes.active="{Binding IsCoopPreset}" Content="Co-op"
                                                     MinHeight="44" HorizontalAlignment="Stretch" Command="{Binding ApplyCoopPresetCommand}"
-                                                    ToolTip.Tip="Share nothing: each player keeps their own game and you just see each other." />
+                                                    ToolTip.Tip="Share no progress: each player keeps their own game. You see each other, and other players' projectiles stay on." />
                                             <Button Grid.Column="4" Classes="ww-seg" Classes.active="{Binding IsCustomPreset}" Content="Custom"
                                                     MinHeight="44" HorizontalAlignment="Stretch" IsEnabled="False"
                                                     ToolTip.Tip="Lit when the switches below are a mix. Pick a preset to reset." />
@@ -573,6 +573,28 @@
                                                           IsChecked="{Binding SharedStoryOn}" ToolTip.Tip="Shared story" AutomationProperties.Name="Shared story" />
                                         </Grid>
                                     </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSwords}" Stroke="{StaticResource HeartBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="Other players' projectiles" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="Their bombs, cannon shots and arrows are real in your game and hit your enemies and walls." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding SharedProjectilesOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding SharedProjectilesOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !SharedProjectilesOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding SharedProjectilesOn}"
+                                                          ToolTip.Tip="Other players' bombs, boat-cannon shots and arrows fly, explode and hit things in your game. Off: you still see them carry a bomb or aim, but nothing flies."
+                                                          AutomationProperties.Name="Other players' projectiles" />
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
 
                                 <!-- Coming later (not interactive) -->
@@ -650,6 +672,15 @@
                                             <TextBlock Grid.Column="1" Text="Shared story" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedStoryOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedStoryOn}" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44"
+                                            ToolTip.Tip="Other players' bombs, boat-cannon shots and arrows fly, explode and hit things in your game.">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconSwords}" Stroke="{StaticResource HeartBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="Other players' projectiles" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedProjectilesOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedProjectilesOn}" />
                                         </Grid>
                                     </Border>
                                 </StackPanel>

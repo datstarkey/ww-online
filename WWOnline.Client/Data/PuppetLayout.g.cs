@@ -82,8 +82,10 @@ public static class PuppetLayout
     public const int PUPPET_SLOT_OFF_BODY_ANGLE_X = 0x48;
     /// <summary>s16  mBodyAngle.y (Link +0x2B6): aim yaw, relative to shape_angle.y</summary>
     public const int PUPPET_SLOT_OFF_BODY_ANGLE_Y = 0x4A;
-    /// <summary>u8   PUPPET_GRAB_KIND_*: what the peer carries (mActorKeepGrab) — last field</summary>
+    /// <summary>u8   PUPPET_GRAB_KIND_*: what the peer carries (mActorKeepGrab)</summary>
     public const int PUPPET_SLOT_OFF_GRAB_KIND = 0x4C;
+    /// <summary>u8   a carried bomb's fuse: frames left (daBomb_c::mRestTime, capped at 255); 0 = none / unknown — last field</summary>
+    public const int PUPPET_SLOT_OFF_GRAB_FUSE = 0x4D;
     /// <summary>nothing carried, or something the puppet doesn't draw (pot, barrel...)</summary>
     public const int PUPPET_GRAB_KIND_NONE = 0;
     /// <summary>a bomb (fpcNm_BOMB_e): the REL draws one between the puppet's hands</summary>
@@ -198,6 +200,86 @@ public static class PuppetLayout
     public const int PUPPET_NAME_MAX_CHARS = 16;
     /// <summary>the local player wants names shown ("Show player names")</summary>
     public const int PUPPET_NAMES_FLAG_SHOW = 0x01;
+    /// <summary>u32 C: events block (game heap), 0 = none yet</summary>
+    public const uint PUPPET_FX_PTR_ADDR = 0x803FD16C;
+    /// <summary>"PFX0"</summary>
+    public const int PUPPET_FX_MAGIC = 0x50465830;
+    /// <summary>header + inbox + outbox (checked below)</summary>
+    public const int PUPPET_FX_BLOCK_SIZE = 0x3F0;
+    /// <summary>u32 C: PUPPET_FX_MAGIC once the block is set up</summary>
+    public const int PUPPET_FX_OFF_MAGIC = 0x00;
+    /// <summary>u32 C#: PUPPET_FX_FLAG_* (0 in a new block)</summary>
+    public const int PUPPET_FX_OFF_FLAGS = 0x04;
+    /// <summary>u32[2] C: __OSStartTime (u64) of the boot that allocated the block (= PUPPET_NAMES_OFF_BOOT: puppet_bootBlock)</summary>
+    public const int PUPPET_FX_OFF_BOOT = 0x08;
+    /// <summary>u32 C#: seq of the last inbox event written</summary>
+    public const int PUPPET_FX_OFF_IN_WRITE = 0x10;
+    /// <summary>u32 C: seq of the last inbox event consumed</summary>
+    public const int PUPPET_FX_OFF_IN_READ = 0x14;
+    /// <summary>u32 C: seq of the last outbox event written</summary>
+    public const int PUPPET_FX_OFF_OUT_WRITE = 0x18;
+    /// <summary>u32 C#: seq of the last outbox event read (the ack)</summary>
+    public const int PUPPET_FX_OFF_OUT_READ = 0x1C;
+    /// <summary>u32 C: outbox events dropped (ring full), diagnostics</summary>
+    public const int PUPPET_FX_OFF_OUT_DROPPED = 0x20;
+    /// <summary>u32 C: inbox events refused (bad values, slot not shown, table full)</summary>
+    public const int PUPPET_FX_OFF_IN_REJECTED = 0x24;
+    /// <summary>u32 C: projectiles spawned for peers, diagnostics</summary>
+    public const int PUPPET_FX_OFF_SPAWNED = 0x28;
+    /// <summary>PUPPET_FX_IN_COUNT events</summary>
+    public const int PUPPET_FX_OFF_IN_RING = 0x30;
+    public const int PUPPET_FX_IN_COUNT = 16;
+    /// <summary>PUPPET_FX_OUT_COUNT events</summary>
+    public const int PUPPET_FX_OFF_OUT_RING = 0x2B0;
+    public const int PUPPET_FX_OUT_COUNT = 8;
+    public const int PUPPET_FX_EVENT_SIZE = 0x28;
+    /// <summary>the room's SharedProjectiles rule is on: report the local Link's projectiles</summary>
+    public const int PUPPET_FX_FLAG_SEND = 0x01;
+    /// <summary>u8  PUPPET_FX_KIND_*</summary>
+    public const int PUPPET_FX_EV_OFF_KIND = 0x00;
+    /// <summary>u8  inbox: the sender's puppet slot; outbox: 0</summary>
+    public const int PUPPET_FX_EV_OFF_SLOT = 0x01;
+    /// <summary>u8  ARROW: the arrow type (daArrow_c::mArrowType, 0..3); 0 for bombs and cannonballs</summary>
+    public const int PUPPET_FX_EV_OFF_VARIANT = 0x02;
+    /// <summary>s8  outbox: the projectile's room (current.roomNo) when it happened, -1 unknown; inbox: 0</summary>
+    public const int PUPPET_FX_EV_OFF_ROOM = 0x03;
+    /// <summary>u32 the sender's projectile: its actor's process id there</summary>
+    public const int PUPPET_FX_EV_OFF_ID = 0x04;
+    /// <summary>f32 current.pos</summary>
+    public const int PUPPET_FX_EV_OFF_POSX = 0x08;
+    /// <summary>f32</summary>
+    public const int PUPPET_FX_EV_OFF_POSY = 0x0C;
+    /// <summary>f32</summary>
+    public const int PUPPET_FX_EV_OFF_POSZ = 0x10;
+    /// <summary>f32 speedF</summary>
+    public const int PUPPET_FX_EV_OFF_SPEED_F = 0x14;
+    /// <summary>f32 speed.y</summary>
+    public const int PUPPET_FX_EV_OFF_SPEED_Y = 0x18;
+    /// <summary>f32 gravity</summary>
+    public const int PUPPET_FX_EV_OFF_GRAVITY = 0x1C;
+    /// <summary>s16 current.angle.x</summary>
+    public const int PUPPET_FX_EV_OFF_ANGLE_X = 0x20;
+    /// <summary>s16 current.angle.y</summary>
+    public const int PUPPET_FX_EV_OFF_ANGLE_Y = 0x22;
+    /// <summary>s16 shape_angle.z</summary>
+    public const int PUPPET_FX_EV_OFF_ANGLE_Z = 0x24;
+    /// <summary>s16 bomb: fuse frames left (mRestTime); cannonball: frames without gravity</summary>
+    public const int PUPPET_FX_EV_OFF_TIMER = 0x26;
+    /// <summary>a bomb left the sender's hands (thrown / put down): spawn or snap a lit bomb in flight</summary>
+    public const int PUPPET_FX_KIND_BOMB_THROW = 1;
+    /// <summary>the sender picked their bomb up again: delete the copy (the puppet shows it carried)</summary>
+    public const int PUPPET_FX_KIND_BOMB_PICKUP = 2;
+    /// <summary>the sender's bomb / cannonball exploded at POS: explode the copy there, or an explosion</summary>
+    public const int PUPPET_FX_KIND_EXPLODE = 3;
+    /// <summary>the sender's bomb / cannonball is gone without exploding (sank): the copy goes</summary>
+    public const int PUPPET_FX_KIND_REMOVE = 4;
+    /// <summary>the sender's boat cannon fired: spawn the cannonball in flight</summary>
+    public const int PUPPET_FX_KIND_CANNON = 5;
+    /// <summary>the sender shot an arrow (VARIANT = type) from POS along ANGLE_X/Y: spawn it in flight</summary>
+    public const int PUPPET_FX_KIND_ARROW = 6;
+    public const int PUPPET_FX_KIND_MAX = 6;
+    /// <summary>light</summary>
+    public const int PUPPET_FX_ARROW_TYPE_MAX = 3;
     public const int APPEARANCE_CLOTHES_HERO = 0;
     public const int APPEARANCE_CLOTHES_CASUAL = 1;
     /// <summary>follow the save: playerInit's rule, d_a_player_main.cpp:12362</summary>
@@ -364,6 +446,8 @@ public static class PuppetLayout
     public const int FPC_OFF_PROC_NAME = 0x08;
     /// <summary>fpcNm_BOMB_e (f_pc_name.h:308)</summary>
     public const int FPC_NAME_BOMB = 0x128;
+    /// <summary>s16 — daBomb_c::mRestTime, the fuse (d_a_bomb.h:233; setBombRestTime DOL 0x800681EC: sth r31,0x6FC)</summary>
+    public const int DABOMB_OFF_REST_TIME = 0x6FC;
     public const int DAPY_PROC_GUARD_0 = 0x0C;
     public const int DAPY_PROC_GUARD_1 = 0x0D;
     public const int DAPY_PROC_GUARD_2 = 0x6D;

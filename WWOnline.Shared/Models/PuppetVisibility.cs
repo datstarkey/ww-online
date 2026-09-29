@@ -1,9 +1,9 @@
-using WWOnline.Shared.Models;
-
-namespace WWOnline.Services;
+namespace WWOnline.Shared.Models;
 
 /// <summary>
-/// Which remote players get a puppet, and which local moves count as a scene change.
+/// Which remote players get a puppet, and which local moves count as a scene change. Shared by the
+/// client (puppets) and the server (it relays a player's projectile events only to the players who
+/// can see them).
 ///
 /// The Great Sea is one stage ("sea") whose 7x7 grid squares are its rooms, islands included.
 /// A room check there hides a player one square over, and treating a room change as a scene
@@ -41,17 +41,22 @@ public static class PuppetVisibility
     /// (<see cref="SeaHideDistance"/> if they were already shown).
     /// </summary>
     public static bool IsSameLocation(string localStage, byte localRoom, float localX, float localZ, PuppetData puppet,
-                                      bool wasVisible = false)
+                                      bool wasVisible = false) =>
+        IsSameLocation(localStage, localRoom, localX, localZ, puppet.StageName, puppet.RoomNumber, puppet.Position, wasVisible);
+
+    /// <summary>The same check for a remote player known only by stage, room and position.</summary>
+    public static bool IsSameLocation(string localStage, byte localRoom, float localX, float localZ,
+                                      string? remoteStage, byte remoteRoom, Vector3? remotePosition, bool wasVisible = false)
     {
-        if (string.IsNullOrEmpty(puppet.StageName) || puppet.StageName != localStage)
+        if (string.IsNullOrEmpty(remoteStage) || remoteStage != localStage)
             return false;
-        if (puppet.RoomNumber == localRoom)
+        if (remoteRoom == localRoom)
             return true;
-        if (!IsSea(localStage) || puppet.Position == null || !puppet.Position.IsFinite())
+        if (!IsSea(localStage) || remotePosition == null || !remotePosition.IsFinite())
             return false;
 
-        float dx = puppet.Position.X - localX;
-        float dz = puppet.Position.Z - localZ;
+        float dx = remotePosition.X - localX;
+        float dz = remotePosition.Z - localZ;
         float range = wasVisible ? SeaHideDistance : SeaVisibleDistance;
         return dx * dx + dz * dz <= range * range;
     }

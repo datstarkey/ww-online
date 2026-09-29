@@ -275,6 +275,13 @@ public class EquipmentState
 
     /// <summary>Highest <see cref="GrabKind"/> (puppet_shared.h PUPPET_GRAB_KIND_MAX; a test keeps them equal).</summary>
     public const byte MaxGrabKind = 1;
+
+    /// <summary>
+    /// A carried bomb's fuse: frames left (daBomb_c::mRestTime, capped at 255); 0 = no bomb / unknown.
+    /// Receivers play the carried bomb's flash and swell from it (and count down between updates).
+    /// </summary>
+    [JsonPropertyName("grabFuse")]
+    public byte GrabFuse { get; set; }
 }
 
 /// <summary>

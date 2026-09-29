@@ -934,7 +934,10 @@ public class PuppetSyncService : IDisposable
                         // v3 held items: aim angles and what they carry (puppet_held.c).
                         WriteBigEndianS16(slotData, GameMemoryAddresses.PuppetSync.SlotOffset_BodyAngleX, puppet.Action.BodyAngleX);
                         WriteBigEndianS16(slotData, GameMemoryAddresses.PuppetSync.SlotOffset_BodyAngleY, puppet.Action.BodyAngleY);
-                        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_GrabKind] = HeldItemState.SanitizeGrabKind(puppet.Equipment.GrabKind);
+                        byte grabKind = HeldItemState.SanitizeGrabKind(puppet.Equipment.GrabKind);
+                        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_GrabKind] = grabKind;
+                        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_GrabFuse] =
+                            grabKind == PuppetLayout.PUPPET_GRAB_KIND_BOMB ? puppet.Equipment.GrabFuse : (byte)0;
 
                         slotBoat = puppet.Boat;
                     }
@@ -1056,6 +1059,7 @@ public class PuppetSyncService : IDisposable
             short bodyAngleX = (short)ReadBigEndianU16FromAddress(actorBase + PuppetLayout.DAPY_OFF_BODY_ANGLE_X);
             short bodyAngleY = (short)ReadBigEndianU16FromAddress(actorBase + PuppetLayout.DAPY_OFF_BODY_ANGLE_Y);
             byte grabKind = HeldItemState.ReadGrabKind(_dolphin, actorBase);
+            byte grabFuse = grabKind == PuppetLayout.PUPPET_GRAB_KIND_BOMB ? HeldItemState.ReadGrabFuse(_dolphin, actorBase) : (byte)0;
             if (_lastLoggedHeld != (mEquipItem, grabKind))
             {
                 Logger.Information("[held] local item 0x{Old:X} -> 0x{New:X} carry {OldGrab} -> {NewGrab} (upper anim 0x{Upper:X}, proc 0x{Proc:X2})",
@@ -1132,6 +1136,7 @@ public class PuppetSyncService : IDisposable
                     ShieldId = _lastShield,
                     ItemInHand = mEquipItem,
                     GrabKind = grabKind,
+                    GrabFuse = grabFuse,
                 },
                 Appearance = new AppearanceState
                 {
@@ -1260,6 +1265,19 @@ public class PuppetSyncService : IDisposable
     }
 
     // === Slot helpers ===
+
+    /// <summary>The local stage, room and position (x, z) as of the last 20Hz tick.</summary>
+    public (string Stage, byte Room, float X, float Z) LocalLocation => (_lastLocalStage, _lastLocalRoom, _lastLocalX, _lastLocalZ);
+
+    /// <summary>
+    /// The puppet slot assigned to <paramref name="playerId"/>, shown here or not (their projectile
+    /// events are keyed by it; PlayerEventService checks where the event happened).
+    /// </summary>
+    public bool TryGetSlot(string playerId, out int slot)
+    {
+        lock (_slotLock)
+            return _slotAssignments.TryGetValue(playerId, out slot);
+    }
 
     /// <summary>Returns the player ID assigned to the given slot, or null if empty.</summary>
     private string? GetPlayerInSlot(int slot)

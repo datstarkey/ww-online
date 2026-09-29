@@ -31,4 +31,6 @@ public interface IGameHubClient
 
     /// <summary>Dungeon / room switches another player in the same save slot (dan) or room (zone) just set.</summary>
     Task ReceiveRoomSwitches(RoomSwitches switches);
+    /// <summary>A player who can see us threw / exploded a bomb or fired their boat cannon (PlayerEvent.PlayerId = who).</summary>
+    Task ReceivePlayerEvent(PlayerEvent evt);
 }

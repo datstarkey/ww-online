@@ -56,6 +56,8 @@ public class GameHub : Hub<IGameHubClient>
         var name = GetPlayerName(connectionId);
 
         ConnectedPlayers.TryRemove(connectionId, out _);
+        EventRelay.Forget(connectionId);
+        DroppedEvents.TryRemove(connectionId, out _);
         OwnerKeyGate.Forget(connectionId);
         ItemsSeedGate.Forget(connectionId);
         StorySeedGate.Forget(connectionId);
@@ -152,12 +154,14 @@ public class GameHub : Hub<IGameHubClient>
     private static RoomSettings _roomSettings = new();
 
     /// <summary>Server defaults from the command line (Program.cs), before anyone connects.</summary>
-    public static void ConfigureRoomDefaults(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory)
+    public static void ConfigureRoomDefaults(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory,
+                                             bool sharedProjectiles = true)
     {
         lock (RoomLock)
             _roomSettings = new RoomSettings
             {
                 SharedWallet = sharedWallet, SharedWorld = sharedWorld, SharedItems = sharedItems, SharedStory = sharedStory,
+                SharedProjectiles = sharedProjectiles,
             };
     }
 
@@ -274,6 +278,7 @@ public class GameHub : Hub<IGameHubClient>
             _roomSettings.SharedWorld = requested.SharedWorld;
             _roomSettings.SharedItems = requested.SharedItems;
             _roomSettings.SharedStory = requested.SharedStory;
+            _roomSettings.SharedProjectiles = requested.SharedProjectiles;
         }
         if (walletTurnedOff)
         {
@@ -358,6 +363,7 @@ public class GameHub : Hub<IGameHubClient>
 
         puppetData.ClampUnknownValues();
         puppetData.PlayerId = Context.ConnectionId;
+        EventRelay.UpdateLocation(Context.ConnectionId, puppetData, DateTime.UtcNow);
         PuppetRelayCounts.AddOrUpdate(Context.ConnectionId, 1, (_, n) => n + 1);
         await Clients.Others.ReceivePuppetData(puppetData);
     }
@@ -670,6 +676,41 @@ public class GameHub : Hub<IGameHubClient>
         if (result.Added.IsEmpty) return; // the room already had all of it
         LogStoryAdded(GetPlayerName(Context.ConnectionId), "set", result.Added);
         await Clients.Others.ReceiveStoryFlags(result.Room);
+    }
+
+    // ── Player events (other players' projectiles) ────────────────────────────
+
+    private static readonly PlayerEventRelay EventRelay = new();
+
+    // Per-connection count of dropped events since the last warning, so a misbehaving client
+    // can't flood the log either (one line per connection per LogDroppedEvery drops).
+    private static readonly ConcurrentDictionary<string, int> DroppedEvents = new();
+    private const int LogDroppedEvery = 50;
+
+    /// <summary>
+    /// One of the caller's projectiles: a bomb thrown / picked up / exploded / gone, or their boat
+    /// cannon fired, arrow shot. Relayed only to the players where it happened (PlayerEventRelay), and only
+    /// while the room's SharedProjectiles rule is on. Malformed, misplaced and over-rate events are dropped.
+    /// </summary>
+    public async Task SendPlayerEvent(PlayerEvent evt)
+    {
+        if (!RoomRules.SharedProjectiles) return; // room rule off
+        var sender = Context.ConnectionId;
+        var now = DateTime.UtcNow;
+        var verdict = EventRelay.Check(sender, evt, now);
+        if (verdict != PlayerEventRelay.Verdict.Relay)
+        {
+            int n = DroppedEvents.AddOrUpdate(sender, 1, (_, c) => c + 1);
+            if (n == 1 || n % LogDroppedEvery == 0)
+                Logger.Warning("[events] dropped an event from {Player} ({Verdict}, {Count} dropped so far): {Event}",
+                    GetPlayerName(sender), verdict, n, evt?.ToString() ?? "null"); // ToString is safe unvalidated
+            return;
+        }
+
+        evt!.PlayerId = sender;
+        var recipients = EventRelay.Recipients(sender, evt, now);
+        if (recipients.Count == 0) return;
+        await Clients.Clients(recipients).ReceivePlayerEvent(evt);
     }
 
     // Per-connection count of relayed puppet packets since the last stats line.

@@ -1023,5 +1023,59 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define DOOR12_ACTION_OFF        0x314 // door12 actionInit: stb r0,0x314(r31)
 #define DOOR_ACTION_WAIT         1
 #define DOOR12_ARG1_TMPBIT       8     // door12 create: arg1 (home.angle.z >> 8) 8 clears tmp bit 0x0440 (d_a_door12.cpp:581)
+/* PROJECTILES (puppet_fx.c) — the local Link's bombs / cannonballs and the    */
+/* copies of other players'. d_a_bomb (daBomb_c, d_a_bomb.h) is in main.dol;   */
+/* offsets verified in the GZLE01 DOL at the cited instructions.              */
+/* ============================================================================ */
+
+#define BASE_PROC_ID(p)                    (*(u32*)((u8*)(p) + 0x04))  // base_process_class::mBsPcId (f_pc_base.h:14), fopAcM_GetID
+#define FPC_PROC_ID_ERROR                  0xFFFFFFFF                  // fpcM_ERROR_PROCESS_ID_e (daPy_actorKeep_c::clearData)
+
+// daPy_lk_c::mActorKeepGrab (d_a_player_main.h:2088) = daPy_actorKeep_c {mID +0, mActor +4}
+#define DAPY_LK_GRAB_ID(link)              (*(u32*)((u8*)(link) + 0x318C))
+
+// daBomb_c (d_a_bomb.h:192-240)
+#define DABOMB_AT_SPRM(b)                  (*(u32*)((u8*)(b) + 0x5A0))  // mSph's AT SPrm (setBombNoHit 0x800680A0; procExplode_init ORs Set only, 0x800DB498)
+#define DABOMB_OWNED_BY_LINK(b)            (*(u8*)((u8*)(b) + 0x6F0))   // field_0x6F0: STATE_3 sets it (create_init 0x800DD118); explode/delete then call the
+                                                                        // LOCAL Link's decrementBombCnt (d_a_bomb3.inc:856,1293; 0x800DB448)
+#define DABOMB_REST_TIME(b)                (*(s16*)((u8*)(b) + 0x6FC))  // mRestTime: fuse, 150 at create (0x800DD01C); procExplode_init zeroes it (0x800DB5D0); = DABOMB_OFF_REST_TIME
+#define DABOMB_NO_GRAVITY_TIME(b)          (*(s16*)((u8*)(b) + 0x700))  // mNoGravityTime (setNoGravityTime 0x80068228)
+// daBomb_c::prm_make (d_a_bomb_static.cpp:95, 0x80068244): 0x80000000 | angXZero << 17 | cheapEff << 16 | state.
+// prm_get_state / cheapEff / angXZero / version read only bits 0-7, 16, 17 and 31 (daObj::PrmAbstract), and
+// change_state keeps the rest (0x800682C0), so the other bits are free for a marker.
+#define DABOMB_PRM_VERSION                 0x80000000
+#define DABOMB_PRM_ANGXZERO                0x00020000
+#define DABOMB_PRM_STATE_MASK              0x000000FF
+#define DABOMB_STATE_EXPLODE               0  // STATE_0: explodes at create (attr A1), not drawn — d_a_canon.cpp:191
+#define DABOMB_STATE_LIT                   1  // STATE_1: a lit bomb lying / flying (attr 1C: fuse effect + SE); a released hand bomb
+#define DABOMB_STATE_CARRIED               2  // STATE_2: being carried (procCarry_init)
+#define DABOMB_STATE_NEW                   3  // STATE_3: fresh from the bomb bag (makeItemType, d_a_player_main.cpp:3693)
+#define DABOMB_STATE_CANNON                4  // STATE_4: a cannonball (the boat's: prm_make(STATE_4, FALSE, TRUE), d_a_ship.cpp:4021)
+
+// cCcD_ObjAt SPrm (c_cc_d.h:20-25): the AT groups an attack hits
+#define CCD_AT_SPRM_VS_PLAYER              0x04  // cCcD_AtSPrm_VsPlayer_e: Tg IsPlayer = Link, the ship, puppets (d_a_player_main_data.inc:51)
+
+// play.mpPlayerPtr[0]: always Link, even while the player controls Medli / Makar / a seagull / Hyoi, when
+// dComIfGp_getPlayer(0) (play.mpPlayer[0], +0x5B44) is that NPC (d_com_inf_game.h:781; procExplode_init
+// reads it for decrementBombCnt, 0x800DB454: lwz r4,0x5B4C(gameInfo))
+#define GAMEINFO_LINK_ACTOR(gameInfo)      (*(void**)((u8*)(gameInfo) + 0x12A0 + 0x48AC))
+
+// daShip_c (d_a_ship.h, REL d_a_ship; the same offsets the client reads: GameMemoryAddresses.Sea)
+#define GAMEINFO_SHIP_ACTOR(gameInfo)      (*(void**)((u8*)(gameInfo) + 0x12A0 + 0x48AC + 0x08))  // play.mpPlayerPtr[2] (d_com_inf_game.h:781)
+#define DASHIP_STATE_FLAG(ship)            (*(u32*)((u8*)(ship) + 0x358))  // mStateFlag (d_a_ship.h:313)
+#define DASHIP_SFLG_SHOOT_CANNON           0x00020000  // daSFLG_SHOOT_CANNON_e: set the frame the cannon fires (d_a_ship.cpp:4030), cleared at the next execute (:3594)
+
+// daArrow_c (d_a_arrow.h; main.dol 0x800D455C-0x800D8288). fpcNm_ARROW_e = 0x1DE (f_pc_name.h:491).
+#define FPC_NAME_ARROW                     0x1DE
+#define DAPY_LK_EQUIP_ID(link)             (*(u32*)((u8*)(link) + 0x317C))  // mActorKeepEquip.mID: the nocked arrow (makeArrow, d_a_player_bow.inc:68-78)
+#define DAARROW_MODEL(a)                   (*(J3DModel**)((u8*)(a) + 0x294)) // mpModel (procWait 0x800D5A90)
+#define DAARROW_CO_SPRM(a)                 (*(u32*)((u8*)(a) + 0x500))       // mCoSph (+0x4D4, createInit 0x800D7400) CO SPrm, +0x2C as the bomb's mSph
+#define DAARROW_TYPE(a)                    (*(u8*)((u8*)(a) + 0x601))        // mArrowType: 0 normal, 1 fire, 2 ice, 3 light (setTypeByPlayer 0x800D7308)
+#define DAARROW_PROC_FUNC(a)               ((u32*)((u8*)(a) + 0x68C))        // mCurrProcFunc, a 12-byte PTMF {0, -1, fn} (procWait 0x800D5AF0-0x800D5AFC)
+#define DAARROW_TYPE_LIGHT                 3
+#define DAARROW_SHOT_PARAM                 1  // fopAcM_SetParam(arrow, 1) at the shot (d_a_player_bow.inc:136); 2 stuck, 3 rebound, 4 water
+// dSv_player_status_a_c::mMagic (dComIfGs_getMagic): checkRestMp reads it (0x800D72C4: lbz r4,0x14(gameInfo))
+#define GAMEINFO_MAGIC(gameInfo)           (*(u8*)((u8*)(gameInfo) + 0x14))
+#define CCD_CO_SPRM_SET                    0x01  // cCcD_CoSPrm_Set_e (c_cc_d.h:47)
 
 #endif /* WW_INLINES_H */

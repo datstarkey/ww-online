@@ -37,7 +37,7 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj -- --build-patchdata
 - `-Patch` also recompiles the C code and re-patches the game. This is a compile, so only use it when asked. `-Stop` / `-Collect` stop everything / copy the live Dolphin logs. `-AllowStale` launches against a stale build (it passes `--allow-stale`: otherwise a client's `--auto-attach` refuses a stale game). `-DedicatedServer` runs the server as a separate process.
 - **Logs** are in `logs/latest/`. Older runs are in `logs/sessions/<time>/`.
   - `session.txt`: git rev, PIDs, build-check result.
-  - `client-Player<N>.log`: `[diag]` every 2s, plus `[puppet]`, `[world]`, `[items]`, `[story]`, `[wallet]` and `[build-check]` lines.
+  - `client-Player<N>.log`: `[diag]` every 2s, plus `[puppet]`, `[world]`, `[items]`, `[story]`, `[wallet]`, `[fx]` (projectile events sent / received / dropped, REL counters) and `[build-check]` lines.
   - `server.log`: joins and leaves, `[room]` rules/owner, sync store activity, `[stats]` relay rates every 10s.
   - `dolphin-<N>.log`: OSReport output (`[PUPPET]` lines from the REL) and MMU invalid read/write errors.
   - `build.log`, `patch.log`, `build-check.log`.
@@ -49,6 +49,7 @@ WWOnline.Shared/           DTOs (PuppetData, RoomSettings, RoomInventory, StageF
                            RoomSwitches, EventFlagCatalog), IGameHubClient, HubConstants
 WWOnline.Server/           ASP.NET SignalR relay: Hubs/GameHub (relay + room rules/owner) and the
                            room stores (WorldFlag, Wallet, RoomInventory, StoryFlag, RoomSwitch, OwnerSeedGate)
+                           and PlayerEventRelay (who gets a player's projectile events)
 WWOnline.Client/           Avalonia app (MVVM, CommunityToolkit.Mvvm, all-singleton DI in App.axaml.cs)
   Services/                Dolphin memory, puppet + room sync services, patcher UI, HeadlessCommands,
                            UpdateService (Velopack auto-update), AppPaths
@@ -102,7 +103,7 @@ Optional patches (`GameMod/src/patches/optional/*.asm`, betterww QoL + vanilla b
 
 ## Room sync model
 - The **room owner** is the player who started the server, otherwise the earliest-joined player still connected. The owner can change the rules at runtime.
-- The **rules** (`RoomSettings`) are shared wallet, shared world, shared items and shared story. The Full sync preset turns them all on. Co-op turns them all off, so players only see each other. The server ignores messages for a rule that is off.
+- The **rules** (`RoomSettings`) are shared wallet, shared world, shared items, shared story and other players' projectiles (`SharedProjectiles`: peers' bombs, cannon shots and arrows are real in your world). The Full sync preset turns them all on. Co-op turns the four progress rules off but keeps projectiles on, so players see each other and fight together with their own progress. The server ignores messages for a rule that is off.
 - The owner's game **seeds** the items, story and wallet stores. If the owner hasn't seeded them within 30s of the first joiner (`OwnerSeedGate`), a joiner seeds them.
 - **World and story merge in one direction only.** World is per-stage save flags OR-merged. Story is event flags 0x00-0x41, masked by `StoryFlags.SyncMask`. **Items** only grow (OR / MAX), and only the owner can remove an item.
 - **Small keys** (part of Shared world, `docs/small-keys.md`) are not synced but derived: a dungeon's count = its key flags taken (chest tbox / item bits) - its key doors opened (door switches), from a key table built from the player's own stage files (`SmallKeyTableBuilder`, at runtime by `SmallKeyTableProvider`). `SharedSmallKeyService` writes it into mKeyNum (the HUD's pending count in the current stage, only while idle; the saved copy elsewhere). No hub method or server state. The Room page's Dungeons card shows it. Log lines: `[keys]`.
@@ -111,7 +112,8 @@ Optional patches (`GameMod/src/patches/optional/*.asm`, betterww QoL + vanilla b
 - **Name tags:** each peer's name (from `PlayerJoined`, sanitised to printable ASCII by `PuppetNameTags`) is drawn above their puppet by the REL. `PuppetSyncService` writes the REL's names block (pointer at `PUPPET_NAMES_PTR_ADDR`) only where it differs; "Show player names" (Appearance page, `GameSettings.ShowPlayerNames`) is the block's SHOW flag, local only. Log lines: `[names]`.
 - **Live world** (`docs/live-world.md`): chest and switch bits applied from other players to the current stage are handed to the REL (`LiveWorldPoke` → the REL's boot-stamped block at `LIVEWORLD_PTR_ADDR`, one acknowledged batch at a time), which re-creates the actors that read their flag only at create (chests open empty, walls/floors/ice/barricades vanish, crystals show on, locked doors come back unlocked; a lock byte is never written, docs/live-world.md 0.1). Log lines: `[world] live world:` (client) and `[PUPPET] live world:` per actor (Dolphin).
 - **Live room switches:** latching dungeon-visit (dan) and room (zone) switches sync between players in the same stage / room, on-edges only, apply-once, never echoed (`RoomSwitchSyncService`, `RoomSwitchStore`, hub `JoinRoomSwitches`/`SendRoomSwitches`). Which switches are latching comes from the patch-time switch table, which also keeps push-block (path-encoded) memory switches out of the world sync. Log lines: `[switches]`.
-- **Visibility:** a puppet shows when the other player is in the same stage and room. On the Great Sea (`sea`, whose grid squares and islands are rooms) it's by distance instead, and crossing a square doesn't despawn puppets (`PuppetVisibility`).
+- **Visibility:** a puppet shows when the other player is in the same stage and room. On the Great Sea (`sea`, whose grid squares and islands are rooms) it's by distance instead, and crossing a square doesn't despawn puppets (`PuppetVisibility`, in Shared: the server uses it too).
+- **Projectiles** (SharedProjectiles rule; docs/held-items.md): one-shot `PlayerEvent`s (bomb thrown / picked up / exploded / gone, boat cannon fired, arrow shot) go through the hub method `SendPlayerEvent` → `ReceivePlayerEvent`, not the 20Hz puppet data. The REL reports the local Link's projectiles in a game-heap events block (`PlayerEventBlock`, puppet_shared.h `PUPPET_FX_*`); `PlayerEventService` sends them with an origin (per app run) + seq, and writes peers' events back for the REL to spawn real bombs, cannonballs and arrows (they hit the receiver's world, never the receiver). The server (`PlayerEventRelay`) validates every field, rate-limits (burst 20, 10/s), checks the event is where its sender is, forgets locations after 3 s without puppet data, and relays it to the players in the event's own stage and room (the projectile's room, from the REL; sea: by distance from the event); an origin belongs to one connection until it leaves. Receivers drop repeats (origin + seq), events not in their stage and room, and everything during one of their minigames (`MinigameGate`).
 
 ## C# conventions
 - ViewModels implement `IDisposable`: unsubscribe events and dispose timers/CTS.

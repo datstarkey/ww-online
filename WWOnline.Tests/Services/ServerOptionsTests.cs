@@ -19,6 +19,7 @@ public class ServerOptionsTests
         Assert.True(r.IsValid);
         Assert.Equal(HubConstants.DefaultPort, r.Options.Port);
         Assert.True(r.Options.SharedWallet && r.Options.SharedWorld && r.Options.SharedItems && r.Options.SharedStory);
+        Assert.True(r.Options.SharedProjectiles);
         Assert.Null(r.Options.OwnerKey);
         Assert.Null(r.Options.LogFile);
     }
@@ -93,8 +94,32 @@ public class ServerOptionsTests
     [Fact]
     public void AllNoSharedFlags_TurnTheRulesOff()
     {
-        var o = Parse(["--no-shared-wallet", "--no-shared-world", "--no-shared-items", "--no-shared-story"]).Options;
-        Assert.False(o.SharedWallet || o.SharedWorld || o.SharedItems || o.SharedStory);
+        var o = Parse(["--no-shared-wallet", "--no-shared-world", "--no-shared-items", "--no-shared-story",
+                       "--no-shared-projectiles"]).Options;
+        Assert.False(o.SharedWallet || o.SharedWorld || o.SharedItems || o.SharedStory || o.SharedProjectiles);
+    }
+
+    [Theory]
+    [InlineData("false", false)]
+    [InlineData("0", false)]
+    [InlineData("off", false)]
+    [InlineData("true", true)]
+    [InlineData("Yes", true)]
+    public void SharedProjectilesVariable_IsRead(string value, bool expected)
+    {
+        var r = Parse([], new() { [ServerOptions.SharedProjectilesVar] = value });
+        Assert.True(r.IsValid, string.Join("; ", r.Errors));
+        Assert.Equal(expected, r.Options.SharedProjectiles);
+        Assert.True(r.Options.SharedWallet && r.Options.SharedStory); // the other rules keep their defaults
+    }
+
+    [Fact]
+    public void NoSharedProjectilesFlag_WinsOverTheVariable()
+    {
+        var r = Parse(["--no-shared-projectiles"], new() { ["WWO_SHARED_PROJECTILES"] = "true" });
+        Assert.True(r.IsValid);
+        Assert.False(r.Options.SharedProjectiles);
+        Assert.True(r.Options.SharedWorld);
     }
 
     [Theory]
@@ -102,6 +127,7 @@ public class ServerOptionsTests
     [InlineData("WWO_PORT", "0")]
     [InlineData("WWO_PORT", "70000")]
     [InlineData("WWO_SHARED_ITEMS", "maybe")]
+    [InlineData("WWO_SHARED_PROJECTILES", "sometimes")]
     public void BadEnvironmentValues_AreErrors_NamingTheVariable(string name, string value)
     {
         var r = Parse([], new() { [name] = value });

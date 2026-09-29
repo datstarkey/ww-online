@@ -42,6 +42,28 @@ public static class HeldItemState
             : (byte)PuppetLayout.PUPPET_GRAB_KIND_NONE;
     }
 
+    /// <summary>
+    /// The fuse of the bomb Link carries (daBomb_c::mRestTime of mActorKeepGrab's actor): frames left,
+    /// capped at 255 for the slot's byte; 0 when he carries no bomb (or it just exploded). The receiver's
+    /// REL plays the carried bomb's flash and swell from it, as the real bomb's draw_norm does.
+    /// </summary>
+    public static byte ReadGrabFuse(IDolphinService dolphin, uint linkPtr)
+    {
+        if (ReadGrabKind(dolphin, linkPtr) != PuppetLayout.PUPPET_GRAB_KIND_BOMB)
+            return 0;
+        byte[]? p = dolphin.ReadMemory(linkPtr + PuppetLayout.DAPY_OFF_GRAB_ACTOR, 4);
+        if (p is not { Length: 4 })
+            return 0;
+        uint actor = (uint)(p[0] << 24 | p[1] << 16 | p[2] << 8 | p[3]);
+        byte[]? rest = dolphin.ReadMemory(actor + PuppetLayout.DABOMB_OFF_REST_TIME, 2);
+        if (rest is not { Length: 2 })
+            return 0;
+        return FuseByte((short)(rest[0] << 8 | rest[1]));
+    }
+
+    /// <summary>A fuse (mRestTime) as the slot byte: 1..255 frames, 0 for none.</summary>
+    public static byte FuseByte(short restTime) => (byte)Math.Clamp((int)restTime, 0, byte.MaxValue);
+
     /// <summary>Only grab kinds the REL knows reach the slot (the server clamps others to 0 too).</summary>
     public static byte SanitizeGrabKind(byte kind) =>
         kind <= PuppetLayout.PUPPET_GRAB_KIND_MAX ? kind : (byte)PuppetLayout.PUPPET_GRAB_KIND_NONE;

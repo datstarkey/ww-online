@@ -47,6 +47,38 @@ public class HeldItemStateTests
     }
 
     [Fact]
+    public void ACarriedBombsFuse_IsItsRestTime_CappedToAByte()
+    {
+        var game = new FakeDolphin();
+        game.SetU32(Link + PuppetLayout.DAPY_OFF_GRAB_ACTOR, Bomb);
+        game.Set(Bomb + PuppetLayout.FPC_OFF_PROC_NAME, 0x01, 0x28);
+        game.Set(Bomb + PuppetLayout.DABOMB_OFF_REST_TIME, 0x00, 0x87); // 135 frames left
+        Assert.Equal(135, HeldItemState.ReadGrabFuse(game, Link));
+        game.Set(Bomb + PuppetLayout.DABOMB_OFF_REST_TIME, 0x01, 0x2C); // 300 (an enemy's): capped
+        Assert.Equal(255, HeldItemState.ReadGrabFuse(game, Link));
+        game.Set(Bomb + PuppetLayout.DABOMB_OFF_REST_TIME, 0xFF, 0xFF); // -1: none
+        Assert.Equal(0, HeldItemState.ReadGrabFuse(game, Link));
+    }
+
+    [Fact]
+    public void NoFuse_WithoutACarriedBomb()
+    {
+        var game = new FakeDolphin();
+        Assert.Equal(0, HeldItemState.ReadGrabFuse(game, Link));
+        game.SetU32(Link + PuppetLayout.DAPY_OFF_GRAB_ACTOR, Bomb);
+        game.Set(Bomb + PuppetLayout.FPC_OFF_PROC_NAME, 0x01, 0xCB); // TSUBO
+        game.Set(Bomb + PuppetLayout.DABOMB_OFF_REST_TIME, 0x00, 0x50);
+        Assert.Equal(0, HeldItemState.ReadGrabFuse(game, Link));
+    }
+
+    [Fact]
+    public void GrabFuse_SitsBesideGrabKind_InsideTheSlot()
+    {
+        Assert.Equal(PuppetLayout.PUPPET_SLOT_OFF_GRAB_KIND + 1, PuppetLayout.PUPPET_SLOT_OFF_GRAB_FUSE);
+        Assert.True(PuppetLayout.PUPPET_SLOT_OFF_GRAB_FUSE < PuppetLayout.PUPPET_SLOT_SIZE);
+    }
+
+    [Fact]
     public void ACarriedPot_OrNothing_IsNone()
     {
         var game = new FakeDolphin();
