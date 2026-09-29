@@ -20,7 +20,7 @@ public class PipelineRunner
 
     public enum BuildMode
     {
-        /// <summary>Full build (all 6 steps).</summary>
+        /// <summary>Full build (all 7 steps).</summary>
         Full,
         /// <summary>Quick compile only (steps 1-3).</summary>
         Compile,
@@ -70,7 +70,7 @@ public class PipelineRunner
         }
 
         if (mode == BuildMode.Full)
-            BuildStamp.Write(_config);
+            BuildStamp.Write(_config, WorldData.SwitchTableBuilder.RulesVersion); // step 7 wrote the table
     }
 
     private List<IPipelineStep> GetSteps(BuildMode mode)
@@ -85,6 +85,7 @@ public class PipelineRunner
                 new AssemblePatchesStep(_config, _toolchain),
                 new ApplyPatchesStep(_config),
                 new PatchBi2Step(_config),
+                new BuildSwitchTableStep(_config),
             ],
             BuildMode.Compile =>
             [

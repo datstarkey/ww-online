@@ -25,6 +25,8 @@ namespace WWOnline.Services;
 /// (scratch memory) so the puppet REL can despawn those placed items live.
 /// Live world: chest and switch bits applied to the current stage go to <see cref="LiveWorldPoke"/>,
 /// which hands them to the REL so actors that read their flag only at create catch up live.
+/// Push-block switches (a path position encoded in two memory switches, which OR-merging would corrupt)
+/// are neither sent nor applied: the patch-time switch table lists them (<see cref="SwitchTableProvider"/>).
 /// </summary>
 public class WorldFlagSyncService : IDisposable
 {
@@ -38,6 +40,7 @@ public class WorldFlagSyncService : IDisposable
     private readonly RoomSettingsService _room;
     private readonly DespawnWorker _despawnWorker;
     private readonly LiveWorldPoke _liveWorld;
+    private readonly SwitchTableProvider _tables;
 
     // Guarded by _tickLock. _sent / _received / _sending are per connection (reset on Connected).
     private StageFlags[] _sent = NewSlots();
@@ -54,13 +57,14 @@ public class WorldFlagSyncService : IDisposable
     private uint _remoteItemMask;
 
     public WorldFlagSyncService(IDolphinService dolphin, SignalRClientService signalR, RoomSettingsService room,
-        DespawnWorker despawnWorker, LiveWorldPoke liveWorld)
+        DespawnWorker despawnWorker, LiveWorldPoke liveWorld, SwitchTableProvider tables)
     {
         _dolphin = dolphin;
         _signalR = signalR;
         _room = room;
         _despawnWorker = despawnWorker;
         _liveWorld = liveWorld;
+        _tables = tables;
     }
 
     public void Start()
@@ -168,11 +172,15 @@ public class WorldFlagSyncService : IDisposable
             ? _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.LiveMemory, GameMemoryAddresses.WorldFlags.MemorySize)
             : null;
 
+        var table = _tables.Table;
         for (int i = 0; i < StageFlags.SlotCount; i++)
         {
             var local = Parse(savedBytes, i * GameMemoryAddresses.WorldFlags.MemorySize, i);
             if (i == slot && liveBytes != null)
                 local.MergeFrom(Parse(liveBytes, 0, i));
+            var excluded = table?.MemoryExcludedWords(i);
+            if (excluded != null)
+                PushBlockSwitches.Remove(local, excluded); // never sent...
 
             // Outbound: bits this game set that the shared world hasn't seen from us or anyone.
             if (online && !_sending[i])
@@ -185,6 +193,8 @@ public class WorldFlagSyncService : IDisposable
 
             // Inbound: shared-world bits this game is missing.
             var missing = _received[i].Except(local);
+            if (excluded != null)
+                PushBlockSwitches.Remove(missing, excluded); // ...nor applied (the room may have them from older clients)
             _switchGuard.Filter(i, local, missing);
             if (missing.IsEmpty) continue;
 
@@ -349,6 +359,21 @@ public class WorldFlagSyncService : IDisposable
         Enumerable.Range(0, StageFlags.SlotCount).Select(i => new StageFlags { Slot = i }).ToArray();
 
     public void Dispose() => Stop();
+}
+
+/// <summary>
+/// A push block's path position is encoded in two memory switches (swSave1/swSave2,
+/// d_a_obj_movebox.cpp:1163-1206): OR-merging two players' positions makes a third one, so those
+/// switches (the switch table's MemoryExcluded) never take part in the shared world.
+/// </summary>
+public static class PushBlockSwitches
+{
+    /// <summary>Clear the <paramref name="excluded"/> memory switch words (dSv_memBit_c::mSwitch layout) from <paramref name="flags"/>.</summary>
+    public static void Remove(StageFlags flags, IReadOnlyList<uint> excluded)
+    {
+        for (int w = 0; w < StageFlags.SwitchWords && w < excluded.Count; w++)
+            flags.Switch[w] &= ~excluded[w];
+    }
 }
 
 /// <summary>

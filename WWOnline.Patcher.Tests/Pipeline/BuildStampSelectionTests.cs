@@ -101,6 +101,8 @@ public class BuildStampSelectionTests : IDisposable
     {
         Assert.Equal(BuildStamp.Status.Missing, BuildStamp.CheckSelection(_config.GamePath, ["skip_intro"]).Status);
         BuildStamp.Write(_config.GamePath, new BuildStamp.Stamp("ab" + new string('0', 62), DateTime.UtcNow, 3, ["skip_intro"], "prebuilt"));
+        Assert.Equal(BuildStamp.Status.Stale, BuildStamp.CheckSelection(_config.GamePath, ["skip_intro"]).Status); // no switch table
+        new WWOnline.Patcher.WorldData.SwitchTable { Rules = WWOnline.Patcher.WorldData.SwitchTableBuilder.RulesVersion }.Write(_config.GamePath);
         Assert.Equal(BuildStamp.Status.Fresh, BuildStamp.CheckSelection(_config.GamePath, ["skip_intro"]).Status);
         Assert.True(BuildStamp.CheckSelection(_config.GamePath, []).SelectionChanged);
     }

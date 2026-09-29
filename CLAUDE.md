@@ -45,15 +45,16 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj -- --build-patchdata
 ## Layout
 ```
 WWOnline.Shared/           DTOs (PuppetData, RoomSettings, RoomInventory, StageFlags, StoryFlags,
-                           EventFlagCatalog), IGameHubClient, HubConstants
+                           RoomSwitches, EventFlagCatalog), IGameHubClient, HubConstants
 WWOnline.Server/           ASP.NET SignalR relay: Hubs/GameHub (relay + room rules/owner) and the
-                           room stores (WorldFlag, Wallet, RoomInventory, StoryFlag, OwnerSeedGate)
+                           room stores (WorldFlag, Wallet, RoomInventory, StoryFlag, RoomSwitch, OwnerSeedGate)
 WWOnline.Client/           Avalonia app (MVVM, CommunityToolkit.Mvvm, all-singleton DI in App.axaml.cs)
   Services/                Dolphin memory, puppet + room sync services, patcher UI, HeadlessCommands,
                            UpdateService (Velopack auto-update), AppPaths
   Data/                    GameMemoryAddresses, PuppetLayout.g.cs (generated, do not edit)
   build/PuppetLayout.targets  generates PuppetLayout.g.cs from puppet_shared.h on every build
-WWOnline.Patcher/          C# build pipeline (devkitPPC -> REL + DOL patches); PatcherConfig
+WWOnline.Patcher/          C# build pipeline (devkitPPC -> REL + DOL patches); PatcherConfig;
+                           WorldData/ (stage data reader + switch table, built from the player's game)
 WWOnline.Tests/            client + server tests (xUnit, FakeDolphin)
 WWOnline.Patcher.Tests/
 GameMod/                   game-side mod (see GameMod/CLAUDE.md)
@@ -78,13 +79,14 @@ scripts/                   check-no-nintendo-files.ps1 (CI + release guard)
 
 The client's Patch Game button (and the setup's Patch step, the same `GamePatcherService.PatchGameAsync`) uses the Settings page's vanilla and game paths instead of the config's. It first copies any game files the patched folder lacks (all of them into a new folder), since only a complete extracted disc boots.
 
-Pipeline (`PipelineRunner`, Full = all six steps):
+Pipeline (`PipelineRunner`, Full = all seven steps):
 1. Copy the vanilla files.
 2. Compile `puppet.c`, turn it into a REL and put it in RELS.arc.
 3. Compile `link_draw_hook.c` into `link_draw_hook.asm`.
 4. Assemble the ASM into YAML diffs.
 5. Apply the diffs to main.dol.
 6. Set bi2.bin to 48MB.
+7. Build the switch table (`wwo-switch-table.json`) from the vanilla stage data into the game folder (`SwitchTableBuilder`; the pre-built patch path does it too). Nintendo-derived: never in the repo. Its `RulesVersion` is part of the stamp hash (bump it when the classification changes), and a stamped game without its table is stale.
 
 A Full build writes `<game_path>/wwo-build-stamp.json`, a hash of the GameMod C/ASM/include sources and the selected optional patches. The client and dev-test refuse a stale build.
 
@@ -107,6 +109,7 @@ Optional patches (`GameMod/src/patches/optional/*.asm`, betterww QoL + vanilla b
 - Every sync service resets and rejoins on `SignalRClientService.Connected`. Nothing is marked "sent" until the send succeeds. Puppets are position/animation/equipment (plus the boat while riding it) only, and never include yourself.
 - **Name tags:** each peer's name (from `PlayerJoined`, sanitised to printable ASCII by `PuppetNameTags`) is drawn above their puppet by the REL. `PuppetSyncService` writes the REL's names block (pointer at `PUPPET_NAMES_PTR_ADDR`) only where it differs; "Show player names" (Appearance page, `GameSettings.ShowPlayerNames`) is the block's SHOW flag, local only. Log lines: `[names]`.
 - **Live world** (`docs/live-world.md`): chest and switch bits applied from other players to the current stage are handed to the REL (`LiveWorldPoke` → the REL's boot-stamped block at `LIVEWORLD_PTR_ADDR`, one acknowledged batch at a time), which re-creates the actors that read their flag only at create (chests open empty, walls/floors/ice/barricades vanish, crystals show on, locked doors come back unlocked; a lock byte is never written, docs/live-world.md 0.1). Log lines: `[world] live world:` (client) and `[PUPPET] live world:` per actor (Dolphin).
+- **Live room switches:** latching dungeon-visit (dan) and room (zone) switches sync between players in the same stage / room, on-edges only, apply-once, never echoed (`RoomSwitchSyncService`, `RoomSwitchStore`, hub `JoinRoomSwitches`/`SendRoomSwitches`). Which switches are latching comes from the patch-time switch table, which also keeps push-block (path-encoded) memory switches out of the world sync. Log lines: `[switches]`.
 - **Visibility:** a puppet shows when the other player is in the same stage and room. On the Great Sea (`sea`, whose grid squares and islands are rooms) it's by distance instead, and crossing a square doesn't despawn puppets (`PuppetVisibility`).
 
 ## C# conventions

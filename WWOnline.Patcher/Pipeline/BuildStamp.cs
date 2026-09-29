@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using WWOnline.Patcher.Config;
 using WWOnline.Patcher.Patches;
+using WWOnline.Patcher.WorldData;
 
 namespace WWOnline.Patcher.Pipeline;
 
@@ -21,6 +22,12 @@ namespace WWOnline.Patcher.Pipeline;
 /// over per-file content hashes. The live pipeline hashes GameMod/ directly; a pre-built PatchData
 /// folder carries the same per-file hashes in its <see cref="PatchDataStamp"/>, so both give the same
 /// hash for the same sources and selection.
+///
+/// The patch also writes the switch table (<see cref="SwitchTable"/>, built by the app's own
+/// <see cref="SwitchTableBuilder"/>), so the hash includes <see cref="SwitchTableBuilder.RulesVersion"/>:
+/// a game patched before the table existed, or by an app with other classification rules, reads as
+/// stale. A stamp that records a table (<see cref="Stamp.SwitchTableRules"/>) is stale while that file
+/// is missing or from other rules.
 /// </summary>
 public static class BuildStamp
 {
@@ -34,12 +41,16 @@ public static class BuildStamp
     /// <param name="SourceHash">Hash of the sources (required + the selected optional patches).</param>
     /// <param name="OptionalPatches">Optional patch ids the game was built with (null in stamps from before optional patches).</param>
     /// <param name="Origin">"pipeline" (live compile) or "prebuilt" (client fallback from PatchData/).</param>
+    /// <param name="SwitchTableRules">The <see cref="SwitchTableBuilder.RulesVersion"/> of the switch table the patch
+    /// wrote next to the game (null in stamps that don't record one).</param>
     public sealed record Stamp(string SourceHash, DateTime BuiltAtUtc, int FileCount,
-        string[]? OptionalPatches = null, string? Origin = null);
+        string[]? OptionalPatches = null, string? Origin = null, int? SwitchTableRules = null);
 
     /// <param name="AgainstPatchData">Compared with a pre-built PatchData stamp (installed app), not GameMod sources.</param>
+    /// <param name="Problem">Why an otherwise matching game is stale (its switch table is missing or out of date).</param>
     public sealed record CheckResult(Status Status, string CurrentHash, Stamp? Recorded,
-        bool SelectionChanged = false, IReadOnlyList<string>? DesiredPatches = null, bool AgainstPatchData = false)
+        bool SelectionChanged = false, IReadOnlyList<string>? DesiredPatches = null, bool AgainstPatchData = false,
+        string? Problem = null)
     {
         public IReadOnlyList<string> RecordedPatches => Recorded?.OptionalPatches ?? [];
 
@@ -51,6 +62,8 @@ public static class BuildStamp
             if (SelectionChanged)
                 return $"game build is STALE: it was built with optional patches [{patches}] but [{string.Join(", ", DesiredPatches ?? [])}] " +
                        "are selected now. Re-patch the game.";
+            if (Problem != null)
+                return $"game build is STALE: {Problem}. Patch the game again.";
             if (Status == Status.Fresh)
                 return $"game build is up to date (sources {Short(CurrentHash)}, optional patches [{patches}], built {Recorded!.BuiltAtUtc:u})";
             return AgainstPatchData
@@ -129,6 +142,8 @@ public static class BuildStamp
         // The selection itself is an input too (covers ids whose .asm has vanished).
         var ids = optionalPatchIds.Distinct(StringComparer.Ordinal).OrderBy(i => i, StringComparer.Ordinal);
         manifest.Append("optional:").Append(string.Join(",", ids));
+        // The switch table the patch writes is an output of the app's own classification rules.
+        manifest.Append("\nswitch-table-rules:").Append(SwitchTableBuilder.RulesVersion);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(manifest.ToString()))).ToLowerInvariant();
     }
 
@@ -151,11 +166,36 @@ public static class BuildStamp
     public static string GetStampPath(string gamePath) => Path.Combine(gamePath, FileName);
 
     /// <summary>Stamp a completed Full build of <paramref name="config"/>'s selection.</summary>
-    public static void Write(PatcherConfig config)
+    /// <param name="switchTableRules">The rules of the switch table the build wrote (null: none recorded).</param>
+    public static void Write(PatcherConfig config, int? switchTableRules = null)
     {
         var ids = config.LoadOptionalPatchCatalog().Resolve(config.OptionalPatches).Ids;
         Write(config.GamePath, new Stamp(ComputeSourceHash(config, ids), DateTime.UtcNow,
-            GetSourceFiles(config, ids).Count, ids.ToArray(), "pipeline"));
+            GetSourceFiles(config, ids).Count, ids.ToArray(), "pipeline", switchTableRules));
+    }
+
+    /// <summary>
+    /// Why a game whose stamp records a switch table can't use it: the file is missing or unreadable, or it
+    /// was built with other rules than the stamp says or this app uses. Null when fine (or none recorded).
+    /// <paramref name="required"/>: the checks that can't see the rules in the hash (selection only) need a
+    /// current table even when the stamp records none (stamps from before the table).
+    /// </summary>
+    public static string? SwitchTableProblem(string gamePath, Stamp? recorded, bool required = false)
+    {
+        if ((recorded?.SwitchTableRules ?? (required ? SwitchTableBuilder.RulesVersion : null)) is not int rules) return null;
+        var table = SwitchTable.Load(gamePath);
+        if (table == null) return $"its switch table ({SwitchTable.FileName}) is missing";
+        if (table.Rules != rules || rules != SwitchTableBuilder.RulesVersion)
+            return $"its switch table was built with rules {table.Rules}, this app uses {SwitchTableBuilder.RulesVersion}";
+        return null;
+    }
+
+    /// <summary>A fresh result made stale by <see cref="SwitchTableProblem"/>.</summary>
+    public static CheckResult WithSwitchTable(CheckResult result, string gamePath, bool required = false)
+    {
+        if (result.Status != Status.Fresh) return result;
+        var problem = SwitchTableProblem(gamePath, result.Recorded, required);
+        return problem == null ? result : result with { Status = Status.Stale, Problem = problem };
     }
 
     public static void Write(string gamePath, Stamp stamp) =>
@@ -197,7 +237,8 @@ public static class BuildStamp
         var current = ComputeSourceHash(config, recordedIds);
         var selectionChanged = desired != null && !SameSelection(desired, recordedIds);
         var fresh = recorded.SourceHash == current && !selectionChanged;
-        return new CheckResult(fresh ? Status.Fresh : Status.Stale, current, recorded, selectionChanged, desired);
+        return WithSwitchTable(new CheckResult(fresh ? Status.Fresh : Status.Stale, current, recorded, selectionChanged, desired),
+            config.GamePath);
     }
 
     /// <summary>
@@ -220,7 +261,8 @@ public static class BuildStamp
         var current = patchData.ComputeSourceHash(recordedIds);
         var selectionChanged = desired != null && !SameSelection(desired, recordedIds);
         var fresh = recorded.SourceHash == current && !selectionChanged;
-        return new CheckResult(fresh ? Status.Fresh : Status.Stale, current, recorded, selectionChanged, desired, AgainstPatchData: true);
+        return WithSwitchTable(new CheckResult(fresh ? Status.Fresh : Status.Stale, current, recorded, selectionChanged, desired,
+            AgainstPatchData: true), gamePath);
     }
 
     /// <summary>Selection-only check for a game folder (no GameMod sources and no PatchData stamp).</summary>
@@ -229,7 +271,8 @@ public static class BuildStamp
         var recorded = Read(gamePath);
         if (recorded == null) return new CheckResult(Status.Missing, "", null, DesiredPatches: desiredOptionalPatches.ToList());
         var changed = !SameSelection(desiredOptionalPatches, recorded.OptionalPatches ?? []);
-        return new CheckResult(changed ? Status.Stale : Status.Fresh, recorded.SourceHash, recorded, changed, desiredOptionalPatches.ToList());
+        return WithSwitchTable(new CheckResult(changed ? Status.Stale : Status.Fresh, recorded.SourceHash, recorded, changed,
+            desiredOptionalPatches.ToList()), gamePath, required: true);
     }
 
     public static bool SameSelection(IEnumerable<string> a, IEnumerable<string> b) =>

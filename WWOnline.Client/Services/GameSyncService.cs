@@ -23,6 +23,7 @@ public class GameSyncService : IDisposable
     private readonly SharedWalletService _sharedWallet;
     private readonly StorySyncService _storySync;
     private readonly SharedSmallKeyService _smallKeys;
+    private readonly RoomSwitchSyncService _roomSwitchSync;
 
     private System.Timers.Timer? _puppetBroadcastTimer;
     private System.Timers.Timer? _gameStateBroadcastTimer;
@@ -42,7 +43,8 @@ public class GameSyncService : IDisposable
         WorldFlagSyncService worldFlagSync,
         SharedWalletService sharedWallet,
         StorySyncService storySync,
-        SharedSmallKeyService smallKeys)
+        SharedSmallKeyService smallKeys,
+        RoomSwitchSyncService roomSwitchSync)
     {
         _signalR = signalR;
         _puppetSync = puppetSync;
@@ -52,6 +54,7 @@ public class GameSyncService : IDisposable
         _sharedWallet = sharedWallet;
         _storySync = storySync;
         _smallKeys = smallKeys;
+        _roomSwitchSync = roomSwitchSync;
     }
 
     /// <summary>
@@ -85,6 +88,8 @@ public class GameSyncService : IDisposable
 
         // Shared world: chests / switches / collected items OR-merged across players
         _worldFlagSync.Start();
+        // ...and the live dungeon / room switches of players in the same dungeon or room
+        _roomSwitchSync.Start();
         _sharedWallet.Start();
         // Shared items: the room's inventory / equipment / upgrades, owned by the server
         _roomInventorySync.Start();
@@ -155,6 +160,7 @@ public class GameSyncService : IDisposable
         _gameStateBroadcastTimer = null;
 
         _worldFlagSync.Stop();
+        _roomSwitchSync.Stop();
         _sharedWallet.Stop();
         _roomInventorySync.Stop();
         _storySync.Stop();

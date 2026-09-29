@@ -39,6 +39,8 @@ public partial class App : Application
         services.AddSingleton<GameMemoryMonitorService>();
         services.AddSingleton<DespawnWorker>();
         services.AddSingleton<LiveWorldPoke>();
+        services.AddSingleton<SwitchTableProvider>();
+        services.AddSingleton<RoomSwitchSyncService>();
         services.AddSingleton<PuppetSyncService>();
         services.AddSingleton<RoomInventorySyncService>();
         services.AddSingleton<WorldFlagSyncService>();

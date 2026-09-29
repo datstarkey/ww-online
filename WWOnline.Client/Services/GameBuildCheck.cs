@@ -43,6 +43,7 @@ public static class GameBuildCheck
         var recorded = BuildStamp.Read(gamePath);
         return recorded == null
             ? new BuildStamp.CheckResult(BuildStamp.Status.Missing, "", null)
-            : new BuildStamp.CheckResult(BuildStamp.Status.Fresh, recorded.SourceHash, recorded);
+            : BuildStamp.WithSwitchTable(new BuildStamp.CheckResult(BuildStamp.Status.Fresh, recorded.SourceHash, recorded),
+                gamePath, required: true);
     }
 }
