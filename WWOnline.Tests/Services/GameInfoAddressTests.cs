@@ -58,6 +58,27 @@ public class GameInfoAddressTests
     }
 
     [Fact]
+    public void HeartAddresses_MatchTheVanillaDol()
+    {
+        // item_func_kakera_heart / item_func_utuwa_heart (DOL 0x800C2F28 / 0x800C2F40): lha / sth 0x5B76(gameInfo) =
+        // play.mItemMaxLifeCount.
+        Assert.Equal(0x803CA77Eu, GameMemoryAddresses.Hearts.PendingMaxLife.Address);
+        Assert.Equal(GameMemoryAddresses.GameInfo + 0x5B76, GameMemoryAddresses.Hearts.PendingMaxLife.Address);
+        const uint gi = GameMemoryAddresses.GameInfo;
+        // The Archipelago TWW client's addresses for the same fields (worlds/tww/TWWClient.py): the charts' salvaged
+        // bits (CHARTS_BITFLD_ADDR), a Big Octo's ocean bit (Tingle Island, grid 17), the delivery bag
+        // (LETTER_BASE_ADDR) and its ever-obtained bits (LETTER_OWND_ADDR).
+        Assert.Equal(0x803C4CFCu, gi + GameMemoryAddresses.Hearts.OffCompleteMaps);
+        Assert.Equal(0x803C51EAu, gi + GameMemoryAddresses.Hearts.OffOcean + 17 * 2);
+        Assert.Equal(0x803C4C8Eu, gi + GameMemoryAddresses.Hearts.OffDeliveryBag);
+        Assert.Equal(0x803C4C98u, gi + GameMemoryAddresses.Hearts.OffGetBagReserve);
+        Assert.Equal(GameMemoryAddresses.Events.EventBits, gi + GameMemoryAddresses.Hearts.OffEvents);
+        Assert.Equal(GameMemoryAddresses.WorldFlags.SavedMemoryBase, gi + GameMemoryAddresses.Hearts.OffSavedMemory);
+        Assert.Equal(gi + GameMemoryAddresses.Hearts.OffMaxLife, GameMemoryAddresses.Player.MaxHealth.Address);
+        Assert.Equal(gi + GameMemoryAddresses.Hearts.OffLife, GameMemoryAddresses.Player.CurrentHealth.Address);
+    }
+
+    [Fact]
     public void ClothesInputs_MatchPlayerInit()
     {
         // daPy_lk_c::playerInit (DOL 0x80125AC8-0x80125AEC): isEventBit(gameInfo + 0x624, 0x2A80) and

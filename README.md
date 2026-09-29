@@ -55,7 +55,7 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 |------|---------------|
 | **Shared wallet** | One rupee purse. Anyone's rupees count for everyone. |
 | **Shared world** | Chests, switches and pickups are gone for everyone once someone takes them, and it happens live if you're in the same room: a chest opens empty, a bombed wall vanishes, a locked door comes back unlocked, and a ladder drops or a torch lights when another player clears the room. Small keys too: a key anyone finds is everyone's, and a door anyone unlocks uses it up for everyone. |
-| **Shared items** | One player finding an item unlocks it for the whole room, including heart containers and the magic meter. |
+| **Shared items** | One player finding an item unlocks it for the whole room, including the magic meter. Max hearts come from the room's pieces: every Heart Container and Piece of Heart anyone gets counts once for everyone. |
 | **Shared story** | Main story progress is shared, so you can split up and finish different parts of the game. So is the Nintendo Gallery: a figurine Carlov makes for anyone is made for everyone, so you can split the Picto Box photos between you. |
 | **Shared bait bag** | One stock of All-Purpose Bait and Hyoi Pears. Anyone's purchase, pickup or use counts for everyone. |
 | **Shared spoils bag** | One stock of Joy Pendants, Skull Necklaces, Chu Jellies, Knight's Crests and the other spoils. Anyone's pickup, sale or trade counts for everyone. |
@@ -66,7 +66,7 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 - **Full sync** turns everything on. **Co-op** turns the seven shared-progress rules and warping off, so you see each other (and each other's projectiles) but keep your own progress.
 - Joining a room never throws away progress: if you're further ahead than the room, your progress is added to it.
 - Never shared: health, magic, bomb and arrow counts, bottle contents (the bait, spoils and delivery bags only with their Shared rules), and Picto Box photos (each player gives Carlov their own).
-- The Room page's **Dungeons** card shows each dungeon's small keys, map, compass, big key and boss.
+- The Room page's **Dungeons** card shows each dungeon's small keys, map, compass, big key and boss, and the Room items page shows how many of the 6 Heart Containers and 44 Pieces of Heart the room has.
 - The app's item icons are read from your own game files and stay on your PC.
 
 **Planned:** shared weather, wind and time of day (off by default), a "no player collision" option (players bump into each other today), PVP and riding in each other's boats.
@@ -158,7 +158,7 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj
 - Copy `GameMod/config.example.json` to `GameMod/config.json` and set `vanilla_game_path` (your extracted game) and `game_path` (the patched output).
 - `.\scripts\dev-test.ps1` runs a local two-player test: two Dolphins and two clients, with Player 1 hosting. `-Patch` also rebuilds the in-game code. Logs go to `logs/latest/`.
 - `python scripts/dolphin-crash-context.py <dolphin pid> tww-decomp/config/GZLE01/symbols.txt` prints the registers and stack of a game crash from the running Dolphin (read-only).
-- `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules. `docs/` has the design notes (held items and projectiles, live world, small keys, event flags, optional patches), [softlocks and warping](docs/softlocks.md), [self-hosting](docs/self-hosting.md) and [releasing](docs/releasing.md).
+- `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules. `docs/` has the design notes (held items and projectiles, live world, small keys, hearts, event flags, optional patches), [softlocks and warping](docs/softlocks.md), [self-hosting](docs/self-hosting.md) and [releasing](docs/releasing.md).
 
 **How it works, in short:** an Avalonia desktop app reads and writes the running game's memory through Dolphin, and a SignalR server relays each player's state. On the game side, a small injected module (C, built with devkitPPC and linked against [the Wind Waker decompilation](https://github.com/zeldaret/tww)) spawns and animates the other players' Links. The game's own code does the work, so they move, fight and draw just like the real Link.
 

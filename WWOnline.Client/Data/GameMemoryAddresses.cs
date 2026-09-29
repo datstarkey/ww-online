@@ -436,6 +436,37 @@ public static class GameMemoryAddresses
     }
 
     /// <summary>
+    /// Derived max health (SharedHeartService, docs/hearts.md): the save data the heart flags live in, read as one
+    /// block from gameInfo (dSv_save_c: dSv_player_c /* 0x000 */ .. dSv_event_c /* 0x624 */, d_save.h:908-911),
+    /// and the game's own pending max-life change.
+    /// </summary>
+    public static class Hearts
+    {
+        /// <summary>dSv_player_status_a_c /* 0x0 */ mMaxLife, /* 0x2 */ mLife (u16, quarter hearts).</summary>
+        public const int OffMaxLife = 0x0, OffLife = 0x2;
+        /// <summary>dSv_player_c /* 0x076 */ mBagItem → dSv_player_bag_item_c /* 0x10 */ mReserve[8]: the delivery bag.</summary>
+        public const int OffDeliveryBag = 0x76 + 0x10;
+        /// <summary>dSv_player_c /* 0x090 */ mGetBagItem → dSv_player_get_bag_item_c /* 0x0 */ u32 mReserveFlags.</summary>
+        public const int OffGetBagReserve = 0x90;
+        /// <summary>dSv_player_c /* 0x0C4 */ mMap → dSv_player_map_c field_0x0[3][4] (+0x30): isCompleteMap (d_save.cpp:894-897).</summary>
+        public const int OffCompleteMaps = 0xC4 + 0x30;
+        /// <summary>dSv_save_c /* 0x380 */ mMemory[16] (the saved memBits; <see cref="WorldFlags.SavedMemoryBase"/>).</summary>
+        public const int OffSavedMemory = 0x380;
+        /// <summary>dSv_save_c /* 0x5C0 */ mOcean: dSv_ocean_c u16 field_0x0[50] (isOceanSvBit, d_save.cpp:1171-1175).</summary>
+        public const int OffOcean = 0x5C0;
+        /// <summary>dSv_save_c /* 0x624 */ mEvent (<see cref="Events.EventBits"/>).</summary>
+        public const int OffEvents = 0x624;
+        /// <summary>gameInfo .. the end of mEvent (0x624 + 0x100).</summary>
+        public const int SaveBlockLength = OffEvents + 0x100;
+
+        /// <summary>play.mItemMaxLifeCount (d_com_inf_game.h "/* 0x48D6 */ s16"): the max-life change queued for the HUD.
+        /// item_func_kakera_heart adds 1 and item_func_utuwa_heart 4 (DOL 0x800C2F30 / 0x800C2F54: lha / sth
+        /// 0x5B76(gameInfo)); dMeter_LifeMove adds it to mMaxLife clamped 0..80, zeroes it, refills life on a gain and
+        /// clamps it on a loss, and animates the heart row (d_meter.cpp:1405-1433).</summary>
+        public static readonly MemoryAddress<short> PendingMaxLife = new(Play + 0x48D6, "PendingMaxLife", "Max-life change queued for the HUD (dComIfGp_setItemMaxLifeCount)");
+    }
+
+    /// <summary>
     /// Warp to player (WarpService, docs/softlocks.md): where the current stage was entered, the
     /// stage-change request, and the local Link's position.
     /// </summary>
