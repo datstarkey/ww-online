@@ -112,29 +112,29 @@ public static class ItemIDs
     }
     
     /// <summary>
-    /// Delivery Bag items
+    /// Delivery Bag items (d_item_data.h 0x8C-0x9E; the room's bag is DeliveryCounts)
     /// </summary>
     public static class Delivery
     {
-        public const byte TownFlower = 0x2E;         // Town Flower
-        public const byte SeaFlower = 0x2F;          // Sea Flower
-        public const byte ExoticFlower = 0x30;       // Exotic Flower
-        public const byte HeroFlag = 0x31;           // Hero's Flag
-        public const byte BigCatchFlag = 0x32;       // Big Catch Flag
-        public const byte BigSaleFlag = 0x33;        // Big Sale Flag
-        public const byte Pinwheel = 0x34;           // Pinwheel
-        public const byte SickleMoonFlag = 0x35;     // Sickle Moon Flag
-        public const byte SkullTowerIdol = 0x36;     // Skull Tower Idol
-        public const byte FountainIdol = 0x37;       // Fountain Idol
-        public const byte PostmanStatue = 0x38;      // Postman Statue
-        public const byte ShopGuruStatue = 0x39;     // Shop Guru Statue
-        public const byte FathersLetter = 0x3A;      // Father's Letter
-        public const byte NoteToMom = 0x3B;          // Note to Mom
-        public const byte MaggiesLetter = 0x3C;      // Maggie's Letter
-        public const byte MoblinsLetter = 0x3D;      // Moblin's Letter
-        public const byte CabanaDeed = 0x3E;         // Cabana Deed
-        public const byte ComplimentLetter = 0x3F;   // Compliment Letter
-        public const byte FillUpCoupon = 0x40;       // Fill-Up Coupon
+        public const byte TownFlower = 0x8C;         // Town Flower
+        public const byte SeaFlower = 0x8D;          // Sea Flower
+        public const byte ExoticFlower = 0x8E;       // Exotic Flower
+        public const byte HeroFlag = 0x8F;           // Hero's Flag
+        public const byte BigCatchFlag = 0x90;       // Big Catch Flag
+        public const byte BigSaleFlag = 0x91;        // Big Sale Flag
+        public const byte Pinwheel = 0x92;           // Pinwheel
+        public const byte SickleMoonFlag = 0x93;     // Sickle Moon Flag
+        public const byte SkullTowerIdol = 0x94;     // Skull Tower Idol
+        public const byte FountainIdol = 0x95;       // Fountain Idol
+        public const byte PostmanStatue = 0x96;      // Postman Statue
+        public const byte ShopGuruStatue = 0x97;     // Shop Guru Statue
+        public const byte FathersLetter = 0x98;      // Father's Letter
+        public const byte NoteToMom = 0x99;          // Note to Mom
+        public const byte MaggiesLetter = 0x9A;      // Maggie's Letter
+        public const byte MoblinsLetter = 0x9B;      // Moblin's Letter
+        public const byte CabanaDeed = 0x9C;         // Cabana Deed
+        public const byte ComplimentaryId = 0x9D;    // Complimentary ID
+        public const byte FillUpCoupon = 0x9E;       // Fill-Up Coupon
     }
     
     /// <summary>

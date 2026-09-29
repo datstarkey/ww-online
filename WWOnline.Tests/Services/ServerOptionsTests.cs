@@ -96,9 +96,10 @@ public class ServerOptionsTests
     public void AllNoSharedFlags_TurnTheRulesOff()
     {
         var o = Parse(["--no-shared-wallet", "--no-shared-world", "--no-shared-items", "--no-shared-story",
-                       "--no-shared-projectiles", "--no-shared-bait", "--no-shared-spoils", "--no-warping"]).Options;
+                       "--no-shared-projectiles", "--no-shared-bait", "--no-shared-spoils", "--no-shared-delivery",
+                       "--no-warping"]).Options;
         Assert.False(o.SharedWallet || o.SharedWorld || o.SharedItems || o.SharedStory || o.SharedProjectiles || o.SharedBait ||
-                     o.SharedSpoils || o.AllowWarping);
+                     o.SharedSpoils || o.SharedDelivery || o.AllowWarping);
     }
 
     [Theory]
@@ -158,6 +159,18 @@ public class ServerOptionsTests
         Assert.True(env.Options.SharedBait);
         Assert.False(Parse(["--no-shared-spoils"], new() { ["WWO_SHARED_SPOILS"] = "yes" }).Options.SharedSpoils);
         Assert.False(Parse([], new() { [ServerOptions.SharedSpoilsVar] = "sometimes" }).IsValid);
+    }
+
+    [Fact]
+    public void SharedDelivery_DefaultsOn_ReadsItsVariable_AndTheFlagWins()
+    {
+        Assert.True(Parse([]).Options.SharedDelivery);
+        var env = Parse([], new() { [ServerOptions.SharedDeliveryVar] = "off" });
+        Assert.True(env.IsValid);
+        Assert.False(env.Options.SharedDelivery);
+        Assert.True(env.Options.SharedSpoils);
+        Assert.False(Parse(["--no-shared-delivery"], new() { ["WWO_SHARED_DELIVERY"] = "true" }).Options.SharedDelivery);
+        Assert.False(Parse([], new() { [ServerOptions.SharedDeliveryVar] = "perhaps" }).IsValid);
     }
 
     [Fact]

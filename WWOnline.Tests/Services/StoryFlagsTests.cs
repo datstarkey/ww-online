@@ -172,13 +172,15 @@ public class RoomPresetTests
     public void ApplyPreset_SetsEveryRule()
     {
         var coop = new RoomSettings().ApplyPreset(RoomPreset.Coop);
-        Assert.False(coop.SharedWallet || coop.SharedWorld || coop.SharedItems || coop.SharedStory || coop.SharedBait || coop.SharedSpoils);
+        Assert.False(coop.SharedWallet || coop.SharedWorld || coop.SharedItems || coop.SharedStory || coop.SharedBait || coop.SharedSpoils ||
+                     coop.SharedDelivery);
         Assert.False(coop.AllowWarping); // nothing syncs in Co-op, so nobody gets stuck
         Assert.True(coop.SharedProjectiles); // Co-op still shows each other's projectiles
         Assert.Equal(RoomPreset.Coop, coop.MatchingPreset());
 
         var full = coop.ApplyPreset(RoomPreset.FullSync);
-        Assert.True(full.SharedWallet && full.SharedWorld && full.SharedItems && full.SharedStory && full.SharedBait && full.SharedSpoils && full.SharedProjectiles);
+        Assert.True(full.SharedWallet && full.SharedWorld && full.SharedItems && full.SharedStory && full.SharedBait && full.SharedSpoils &&
+                    full.SharedDelivery && full.SharedProjectiles);
         Assert.True(full.AllowWarping);
         Assert.Equal(RoomPreset.FullSync, full.MatchingPreset());
     }
@@ -235,6 +237,15 @@ public class RoomPresetTests
         var coopWithSpoils = new RoomSettings().ApplyPreset(RoomPreset.Coop);
         coopWithSpoils.SharedSpoils = true;
         Assert.Equal(RoomPreset.Custom, coopWithSpoils.MatchingPreset());
+    }
+
+    [Fact]
+    public void DeliveryRule_IsPartOfBothPresets()
+    {
+        Assert.Equal(RoomPreset.Custom, new RoomSettings { SharedDelivery = false }.MatchingPreset());
+        var coopWithDelivery = new RoomSettings().ApplyPreset(RoomPreset.Coop);
+        coopWithDelivery.SharedDelivery = true;
+        Assert.Equal(RoomPreset.Custom, coopWithDelivery.MatchingPreset());
     }
 
     [Fact]
