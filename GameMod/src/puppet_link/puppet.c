@@ -14,6 +14,8 @@
 #include "puppet_draw.c"
 // The item the peer holds / uses (called from execute and draw)
 #include "puppet_held.c"
+// More of the peer's procs: real inits or relabelled poses (called from execute)
+#include "puppet_procs_extra.c"
 // Shared-world layer 2: live despawn of placed items other players collected
 #include "puppet_worldsync.c"
 // The peer's King of Red Lions
