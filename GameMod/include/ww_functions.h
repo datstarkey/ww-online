@@ -5226,7 +5226,7 @@ undefined daPy_lk_c__dProcHandUp_init(daPy_lk_c * this);
 undefined daPy_lk_c__dProcHandUp(daPy_lk_c * this);
 undefined daPy_lk_c__dProcIceSlip_init(daPy_lk_c * this);
 undefined daPy_lk_c__dProcIceSlip(daPy_lk_c * this);
-undefined daPy_lk_c__getLadderMoveAnmSpeed(daPy_lk_c * this);
+f32 daPy_lk_c__getLadderMoveAnmSpeed(daPy_lk_c * this);
 undefined daPy_lk_c__setLadderFootSe(daPy_lk_c * this);
 undefined daPy_lk_c__changeLadderMoveProc(daPy_lk_c * this, int param_1);
 undefined daPy_lk_c__setMoveBGLadderCorrect(daPy_lk_c * this);
