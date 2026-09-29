@@ -1,6 +1,8 @@
 # Live world: another player's action happens in your world
 
-When a player in the same room opens a chest, blows up a wall, hits a switch or clears a room so a ladder drops, the other players see the same thing live, and nobody can get a chest's item twice. This is the design doc: what is built (§0), then the research it rests on (§1-§8).
+When a player in the same room opens a chest, blows up a wall, hits a switch or clears a room so a ladder drops, the other players see the same thing live, and nobody can get a chest's item twice. This is the design doc: what is built (§0), then the research it rests on (§1-§8, written before the build: "today" there means before stages 1-2).
+
+**Status (v0.1.0):** stage 1 (#12, key doors re-created #15) and stages 1b + 2 (#13, protocol 3) are merged. Chests and key doors were verified in game on 2026-09-29 (checklist A below). The room switches (checklist B) are merged but not explicitly verified in game: in particular the drop-down ladder (B1) hasn't been seen to drop on the other screen yet.
 
 - Most puzzle objects **poll** their switch every frame. When a bit reaches your live save data, they react on their own, often with the same short camera cutscene you would get if you had pressed the switch yourself. That works for memory switches (0x00-0x7F), which `WorldFlagSyncService` syncs.
 - About **half the in-room puzzle switches are not memory switches.** They are dungeon-visit (`dan`, 0x80-0xBF) or room-temporary (`zone`, 0xC0-0xEF) switches. That includes **16 of 18 drop-down ladders** (kill-all-enemies → room switch 0xE0), most torches and about half the crystal and floor switches. Stage 2 syncs the latching ones, chosen by a table built at patch time (stage 1b).
@@ -11,9 +13,9 @@ Citations are `tww-decomp/` paths unless they name a repo file. Offsets marked *
 
 ## 0. What is built
 
-### Stage 1: REL catch-up for create-only actors (`feature/live-world`)
+### Stage 1: REL catch-up for create-only actors (#12, #15)
 - **C#** (`LiveWorldPoke`, fed by `WorldFlagSyncService`): the chest and memory-switch bits it applies **from other players** to the current stage's live copy are recorded per stage visit (the `_remoteItemMask` idea). Each tick it hands the REL the ones the live copy now has (read back, so the REL never acts on a bit the game lacks) and that the REL hasn't handled yet.
-- **Block** (`puppet_shared.h` `LIVEWORLD_*`, pointer in scratch word `0x803FD14C`): a 0x48-byte game-heap block the REL allocates once and never frees, boot-stamped like the names block (`BootStampedBlock` / `puppet_bootBlock`, shared). One **batch of new bits** at a time: C# writes it under a seqlock (SEQ odd, TAG = "LW" | saveTbl, ZONE_ROOM, BITS[9], SEQ even) only once the REL has acknowledged the previous one (`DONE_SEQ == SEQ`), so each bit is handled once. BITS: word 0 = chests, words 1..8 = switch *n* in word `1 + (n >> 5)` (memory, dan, and the zone switches of ZONE_ROOM).
+- **Block** (`puppet_shared.h` `LIVEWORLD_*`, pointer in scratch word `0x803FD14C`): a 0x4C-byte game-heap block the REL allocates once and never frees, boot-stamped like the names block (`BootStampedBlock` / `puppet_bootBlock`, shared). One **batch of new bits** at a time: C# writes it under a seqlock (SEQ odd, TAG = "LW" | saveTbl, ZONE_ROOM, BITS[9], SEQ even) only once the REL has acknowledged the previous one (`DONE_SEQ == SEQ`), so each bit is handled once. BITS: word 0 = chests, words 1..8 = switch *n* in word `1 + (n >> 5)` (memory, dan, and the zone switches of ZONE_ROOM).
 - **REL** (`puppet_liveworld.c`, called first thing in every puppet's **draw**, parked ones too, once per frame, every 4th frame): one `fopAcIt_Judge` pass over a table `{proc, shift, mask, lock offsets}`. It runs in the draw, after every execute of the frame, because the player orders a chest's TREASURE event with the chest's pointer in its own execute (`d_a_player_main.cpp:4166`), which runs after the puppet's: from the execute we could delete a chest the player has just targeted, and the event would then use a freed actor. In the draw, `mOrderCount` holds every order of the frame.
 
 | Actor (proc) | Key | Action | Result |
@@ -43,7 +45,7 @@ So a locked door is now **re-created** like a chest: its create builds it exactl
 
 **The chest in the same session.** A Stage.arc chest logs `room -1` (for example `re-created proc 0x126 prm 0xff000001 room -1`: tbox 0, func 1). That's its real `home.roomNo`: stage actors are created with room -1 (`dStage_tgscInfoInit`/`dStage_actorInit`: `appen->room_no = i_stage->getRoomNo()`, -1 for the stage) in the stage's layer, and the chest finds its room itself (`searchRoomNo`: `home.angle.x & 0x3F`). The re-create does the same, so room -1 is correct and not a crash suspect by itself. The room gate is skipped for room -1 (the stage is always loaded). The OSReport now reads the actor's fields before the delete.
 
-**In-game checklist (stage 1).** Two players, Shared world on, P2 standing in the room while P1 acts. Check `client-Player2.log` for `live world: handing the REL` then `REL handled`.
+**In-game checklist (stage 1).** Chests and key doors verified in game on 2026-09-29. Two players, Shared world on, P2 standing in the room while P1 acts. Check `client-Player2.log` for `live world: handing the REL` then `REL handled`.
 
 | # | Where | P1 does | Expected on P2 |
 |---|---|---|---|
@@ -58,7 +60,7 @@ So a locked door is now **re-created** like a chest: its create builds it exactl
 | A7 | A1 with P2 in a cutscene, or mid-room-load | | Catches up when the event ends / the room has loaded; nothing duplicates on re-entering the room (layer check) |
 | A8 | A1, then P1 leaves the stage | | P2's chest still opens (P2 keeps a parked puppet until the REL acknowledges) |
 
-### Stage 1b: the switch table (`feature/live-switches`)
+### Stage 1b: the switch table (#13)
 - **Built at patch time from the player's own game** (`WWOnline.Patcher/WorldData`): `StageDataReader` reads every `files/res/Stage/*/Stage.arc` and `Room*.arc` (only the archive header and the .dzs/.dzr are inflated; all layers), the STAG chunk gives each stage's save slot, and main.dol's `l_objectName` (0x80372818) maps object names to process names. `SwitchTableBuilder.SettersOf` says what each actor kind does to its switch (from the decomp, proc names read from each REL's profile). Pipeline step 7 (`BuildSwitchTableStep`, Full builds) and the pre-built patch path both write `<game>/wwo-switch-table.json` (a few KB, ~0.2 s). It is never in the repo; `SwitchTableProvider` finds it next to the patched game (Settings game folder, else the dev config's `game_path`) and re-reads it after a new patch. A patch without stage data fails rather than writing no table; a stage whose archives can't be read (damaged or modded) is skipped and named in the patch log.
 - **Enforced like the rest of the build:** `SwitchTableBuilder.RulesVersion` (bump it whenever the classification changes) is part of the build stamp's source hash, so a game patched before the table existed or with other rules reads as **stale — patch again** (dev sources, installed PatchData and selection-only checks alike). The stamp records the rules of the table it wrote (`SwitchTableRules`), and a stamped game whose table is missing or from other rules is stale too. The client ignores a table from other rules.
 - **Classification** (per save slot for memory switches, per **stage** for dan switches, per stage room for zone switches; a Stage.arc actor's zone room is its own room field, or "unknown"). Dan switches are per stage, not per slot: the game keeps them per slot (`dComIfGs_initDan` only resets on a new slot, `d_save.cpp:1225`), but the stages that share a slot are separate visits (the sea caves in slots 12/13: you always leave through the sea), so `TF_01`'s kill-all doors must not open `TF_02`'s:
@@ -78,19 +80,19 @@ So a locked door is now **re-created** like a chest: its create builds it exactl
 
   A dan or zone switch syncs only if at least one latching setter uses it and no unsafe one does; a switch nobody is known to set (enemy death switches, events) is left alone. An unsafe setter with an unknown room excludes that switch in every room of the stage. On the vanilla game (rules 2) this gives 68 dan and 161 room switches (the 0xE0 ladder rooms `PShip/0-2`, `SubD45/0-2`, `SubD71/1-2`, `M_Dai/5`, ToTG, WT and FW rooms, the sea caves, the sea) and 27 excluded push-block memory switches.
 
-### Stage 2: live dan and room switches (`feature/live-switches`, protocol 2)
+### Stage 2: live dan and room switches (#13, protocol 3)
 - **What syncs:** the table's syncable dan switches between players in the same stage (and save slot), and zone switches between players in the same stage **and** room (at sea too: each square is a room with its own zone), while **Shared world** is on. On-edges only.
 - **Client** (`RoomSwitchSyncService` + `RoomSwitchTracker`, 4 Hz, scene stable and the same room for 1 s): reads the place (stage name, STAG save slot, `mStayNo`), `mDan` (gameInfo+0x79C, only while its `mStageNo` is this slot) and the stay room's zone (`mStatus[room].mZoneNo`, only if `mZone[z].mRoomNo == room`). A new place **joins** the server's store for it (sending its own latching bits) and applies what the players there set. Then new local bits are sent, received bits are ORed in (u32 dan words, u16 zone words).
   - **Echo guard:** a bit received from the room is never sent back; nobody ever sends a clear.
   - **Apply once:** a room bit is written at most once per place, and never if this game has had it there (it may have turned it off itself, e.g. a torch blown out): the room's copy would re-latch it. A bit counts as applied only once the write landed. A new room keeps the stage's dan bookkeeping; a new stage starts afresh, and so does anything that drops the scene gate (a load, void-out, game over, soft reset, title screen): the reload clears the room's switches even at the same place, so the client leaves and joins again.
   - Applied dan/zone bits also go to `LiveWorldPoke` (words 5-8, ZONE_ROOM = the stay room), so the stage-1 REL pass catches up ice blocks and crystal visuals on room switches. **No REL change in stage 2.**
 - **Server** (`RoomSwitchStore`, `GameHub.JoinRoomSwitches` / `SendRoomSwitches` → `ReceiveRoomSwitches`): every input is validated (`RoomSwitches.IsValid`: stage 1-8 printable ASCII, slot 0-15, room 0-63, exactly 2+2 words, no bits past 0xEF). Each connection is at one place; bits merge up per stage (dan) and per stage room (zone); new bits go to the others in the same room (dan + zone) and dan-only to the rest of the stage, nobody else. A stage's dan bits are dropped when its last player leaves, a room's zone bits when the last player leaves the room (a fresh visit starts clean, like the game). `SendRoomSwitches` for a place the connection hasn't joined returns false and the client joins again (the store was cleared, e.g. Shared world off and on between two ticks); clients also rejoin on every room-rules change. Turning Shared world off clears the store.
-- **Protocol:** `HubConstants.ProtocolVersion` 1 → **2** (new hub methods, callback and DTO). Held items (#6) and boat parts (#7) share protocol 2: nothing was released in between.
+- **Protocol:** `HubConstants.ProtocolVersion` 2 → **3** (new hub methods, callback and DTO; 2 was held items #6 and boat parts #7).
 - **Per object** (the §3 classes, confirmed): ladders `Mhsg` (A+ev: poll, drop with their event), torches (A), floor and iron-boots switches (A), shutters / bars / gates (A+ev), switch-appear chests (A+ev) react on their own. Crystal visuals and ice blocks on room switches are B: the stage-1 REL pass handles them. Kill-all bars and genocide chests still count your own enemies (local); a synced `ALLdie` switch opens what polls it.
 - **Also:** push-block memory switches are no longer sent or applied by the world sync (`PushBlockSwitches`).
 - **Logs:** `[switches]` in `client-PlayerN.log` (`at … syncable here`, `joined`, `local set … → sending`, `room set`, `applied`) and `server.log` (`is at …`, `set …`).
 
-**In-game checklist (stage 2).** Two players, Shared world on, both in the room. Patch the game again first (the table is written by the patch).
+**In-game checklist (stage 2).** Not yet run as a whole: B1 (the ladder) in particular is unverified. Two players, Shared world on, both in the room. Patch the game again first (the table is written by the patch).
 
 | # | Where | P1 does | Expected on P2 |
 |---|---|---|---|
@@ -115,10 +117,10 @@ So a locked door is now **re-created** like a chest: its create builds it exactl
 
 | Switch no. | Store | Lifetime | Synced today |
 |---|---|---|---|
-| `0x00-0x7F` | `mMemory.mMembit.mSwitch[4]` (`d_save.h:685`) | Per stage save slot. Saved to the card (`putSave`) | **Yes**, OR-merged, applied once per bit (`SwitchApplyGuard`) |
-| `0x80-0xBF` | `mDan.mSwitch[2]` (`d_save.h:754`, `dSv_danBit_c`) | The current save slot's visit. `dStage_stagInfoInit` → `dComIfGs_initDan(saveTbl)` (`src/d/d_stage.cpp:1669-1677`) clears it when the slot changes (`d_save.cpp:1225-1234`). A reload of the same dungeon keeps it. Never saved | No |
-| `0xC0-0xDF` | `mZone[z].mZoneBit.mSwitch[0..1]` (`d_save.h:770`) | Per room. The zone is created when the room loads (`src/d/d_s_room.cpp:193-197`). `zoneCountCheck` removes it after 2 room changes away (`d_stage.cpp:236, 250-263`). Never saved | No |
-| `0xE0-0xEF` | `mZone[z].mZoneBit.mSwitch[2]` | **Cleared on every room change** (`clearRoomSwitch`: `d_save.cpp:1274`, `d_stage.cpp:137, 254`, `d_s_room.cpp:82`). This is "this visit of this room" | No |
+| `0x00-0x7F` | `mMemory.mMembit.mSwitch[4]` (`d_save.h:685`) | Per stage save slot. Saved to the card (`putSave`) | **Yes**, OR-merged, applied once per bit (`SwitchApplyGuard`); push-block (path-encoded) switches excluded since stage 1b |
+| `0x80-0xBF` | `mDan.mSwitch[2]` (`d_save.h:754`, `dSv_danBit_c`) | The current save slot's visit. `dStage_stagInfoInit` → `dComIfGs_initDan(saveTbl)` (`src/d/d_stage.cpp:1669-1677`) clears it when the slot changes (`d_save.cpp:1225-1234`). A reload of the same dungeon keeps it. Never saved | Latching ones, since stage 2 (§0) |
+| `0xC0-0xDF` | `mZone[z].mZoneBit.mSwitch[0..1]` (`d_save.h:770`) | Per room. The zone is created when the room loads (`src/d/d_s_room.cpp:193-197`). `zoneCountCheck` removes it after 2 room changes away (`d_stage.cpp:236, 250-263`). Never saved | Latching ones, since stage 2 |
+| `0xE0-0xEF` | `mZone[z].mZoneBit.mSwitch[2]` | **Cleared on every room change** (`clearRoomSwitch`: `d_save.cpp:1274`, `d_stage.cpp:137, 254`, `d_s_room.cpp:82`). This is "this visit of this room" | Latching ones, since stage 2 |
 | `0xFF` / `-1` | none | | |
 
 - **Items** (`dSv_info_c::onItem/isItem`, `d_save.cpp:1629-1669`): `0x00-0x3F` go to `memBit.mItem`, and bits 32-63 alias `mVisitedRoom[0]` (`puppet_worldsync.c` already notes this). `0x40-0x4F` go to `zone.mItem`.
@@ -295,14 +297,14 @@ If the other player opens a chest while you are in the same room, your chest sta
   - Zone off-edges without the echo guard.
 - **Scene stability.** C# writes the live memBit only behind `SceneStabilityGate`. REL pokes must keep `puppet_worldsync_tick`'s gates: `NEXT_STAGE_ENABLE == 0`, stag pointer valid, stage tag matches. They must also add "no event running" and "target room is loaded (`checkRoomDisp`)". Zone writes need `mZoneNo >= 0` and must be for the local stay room.
 - **Save data:** applied memBit bits are saved by your game, which is intended. Dan and zone bits are never saved, so stage 2 can't corrupt a save.
-- **REL budget:** RELS.arc is near its 64 KB ARAM guard (with held items and boat parts). Stage 1 costs 1680 bytes of REL.
+- **REL budget:** since the REL is stored Yaz0 (#11), RELS.arc grows by about 35 KB of its 64 KB ARAM guard (v0.1.0). Stage 1 costs 1680 bytes of REL.
 
 ---
 
 ## 8. Staged plan
 
 ### Stage 0: find out what already works (no code)
-Two players, **Shared world on** (and Shared wallet on for T1). P1 acts while P2 stands in the same room. Check `logs/latest/client-Player2.log` for `[world] applied … (current stage, live)` and watch P2's screen. Room numbers are stage-file rooms (`M_NewD2` = Dragon Roost Cavern, save slot 3; `Siren` = Tower of the Gods; `kindan` = Forbidden Woods; `kaze` = Wind Temple; `M_Dai` = Earth Temple).
+The expectations below are the behaviour **before** stages 1-2 (kept as the baseline they fixed). Two players, **Shared world on** (and Shared wallet on for T1). P1 acts while P2 stands in the same room. Check `logs/latest/client-Player2.log` for `[world] applied … (current stage, live)` and watch P2's screen. Room numbers are stage-file rooms (`M_NewD2` = Dragon Roost Cavern, save slot 3; `Siren` = Tower of the Gods; `kindan` = Forbidden Woods; `kaze` = Wind Temple; `M_Dai` = Earth Temple).
 
 | # | Where | P1 does | Expected on P2 | Class |
 |---|---|---|---|---|
@@ -323,13 +325,13 @@ Two players, **Shared world on** (and Shared wallet on for T1). P1 acts while P2
 
 ### Stage 1: REL poke for create-only objects on memory switches and chests — **built (§0)**
 - **C#** (`WorldFlagSyncService`): track `remoteTbox` and `remoteSwitch[4]` for the current stage, i.e. bits applied from others. This is the same idea as `_remoteItemMask`.
-- **Layout.** Publish them in a **REL-allocated game-heap block** like `PUPPET_NAMES_*` (magic, boot stamp, stage tag, masks, a "handled" mask the REL owns, a counter and the last action). Its pointer goes in the free scratch word **0x803FD14C** (`puppet_shared.h`; `0x803FD16C` is earmarked for the held-items FX block).
+- **Layout.** Publish them in a **REL-allocated game-heap block** like `PUPPET_NAMES_*` (magic, boot stamp, stage tag, masks, a "handled" mask the REL owns, a counter and the last action). Its pointer goes in the free scratch word **0x803FD14C** (`puppet_shared.h`; `0x803FD16C` became the projectile events block's pointer).
 - **REL** (`puppet_worldsync.c`): one `fopAcIt_Judge` pass over a small table `{procName, param field/shift/width, bit space, action}`:
   - `TBOX` (tbox no. = `(prm>>7)&0x1F`, `include/d/actor/d_a_tbox.h:35`) → re-create.
   - `TBOX` func 2 (`swNo = (prm>>12)&0xFF`) → re-create.
   - `WALL`, `FLOOR`, `Obj_Ice`, `MjDoor` → delete.
   - `SWHIT0` (`prm&0xFF`), `SAKU` → re-create.
-  - `DOOR10/12` small-key lock → the `docs/small-keys.md` §3 byte write. Share this judge with it.
+  - `DOOR10/12` small-key lock → the `docs/small-keys.md` §3 byte write. (Built as a re-create instead: the byte write froze the game, §0.1.)
 - **Gates:** as in 7.2. Handle each bit once per stage tag.
 - **No protocol change.** Needs a re-patch (build stamp). REL about +1-1.5 KB. Put the diagnostics in the block, not in scratch.
 - **Effort** 2-3 days. **Risk** low-medium. The layer trap (3) is the one to get right. Fixes bug 7.1, the stale key locks, walls and crystal visuals.
@@ -362,7 +364,7 @@ Chest-open, lever and door-push poses, as relabelled procs (the `puppet_initBoat
 | Stage | Delivers | Needs | Effort | Risk |
 |---|---|---|---|---|
 | 0 | Checklist of what works now | nothing | ½ day of play | none |
-| 1 | Chests open live (no duplicate items), walls/ice/barricades vanish, crystals show on, key locks clear | C# masks + REL heap block + judge table; 1 scratch word (0x803FD14C); re-patch; no protocol change | 2-3 d | low-med |
+| 1 | Chests open live (no duplicate items), walls/ice/barricades vanish, crystals show on, key doors come back unlocked | C# masks + REL heap block + judge table; 1 scratch word (0x803FD14C); re-patch; no protocol change | 2-3 d | low-med |
 | 1b | Switch semantics table; no push-block corruption | patcher step, C# filter | 1-2 d | low |
 | 2 | Ladders, most torches, crystals and floor switches live for players in the same room/dungeon | C# zone/dan read-write, hub method + DTO + dan store, **ProtocolVersion bump** | 3-5 d | med |
 | 3 | No-cutscene mode, timed puzzles in sync | REL apply-and-recreate, C# rule | 3-4 d | med-high |

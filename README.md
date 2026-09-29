@@ -37,11 +37,14 @@
 ## What it does
 
 **See each other**
-- Other players appear as real Links: running, rolling, climbing, crouching, sword combos, shield, sheathing and the Master Sword glow.
+- Other players appear as real Links: running, rolling, crouching, sword combos, shield, sheathing and the Master Sword glow.
+- They climb like you do: ledge grabs, hanging and shimmying, ladders and vine walls, sidling along walls, pushing and pulling blocks, and crawling.
 - Their equipment shows: sword, shield (including the Mirror Shield) and hero's clothes or pajamas.
+- They hold and use their items: bow (with aim), boomerang, hookshot, Deku Leaf, Skull Hammer, Wind Waker, bottles, telescope, Picto Box, Tingle Tuner, and a carried bomb with a burning fuse.
 - Each player picks their own tunic colour (black Link, purple Link, anything), and everyone sees it change live.
 - Player names above heads: each player's name floats above their Link, in the game's own font. It shrinks with distance and hides in cutscenes and menus (turn it off under **Appearance**).
-- Out on the Great Sea you see each other sailing in your own King of Red Lions.
+- Out on the Great Sea you see each other sailing in your own King of Red Lions, with the sail in their tunic colour, and their cannon or salvage crane when they take it out.
+- You see up to three other players at once.
 
 **Play one adventure together (a "room")**
 
@@ -50,15 +53,16 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 | Rule | What it means |
 |------|---------------|
 | **Shared wallet** | One rupee purse. Anyone's rupees count for everyone. |
-| **Shared world** | Chests, switches and pickups are gone for everyone once someone takes them. Small keys too: a key anyone finds is everyone's, and a door anyone unlocks uses it up for everyone. |
+| **Shared world** | Chests, switches and pickups are gone for everyone once someone takes them, and it happens live if you're in the same room: a chest opens empty, a bombed wall vanishes, a locked door comes back unlocked, and a ladder drops or a torch lights when another player clears the room. Small keys too: a key anyone finds is everyone's, and a door anyone unlocks uses it up for everyone. |
 | **Shared items** | One player finding an item unlocks it for the whole room, including heart containers and the magic meter. |
 | **Shared story** | Main story progress is shared, so you can split up and finish different parts of the game. |
 | **Other players' projectiles** | Other players' bombs, boat-cannon shots and arrows are real in your game: they fly, explode and hit your enemies and walls. Off: you still see them carry a bomb or aim, but nothing flies. |
 
 - **Full sync** turns everything on. **Co-op** turns the four shared-progress rules off, so you see each other (and each other's projectiles) but keep your own progress.
 - Joining a room never throws away progress: if you're further ahead than the room, your progress is added to it.
-- Never shared: health, magic, bomb and arrow counts and bottle contents.
+- Never shared: health, magic, bomb and arrow counts, and bottle and bag contents.
 - The Room page's **Dungeons** card shows each dungeon's small keys, map, compass, big key and boss.
+- The app's item icons are read from your own game files and stay on your PC.
 
 **Planned:** shared weather, wind and time of day (off by default), a "no player collision" option (players bump into each other today), PVP and riding in each other's boats.
 
@@ -89,8 +93,6 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 - **Friends to play with**, and a way to reach each other over the internet (see [Playing over the internet](#playing-over-the-internet)).
 
 ## Install
-
-> Ready-made downloads are coming soon. Until then, see [Building from source](#building-from-source).
 
 1. **Download WW-Online** from the [Releases](../../releases) page (`WWOnline-win-Setup.exe`) and run it. It installs for your user only (no admin needed), adds shortcuts, and updates itself when a new version comes out. Everything it needs, including .NET, is bundled.
    - Windows may say **"Windows protected your PC"** because the installer isn't code-signed yet. Click **More info → Run anyway**.
@@ -129,8 +131,11 @@ The host's PC must be reachable on port `6969`. The easiest options:
 
 - **Purple screen with `d_s_play.cpp` / black screen on boot:** the 48 MB memory setting is off (install step 4; only when you start Dolphin yourself), or the game folder isn't a patched `GZLE01` copy.
 - **WW-Online says to patch your game, and won't start Dolphin:** the game isn't patched yet, WW-Online was updated with new game code, or you changed your patches. Press **Patch now** in the banner (or **Settings → Patch game**).
-- **Players don't appear:** everyone must be on the same WW-Online version, in the same room, and past the title screen.
-- **Can't connect:** check the host address and port, and see [Playing over the internet](#playing-over-the-internet).
+- **WW-Online won't link up with a Dolphin you started yourself:** the running game must be your patched `GZLE01` copy, with the 48 MB memory setting on (install step 4). A vanilla or PAL game is refused.
+- **Players don't appear:** everyone must be on the same WW-Online version, in the same room, and past the title screen. You see a player when you're in the same room of the same stage (on the Great Sea, when they're close).
+- **Can't connect:** check the host address and port, and see [Playing over the internet](#playing-over-the-internet). A "different version" message means someone needs to update.
+- **Item icons are missing:** **Settings → Item icons → Read icons from game** reads them from your own game files.
+- **The game crashes or freezes:** please open an issue with WW-Online's logs (`%LocalAppData%\WWOnline\logs`) and what you were doing.
 
 ## Building from source
 
@@ -145,7 +150,8 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj
 
 - Copy `GameMod/config.example.json` to `GameMod/config.json` and set `vanilla_game_path` (your extracted game) and `game_path` (the patched output).
 - `.\scripts\dev-test.ps1` runs a local two-player test: two Dolphins and two clients, with Player 1 hosting. `-Patch` also rebuilds the in-game code. Logs go to `logs/latest/`.
-- `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules.
+- `python scripts/dolphin-crash-context.py <dolphin pid> tww-decomp/config/GZLE01/symbols.txt` prints the registers and stack of a game crash from the running Dolphin (read-only).
+- `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules. `docs/` has the design notes (held items and projectiles, live world, small keys, event flags, optional patches), [self-hosting](docs/self-hosting.md) and [releasing](docs/releasing.md).
 
 **How it works, in short:** an Avalonia desktop app reads and writes the running game's memory through Dolphin, and a SignalR server relays each player's state. On the game side, a small injected module (C, built with devkitPPC and linked against [the Wind Waker decompilation](https://github.com/zeldaret/tww)) spawns and animates the other players' Links. The game's own code does the work, so they move, fight and draw just like the real Link.
 

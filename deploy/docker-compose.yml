@@ -6,7 +6,7 @@
 
 services:
   ww-online:
-    image: ghcr.io/datstarkey/ww-online-server:latest   # or pin a release, e.g. :0.2.0 / :0.2
+    image: ghcr.io/datstarkey/ww-online-server:latest   # or pin a release, e.g. :0.1.0 / :0.1
     container_name: ww-online
     restart: unless-stopped
     ports:

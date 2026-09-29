@@ -106,7 +106,7 @@ Doing nothing is a safe default: the Full-sync mask is 0 for every register byte
 
 ## The old heuristic (`ProgressionSyncService`: skip bytes 0x00-0x3F, OR-merge 0x40-0xFF)
 
-It is close to inverted.
+Removed: story sync is now `StorySyncService` + the server's `StoryFlagStore`, masked by `StoryFlags.SyncMask` (this catalogue's Full-sync mask, bytes 0x00-0x41), and registers are never synced. Kept for the record: the old heuristic was close to inverted.
 
 - **It excludes almost everything sharable.** Bytes 0x00-0x3F hold 479 of the 487 named bits, and 444 of those are OR-safe (including all Story and CutsceneSeen bits). Nothing in the story is shared.
 - **It OR-merges what must not be merged:**

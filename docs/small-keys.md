@@ -1,6 +1,6 @@
 # Shared small keys
 
-With **Shared world** on, a small key anyone in the room finds is everyone's, and a key door anyone unlocks uses it up for everyone. The Room page's **Dungeons** card shows each dungeon's keys, map, compass, big key and boss. §0 is what is built; §1-§4 are the research it rests on.
+Built in #18 (no protocol change, no re-patch). With **Shared world** on, a small key anyone in the room finds is everyone's, and a key door anyone unlocks uses it up for everyone. The Room page's **Dungeons** card shows each dungeon's keys, map, compass, big key and boss. §0 is what is built; §1-§4 are the research it rests on.
 
 Target: GZLE01. Source: `tww-decomp/` (paths below are relative to it unless they start with a repo folder). **Verified** means checked in the vanilla GZLE01 `main.dol`; **(unverified)** needs a test session.
 
@@ -47,6 +47,8 @@ Exceptions: slot 15 (STAGE_TEST, `K_Test5` / `K_Testc`) has a key chest and a fl
 **Not used:** the scratch range 0x803FD1D0..0x803FD1DF stays free. There is no REL change: the game mod is untouched and nothing needs a re-patch.
 
 ### In-game checklist (dev-test, Shared world on)
+
+Shared small keys were verified in game on 2026-09-29. K7 keeps its own note until it is checked on its own.
 
 | # | Do | Expect |
 |---|---|---|
