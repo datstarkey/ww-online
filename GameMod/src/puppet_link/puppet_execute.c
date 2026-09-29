@@ -834,13 +834,6 @@ static void puppet_setStickData(daPy_lk_c *link, f32 stickDistance, s16 moveAngl
 // Talk event system removed - causes softlock because clearing puppet's event
 // fields doesn't release the player's global event system.
 
-void puppet_updateRotation(fopAc_ac_c *actor, fopAc_ac_c *playerActor)
-{
-  s16 angleToPlayer = fopAcM_searchActorAngleY(actor, playerActor);
-  FOPAC_CURRENT_ANGLE(actor)->y = angleToPlayer;
-  FOPAC_SHAPE_ANGLE(actor)->y = angleToPlayer;
-}
-
 /**
  * puppet_updateAttentionInfo - Keep the puppet off every lock-on list
  *
@@ -1788,14 +1781,6 @@ void puppet_parkResume(daPy_lk_c *link, u32 slotIndex)
   puppet_parkQuiet(link);
 }
 
-// ============================================================================
-// LEGACY SECTION FUNCTIONS (kept for compatibility)
-// ============================================================================
-
-int puppet_executeSection1to10(daPy_lk_c *link)
-{
-  return puppet_execute(link);
-}
 
 // Per-puppet "last requested proc" (a daPyProc value; 0 = nothing requested yet).
 // Used to call procX_init only on transitions so the animation isn't reset every frame.
@@ -2032,15 +2017,4 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
   // mNormalSpeed LAST — after any proc_init above that may have reset it. The walk/run
   // blend (setBlendMoveAnime) reads it, so WAIT->MOVE runs immediately when the peer runs.
   PUPPET_DAPY_MNORMALSPEED(puppet) = targetVelocity;
-
-  // Diagnostic: log the network velocity while moving, throttled to ~3 Hz.
-  if (targetProc == PROC_MOVE || targetProc == PROC_MOVE_TURN)
-  {
-    volatile unsigned int *fc = (volatile unsigned int *)FRAME_COUNTER_ADDR;
-    if (((*fc) % 20) == 0)
-    {
-      OSReport("[PUPPET] MOVE vel=%d/100 (slot %d)\n",
-               (int)(targetVelocity * 100.0f), slotIndex);
-    }
-  }
 }

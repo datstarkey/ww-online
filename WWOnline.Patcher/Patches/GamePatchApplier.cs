@@ -252,10 +252,8 @@ public sealed class GamePatchApplier
     private static void EditEntry(RarcArchive arc, string entryName, Func<byte[], byte[]> edit)
     {
         var entry = arc.GetFileEntry(entryName) ?? throw new InvalidOperationException($"Archive has no {entryName}");
-        var compressed = Yaz0Codec.CheckIsCompressed(entry.Data!);
-        var data = compressed ? Yaz0Codec.Decompress(entry.Data!) : (byte[])entry.Data!.Clone();
-        var edited = edit(data);
-        entry.Data = compressed ? new Yaz0Codec().Compress(edited) : edited;
+        var data = Yaz0Codec.CheckIsCompressed(entry.Data!) ? Yaz0Codec.Decompress(entry.Data!) : (byte[])entry.Data!.Clone();
+        entry.ReplaceContents(edit(data));
     }
 
     /// <summary>

@@ -424,7 +424,7 @@ public class GamePatcherService
             relId, profileSectionIdx, profileOffset);
 
         profileList.SaveChanges(preserveSectionDataOffsets: true);
-        profileListEntry.Data = profileList.GetData();
+        profileListEntry.ReplaceContents(profileList.GetData()); // stays Yaz0, like the vanilla entry
     }
 
     private static void PatchBi2(string bi2Path)

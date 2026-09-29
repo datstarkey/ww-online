@@ -61,19 +61,6 @@ void puppet_parkTick(daPy_lk_c *link);
 void puppet_parkResume(daPy_lk_c *link, u32 slotIndex);
 
 /**
- * Legacy wrapper - calls puppet_execute internally
- *
- * @param link The puppet daPy_lk_c instance
- * @return 1 on success
- */
-int puppet_executeSection1to10(daPy_lk_c *link);
-
-/**
- * Update puppet rotation to face the player
- */
-void puppet_updateRotation(fopAc_ac_c *actor, fopAc_ac_c *playerActor);
-
-/**
  * Update Z-targeting attention info
  * Must be called every frame to maintain lock-on capability
  */

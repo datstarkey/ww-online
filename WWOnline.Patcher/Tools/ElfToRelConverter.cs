@@ -215,28 +215,38 @@ public static class ElfToRelConverter
 
         profileList.SaveChanges(preserveSectionDataOffsets: true);
 
-        // Update the profile list entry
-        profileListEntry.Data = profileList.GetData();
+        // Update the profile list entry (re-compressed like the vanilla one: ~5 KB instead of ~16 KB)
+        profileListEntry.ReplaceContents(profileList.GetData());
 
-        // Find and replace the existing REL with matching ID (other RELs stay compressed)
+        // Find and replace the existing REL with matching ID (stored Yaz0 like every vanilla REL;
+        // other RELs stay compressed)
         if (!relsArc.ReplaceRelById(rel.Id, rel.GetData()))
             throw new InvalidOperationException($"Failed to find REL to replace with ID 0x{rel.Id:X3}");
 
         var savedArc = relsArc.SaveChanges();
 
-        // RELS.arc is loaded into ARAM, which vanilla already nearly fills. Growth past this
-        // makes the first play scene's LkD00.arc ARAM mount fail ("Failed assertion
-        // d_s_play.cpp:3439 l_lkDemoAnmCommand->getArchive()") — fail the build instead.
+        // All of RELS.arc is loaded into ARAM (see MaxRelsArcGrowthBytes). Too much growth makes
+        // the first play scene's LkD00.arc ARAM mount fail ("Failed assertion d_s_play.cpp:3439
+        // l_lkDemoAnmCommand->getArchive()") — fail the build instead.
         long growth = savedArc.Length - arcData.Length;
         if (growth > MaxRelsArcGrowthBytes)
             throw new InvalidOperationException(
                 $"RELS.arc would grow by {growth} bytes ({arcData.Length} -> {savedArc.Length}); limit is " +
-                $"{MaxRelsArcGrowthBytes}. ARAM can't take it — shrink the puppet REL (e.g. fewer OSReport strings) " +
-                "or check that other RELs kept their Yaz0 compression.");
+                $"{MaxRelsArcGrowthBytes}. ARAM can't take it — shrink the puppet REL " +
+                "or check that the RELs kept their Yaz0 compression.");
 
         File.WriteAllBytes(relsArcPath, savedArc);
     }
 
-    /// <summary>How much bigger than vanilla RELS.arc may get before ARAM mounts start failing.</summary>
+    /// <summary>
+    /// How much bigger than vanilla RELS.arc may get (compressed bytes: the puppet REL and the
+    /// profile list are stored Yaz0). A deliberately conservative guard, not the real limit.
+    /// RELS.arc is a JKRCompArchive whose whole file data (vanilla 0xE4A40 bytes) is the ARAM part
+    /// (DynamicLink.cpp:185, JKRCompArchive.cpp:126), allocated for good from the 0x5CE000-byte
+    /// JKRAramHeap (m_Do_machine.cpp:558, set at main.dol 0x8000C92C). The rest of that heap is
+    /// the boot-time ARAM mounts (d_s_logo.cpp:865-923, 2,885,760 bytes), picture box + boss data
+    /// (0x6200) and LkD00/LkD01.arc (1,208,992 / 1,129,728), which leaves about 1,030,000 bytes free
+    /// in vanilla: the real limit, matching the 943KB -> 1.97MB incident that failed at ~1.03 MB.
+    /// </summary>
     public const int MaxRelsArcGrowthBytes = 0x10000;
 }
