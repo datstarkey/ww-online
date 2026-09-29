@@ -86,6 +86,10 @@ public interface IDolphinStarter
 
     /// <summary>Has the process started by <see cref="Start"/> exited?</summary>
     bool HasExited(int processId);
+
+    /// <summary>Ask Dolphin <paramref name="processId"/> to close (its window's close, never a kill) and wait for it.</summary>
+    /// <returns>True once it has exited.</returns>
+    bool Close(int processId, TimeSpan timeout);
 }
 
 /// <summary>Starts the real Dolphin.exe.</summary>
@@ -125,6 +129,25 @@ public sealed class DolphinProcessStarter : IDolphinStarter
         {
             error = ex.Message;
             return null;
+        }
+    }
+
+    public bool Close(int processId, TimeSpan timeout)
+    {
+        try
+        {
+            using var p = Process.GetProcessById(processId);
+            if (p.HasExited) return true;
+            p.CloseMainWindow();
+            return p.WaitForExit(timeout);
+        }
+        catch (ArgumentException)
+        {
+            return true; // already gone
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return false;
         }
     }
 
@@ -259,6 +282,25 @@ public sealed class GameLaunchService : IDisposable
                     "Several Dolphins are running, so WW-Online won't guess which one to use. Attach on the Dolphin page."));
             if (running.Count == 1)
             {
+                // A Dolphin with no game booted would run whatever the player then picks in its game list,
+                // usually the original disc image: close it and start the patched game instead. One with a
+                // game running is left alone (it may be the patched game, or unsaved progress).
+                int open = running[0].ProcessId;
+                var probe = await AttachAsync(open, requirePatchedGame: true).ConfigureAwait(false);
+                if (probe == PatchedGameCheck.Result.Ok)
+                    return SetStatus(new(GameLaunchState.Attached, $"Attached to Dolphin (PID {open})."));
+                if (probe == PatchedGameCheck.Result.NotBooted)
+                {
+                    SetStatus(new(GameLaunchState.Starting, "Dolphin is open without a game: restarting it with your patched game…"));
+                    if (!_starter.Close(open, CloseTimeout))
+                        return SetStatus(new(GameLaunchState.Blocked,
+                            "Dolphin is open without a game and didn't close. Close Dolphin, then press Start game: " +
+                            "WW-Online starts it with your patched game (Dolphin's game list boots the original disc)."));
+                    running = [];
+                }
+            }
+            if (running.Count == 1)
+            {
                 pid = running[0].ProcessId;
                 startedHere = false;
                 SetStatus(new(GameLaunchState.WaitingForGame,
@@ -372,6 +414,9 @@ public sealed class GameLaunchService : IDisposable
             _attachLock.Release();
         }
     }
+
+    /// <summary>How long an idle Dolphin gets to close before Start game gives up on replacing it.</summary>
+    private static readonly TimeSpan CloseTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>How many 2s attempts a booted game may take to show the patch's draw hook before we give up on it.</summary>
     private const int NotPatchedGraceAttempts = 5;

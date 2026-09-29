@@ -279,6 +279,13 @@ public class WarpTests
         Assert.Equal(unchecked((short)0xC000), S16(d, Link + GameMemoryAddresses.Warp.ActorOffAngleY));
         Assert.Equal(0f, F32(d, Link + GameMemoryAddresses.Warp.ActorOffSpeedF));
         Assert.Equal(new byte[12], d.ReadMemory(Link + GameMemoryAddresses.Warp.ActorOffSpeed, 12));
+
+        // Link's execute restores current.pos / angles from these statics every frame, so they carry the move too.
+        Assert.Equal(-100.5f, F32(d, GameMemoryAddresses.Warp.LinkKeepPos));
+        Assert.Equal(250f, F32(d, GameMemoryAddresses.Warp.LinkKeepPos + 4));
+        Assert.Equal(3000f, F32(d, GameMemoryAddresses.Warp.LinkKeepPos + 8));
+        Assert.Equal(unchecked((short)0xC000), S16(d, GameMemoryAddresses.Warp.LinkKeepShapeAngle + 2));
+        Assert.Equal(unchecked((short)0xC000), S16(d, GameMemoryAddresses.Warp.LinkKeepCurrentAngle + 2));
     }
 
     // ── The planner ──────────────────────────────────────────────────────────
@@ -319,9 +326,21 @@ public class WarpTests
     [Fact]
     public void AnotherRoom_LoadsTheirEntrance()
     {
-        var plan = Plan(Me(room: 44), Them(room: 30, point: 2, entryRoom: 11, layer: 1));
+        var plan = Plan(Me(stage: "M_NewD2", room: 1), Them(stage: "M_NewD2", room: 3, point: 2, entryRoom: 1, layer: 1));
         Assert.Equal(WarpAction.LoadEntrance, plan.Action);
-        Assert.Equal(new StageEntry("sea", 2, 11, 1), plan.Entrance);
+        Assert.Equal(new StageEntry("M_NewD2", 2, 1, 1), plan.Entrance);
+    }
+
+    [Fact]
+    public void AnotherSquareOfTheSea_MovesLinkThere_NotToTheirEntrance()
+    {
+        // A v0.2.0 session: they had sailed from Dragon Roost (entered the sea at point 10, room 11) to
+        // square 13, and the warp loaded Dragon Roost's exit instead of going to them.
+        var plan = Plan(Me(room: 12), Them(room: 13, point: 10, entryRoom: 11));
+        Assert.Equal(WarpAction.MoveInRoom, plan.Action);
+        Assert.True(plan.AcrossRooms);
+        Assert.Equal(new Vector3(100f, 200f, 300f), plan.Position);
+        Assert.False(Plan(Me(), Them()).AcrossRooms);
     }
 
     [Fact]
@@ -413,8 +432,11 @@ public class WarpTests
         Assert.Contains("boat", Plan(Me(ship: true), Them()).Message);
         // Swimming or in mid-air is fine: Link just lands next to them.
         Assert.Equal(WarpAction.MoveInRoom, Plan(Me(modeFlg: 0x00040000 /* SWIM */ | 0x2 /* MIDAIR */), Them()).Action);
-        // Another room: a stage load, which works from the boat.
-        Assert.Equal(WarpAction.LoadEntrance, Plan(Me(ship: true, room: 1), Them()).Action);
+        // At sea every warp is a move, so the boat is refused there too; another room of another stage
+        // is a stage load, which works from the boat.
+        Assert.Contains("boat", Plan(Me(ship: true, room: 1), Them()).Message);
+        Assert.Equal(WarpAction.LoadEntrance,
+            Plan(Me(ship: true, room: 1), Them(stage: "M_NewD2", room: 3, point: 0, entryRoom: 0)).Action);
     }
 
     // ── The executor ─────────────────────────────────────────────────────────
@@ -472,6 +494,15 @@ public class WarpTests
         var result = await WarpExecutor.ExecuteAsync(d, Plan(Me(room: 44), Them()), Me(room: 44), _ => true, NoDelay);
         Assert.False(result.Ok);
         Assert.Equal(new Vector3(10f, 20f, 30f), WarpMemory.ReadActorPos(d, Link)); // untouched
+    }
+
+    [Fact]
+    public async Task Execute_MoveAcrossSeaSquares_IsNotStoppedByTheRoomChange()
+    {
+        var d = Game(room: 13); // the game already moved Link's room to the target's square
+        var result = await WarpExecutor.ExecuteAsync(d, Plan(Me(room: 12), Them(room: 13)), Me(room: 12), _ => true, NoDelay);
+        Assert.True(result.Ok, result.Message);
+        Assert.Equal(new Vector3(100f, 200f, 300f), WarpMemory.ReadActorPos(d, Link));
     }
 
     [Fact]
