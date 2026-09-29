@@ -122,6 +122,29 @@ public class BoatState
     [JsonPropertyName("headFrame")]
     public byte HeadFrame { get; set; }
 
+    // The cannon / crane, as daShip_c's cannon / crane joint callbacks and draw use them (d_a_ship.cpp:147-179, 304-317).
+
+    /// <summary>mPart (daShip_c::Part_e): 0 wait, 1 sail, 2 cannon, 3 crane. The cannon or crane is
+    /// drawn while it is that part; it rises and folds with the mast bck.</summary>
+    [JsonPropertyName("part")]
+    public byte Part { get; set; }
+
+    /// <summary>m0394: the cannon's turn (J CANON1 about X). Any angle: procCannon doesn't clamp it.</summary>
+    [JsonPropertyName("cannonYaw")]
+    public short CannonYaw { get; set; }
+
+    /// <summary>m0396: the cannon's elevation (J CANON2 about -Y).</summary>
+    [JsonPropertyName("cannonPitch")]
+    public short CannonPitch { get; set; }
+
+    /// <summary>m0398 + m039C: the crane arm's angle plus the hook's swing (V_CRANE_ROTATION about -Z).</summary>
+    [JsonPropertyName("craneAngle")]
+    public short CraneAngle { get; set; }
+
+    /// <summary>mRopeCnt: the crane rope's length in 10-unit segments.</summary>
+    [JsonPropertyName("ropeLength")]
+    public byte RopeLength { get; set; }
+
     /// <summary>Largest |coordinate| / |speedF| accepted: the REL drops anything outside these
     /// anyway (puppet_boat.c BOAT_MAX_COORD / BOAT_MAX_SPEED), so the server rejects it too.</summary>
     public const float MaxCoordinate = 1.0e6f;
@@ -144,6 +167,20 @@ public class BoatState
     public const byte MastOffBck = 0x0A;
     public const byte MastOnBck = 0x0B;
 
+    /// <summary>daShip_c::Part_e (d_a_ship.h); SHIP_PART_* in puppet_shared.h.</summary>
+    public const byte PartWait = 0;
+    public const byte PartSteer = 1;
+    public const byte PartCannon = 2;
+    public const byte PartCrane = 3;
+    /// <summary>procCannon clamps m0396 to 0x1556..0x4000; outside it m0396 is the fold rate * 0x4000
+    /// (d_a_ship.cpp:1788-1792, 4008), and the actor starts at 0.</summary>
+    public const short MaxCannonPitch = 0x4000;
+    /// <summary>m0398 eases toward mCraneBaseAngle (+-0x3000) or is a 0..1 rate of it, m039C toward
+    /// +-0x800 (d_a_ship.cpp:1830-1958, 1984-2019, 3978-3982).</summary>
+    public const short MaxCraneAngle = 0x3000 + 0x800;
+    /// <summary>ARRAY_SIZE(mRopeLineSegments): incRopeCnt's cap (d_a_ship.cpp:3108-3109).</summary>
+    public const byte MaxRopeLength = 250;
+
     public static bool IsHeadBck(int bck) =>
         bck is >= FirstShipBck and <= LastShipBck && bck != MastOffBck && bck != MastOnBck;
 
@@ -156,7 +193,11 @@ public class BoatState
         Tiller >= -MaxTiller && Tiller <= MaxTiller &&
         HeadX >= MinHeadX && HeadX <= MaxHeadX &&
         HeadY >= -MaxHeadY && HeadY <= MaxHeadY &&
-        (HeadBck == 0 || IsHeadBck(HeadBck));
+        (HeadBck == 0 || IsHeadBck(HeadBck)) &&
+        Part <= PartCrane &&
+        CannonPitch >= 0 && CannonPitch <= MaxCannonPitch &&
+        CraneAngle >= -MaxCraneAngle && CraneAngle <= MaxCraneAngle &&
+        RopeLength <= MaxRopeLength;
 }
 
 public class Vector3

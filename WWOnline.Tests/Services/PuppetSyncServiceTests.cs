@@ -129,12 +129,20 @@ public class PuppetSyncServiceTests : IDisposable
 
         _sut.ReleaseSlot("player-1");
 
-        // Zeroes the slot body (active = 0 deactivates it) and the slot's boat block
+        // Zeroes the slot body (active = 0 deactivates it), the slot's boat block and its cannon / crane words
         _dolphin.Verify(
             d => d.WriteMemory(GameMemoryAddresses.PuppetSync.GetSlotBase(slot), It.Is<byte[]>(b => b.All(x => x == 0))),
             Times.Once);
         _dolphin.Verify(
             d => d.WriteMemory(GameMemoryAddresses.PuppetSync.GetBoatBase(slot), It.Is<byte[]>(b => b.All(x => x == 0))),
+            Times.Once);
+        _dolphin.Verify(
+            d => d.WriteMemory(GameMemoryAddresses.PuppetSync.GetBoatCannonBase(slot),
+                It.Is<byte[]>(b => b.Length == GameMemoryAddresses.PuppetSync.BoatCannonSize && b.All(x => x == 0))),
+            Times.Once);
+        _dolphin.Verify(
+            d => d.WriteMemory(GameMemoryAddresses.PuppetSync.GetBoatCraneBase(slot),
+                It.Is<byte[]>(b => b.Length == GameMemoryAddresses.PuppetSync.BoatCraneSize && b.All(x => x == 0))),
             Times.Once);
     }
 

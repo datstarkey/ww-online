@@ -12,7 +12,8 @@
  *   6. Pose both morfs like daShip_c::execute (d_a_ship.cpp:3960-3976): the peer's mast / head
  *      bck at the peer's frame, then our joint callback (boat_jointCallBack) for the sail,
  *      tiller, mast scale and head look.
- *   7. Move the sail cloth on the posed mast (boat_sailExecute, see "Sail" below).
+ *   7. Pose the cannon or crane if the peer has one out (boat_partsExecute, see "Cannon and crane").
+ *   8. Move the sail cloth on the posed mast (boat_sailExecute, see "Sail" below).
  *
  * The models share the "Ship" J3DModelData with the local King of Red Lions, and daShip_c
  * puts its joint callbacks on those shared joints (d_a_ship.cpp:4577-4619). They find their
@@ -36,6 +37,11 @@
 #define BOAT_HEAD_JNT_KUBI1       0x02  /* FN_HEAD_H_JNT_J_FN_KUBI1_e .. KUBI6_e: the neck */
 #define BOAT_HEAD_JNT_KUBI6       0x07
 #define BOAT_JNT_SAIL2            0x08  /* FN_BODY_JNT_J_FN_SAIL2_e: folds the sail (d_a_ship.cpp:4068) */
+#define BOAT_RES_BDL_VFNCN        0x13  /* dRes_INDEX_SHIP_BDL_VFNCN_e: the cannon */
+#define BOAT_RES_BDL_VFNCR        0x14  /* dRes_INDEX_SHIP_BDL_VFNCR_e: the crane (salvage arm) */
+#define BOAT_CANNON_JNT_CANON1    0x01  /* VFNCN_JNT_CANON1_e */
+#define BOAT_CANNON_JNT_CANON2    0x02  /* VFNCN_JNT_CANON2_e */
+#define BOAT_CRANE_JNT_ROTATION   0x01  /* VFNCR_JNT_V_CRANE_ROTATION_e */
 
 /* daShip_c's morfs (createHeap, d_a_ship.cpp:4406-4467; setPartOnAnime/OffAnime :1328-1360;
  * setHeadAnm :3523-3538): J3DFrameCtrl::EMode_NONE, morf 3 for the mast, 5 for the head (0 for
@@ -50,6 +56,7 @@
 #define BOAT_MODEL_FLAG           0x80000
 #define BOAT_BODY_DIFF_FLAG       0x11200202
 #define BOAT_HEAD_DIFF_FLAG       0x11000002
+#define BOAT_PART_DIFF_FLAG       0x11000002  /* cannon, crane and hook (d_a_ship.cpp:4430-4446) */
 
 #define BOAT_HEAP_SIZE            0x20000  /* daShip_c's own heap size; adjusted down once built */
 #define BOAT_HEAP_ALIGN           0x20
@@ -113,6 +120,17 @@ static f32 boat_waterY(f32 x, f32 z, f32 fallbackY)
   if (d_a_sea__daSea_ChkArea(x, z))
     return d_a_sea__daSea_calcWave(x, z);
   return fallbackY;
+}
+
+/* The part pointers point into the boat heap: forget them with it. */
+static void boat_clearParts(PuppetBoat *boat)
+{
+  boat->cannon = NULL;
+  boat->crane = NULL;
+  boat->hook = NULL;
+  boat->rope = NULL;
+  boat->part = 0;
+  boat->hookShow = 0;
 }
 
 /* The hull must be CPU-skinned like the local ship's. J3DModel::prepareShapePackets (in
@@ -488,8 +506,90 @@ static void boat_sailEntry(PuppetBoat *boat)
   *zMtx = savedZ;
 }
 
-/* Build the hull and head in a solid heap of our own (the puppet's actor heap belongs to
- * playerInit). As daShip_c::createHeap, minus the cannon, crane and rope. */
+/* ---- Cannon and crane ----------------------------------------------------------------------
+ * Vanilla (d_a_ship.cpp): createHeap builds the cannon (vfncn.bdl), the crane / salvage arm
+ * (vfncr.bdl) and the grappling hook on the rope's end ("Link" ropeend.bdl) as plain J3DModels
+ * (:4428-4450), and a 250-segment rope line (mRopeLine, "Always" rope.bti, :4468). All of them hang
+ * off the mast joint: bodyJointCallBack's J_FN_MAST (:119-125) sets the crane's base to
+ * mast * Zrot(0xC000) and the cannon's to that * Yrot(-0x8000), before it scales the mast by m03E8
+ * (0.001 while a part is out). So the part rises and folds with the mast bck (FN_MAST_ON2 / OFF2).
+ * The cannon's joint callback turns CANON1 by Xrot(m0394) (yaw) and CANON2 by Yrot(-m0396) (pitch,
+ * :147-158); the crane's turns V_CRANE_ROTATION by Zrot(-(m0398 + m039C)) (arm angle + hook swing,
+ * :173-179). execute calcs the part's model while mPart is that part (:3978-4012) and draw enters it
+ * (:304-317), plus, for the crane, the rope (mRopeCnt >= 2) and the hook.
+ *
+ * Here the peer's mPart comes from the boat FLAGS and its angles / rope from the slot's
+ * PUPPET_BOAT_CANNON_* / PUPPET_BOAT_CRANE_* word (puppet_shared.h); the models are ours,
+ * posed by boat_jointCallBack and entered by our draw. Nothing else runs: no bomb, event, sound,
+ * effect or salvage. The rope is not simulated: setRopePos (:3148-3389) runs a per-segment sway
+ * with gravity and fires ripples / splashes, all daShip_c state. Ours is 2 points, from the arm's tip
+ * straight down by the peer's length (10 units a segment, l_rope_base_vec), which is what a resting
+ * rope settles to; the hook sits at its end, turned as setRopePos turns it for a straight rope. */
+
+/* mDoExt_3DlineMat1_c (m_Do_ext.h; offsets checked against main.dol init 0x80015328: mNumLines 0x30,
+ * mMaxSegments 0x32, mpLines 0x38; mDoExt_3Dline_c 0x18 bytes, mpSegments at 0) */
+#define ROPE_LINE_SIZE            0x3C
+#define ROPE_LINE_OFF_LINES       0x38
+#define ROPE_LINE_SEGMENTS(line)  (*(cXyz **)(*(u8 **)((line) + ROPE_LINE_OFF_LINES)))
+#define ROPE_LINE_MAT_ID          1        /* mDoExt_3DlineMat1_c::getMaterialID (0x80016D78: li r3,1) */
+#define ROPE_POINTS               2
+#define ROPE_WIDTH                5.0f     /* daShip_c::draw's mRopeLine.update (d_a_ship.cpp:312) */
+#define ROPE_SEGMENT_LEN          10.0f    /* |l_rope_base_vec| (d_a_ship.cpp:107) */
+#define ROPE_HOOK_MIN_CNT         3        /* setRopePos's straight-rope hook pose needs mRopeCnt > 2 */
+#define BOAT_ARC_LINK             "Link"
+#define LINK_RES_BDL_ROPEEND      0x2E     /* dRes_INDEX_LINK_BDL_ROPEEND_e */
+#define BOAT_ARC_ALWAYS           "Always"
+#define ALWAYS_RES_BTI_ROPE       0x7E     /* dRes_INDEX_ALWAYS_BTI_ROPE_e */
+/* bodyJointCallBack's part bases (d_a_ship.cpp:120-123) */
+#define BOAT_CRANE_BASE_ZROT      ((s16)0xC000)
+#define BOAT_CANNON_BASE_YROT     ((s16)-0x8000)
+/* setRopePos's hook angles for a straight-down rope (spBC = (0, -len, 0): cM_atan2s(0, -len) = 0x8000,
+ * cM_atan2s(0, len) = 0), then XrotM(-0x4000) (d_a_ship.cpp:3281-3287) */
+#define BOAT_HOOK_XROT            ((s16)-0x8000)
+#define BOAT_HOOK_XROT2           ((s16)-0x4000)
+
+static const cXyz l_boatRopeOffset = {160.0f, 0.0f, 0.0f}; /* setRopePos rope_offset: the arm's tip */
+static const u32 l_boatRopeColor = 0xC89632FF;             /* daShip_c::draw rope_color {C8, 96, 32, FF} */
+
+/* A plain part model as daShip_c::createHeap makes them, in the current heap. NULL on failure. */
+static J3DModel *boat_createPartModel(char *arc, u32 bdl)
+{
+  J3DModelData *data = (J3DModelData *)dRes_control_c__getRes(arc, bdl, GAMEINFO_RES_OBJECT_INFO(&g_dComIfG_gameInfo),
+                                                              GAMEINFO_RES_OBJECT_INFO_COUNT);
+  if (data == NULL)
+    return NULL;
+  return mDoExt_J3DModel__create(data, BOAT_MODEL_FLAG, BOAT_PART_DIFF_FLAG);
+}
+
+/* The cannon, crane, hook and rope in the current (boat) heap. Each is optional: a missing one
+ * just isn't drawn (a crane without its hook or rope still is). */
+static void boat_createParts(PuppetBoat *boat)
+{
+  ResTIMG *tex;
+  u8 *line;
+  u32 i;
+
+  boat->cannon = boat_createPartModel(BOAT_ARC_NAME, BOAT_RES_BDL_VFNCN);
+  boat->crane = boat_createPartModel(BOAT_ARC_NAME, BOAT_RES_BDL_VFNCR);
+  boat->hook = boat_createPartModel(BOAT_ARC_LINK, LINK_RES_BDL_ROPEEND);
+  boat->rope = NULL;
+
+  tex = (ResTIMG *)dRes_control_c__getRes(BOAT_ARC_ALWAYS, ALWAYS_RES_BTI_ROPE,
+                                          GAMEINFO_RES_OBJECT_INFO(&g_dComIfG_gameInfo),
+                                          GAMEINFO_RES_OBJECT_INFO_COUNT);
+  line = (u8 *)operator_new(ROPE_LINE_SIZE);
+  if (tex == NULL || line == NULL)
+    return;
+  for (i = 0; i < ROPE_LINE_SIZE; i += 4)
+    *(u32 *)(line + i) = 0; // what the (implicit) ctor leaves; init sets the rest
+  *(void **)line = (void *)&mDoExt_3DlineMat1_c____vt;
+  // mRopeLine.init(1, 0xFA, rope, 0) with our 2 points (m_Do_ext.cpp:2198-2220)
+  if (mDoExt_3DlineMat1_c__init((mDoExt_3DlineMat1_c *)line, 1, ROPE_POINTS, tex, 0))
+    boat->rope = line;
+}
+
+/* Build the hull, head and parts in a solid heap of our own (the puppet's actor heap belongs to
+ * playerInit). As daShip_c::createHeap. */
 static int boat_createModels(PuppetBoat *boat)
 {
   JKRSolidHeap *heap;
@@ -505,8 +605,10 @@ static int boat_createModels(PuppetBoat *boat)
     boat->bodyAnm = NULL;
   if (boat->bodyAnm != NULL)
     boat->headAnm = boat_createMorf(BOAT_RES_BDL_FN_HEAD_H, SHIP_BCK_FN_LOOK_L, BOAT_HEAD_DIFF_FLAG);
-  // The sail is optional: a boat without one still draws.
+  // The sail and parts are optional: a boat without them still draws.
   boat->sail = boat->headAnm != NULL ? boat_createSail(heap) : NULL;
+  if (boat->headAnm != NULL)
+    boat_createParts(boat);
   mDoExt_restoreCurrentHeap();
 
   if (boat->bodyAnm == NULL || boat->headAnm == NULL)
@@ -515,6 +617,7 @@ static int boat_createModels(PuppetBoat *boat)
     boat->bodyAnm = NULL;
     boat->headAnm = NULL;
     boat->sail = NULL;
+    boat_clearParts(boat);
     return 0;
   }
 
@@ -599,17 +702,49 @@ static void boat_setFrame(mDoExt_McaMorf *morf, u8 frame)
   MDOEXT_MCAMORF_FRAME(morf) = (f32)(frame < end ? frame : end);
 }
 
-/* The boat being calculated and which of its models, for boat_jointCallBack (actors run
- * single-threaded; NULL outside boat_calcModel). */
+/* Which model boat_calcModel is calculating (boat_jointCallBack's switch) */
+#define BOAT_CALC_BODY            0
+#define BOAT_CALC_HEAD            1
+#define BOAT_CALC_CANNON          2
+#define BOAT_CALC_CRANE           3
+#define BOAT_CALC_HOOK            4   /* no callback of its own */
+
+/* The boat and model being calculated, for boat_jointCallBack (actors run single-threaded; NULL
+ * outside boat_calcModel). */
 static PuppetBoat *l_boatCalc = NULL;
-static u8 l_boatCalcHead = 0;
+static J3DModel *l_boatCalcModel = NULL;
+static u8 l_boatCalcWhich = 0;
+
+/* bodyJointCallBack's J_FN_MAST part bases (d_a_ship.cpp:119-123) on the mast's matrix before its
+ * hide scale, and that matrix's length (the hook's scale while FN_MAST_ON2 plays, :3289-3293). */
+static void boat_placeParts(PuppetBoat *boat, MTX34 *mast)
+{
+  MTX34 m;
+  cXyz col;
+
+  col.x = mast->m[0][0];
+  col.y = mast->m[1][0];
+  col.z = mast->m[2][0];
+  boat->mastScale = PSVECMag(&col);
+  if (boat->crane == NULL && boat->cannon == NULL)
+    return;
+  mDoMtx_ZrotS(&m, BOAT_CRANE_BASE_ZROT);
+  PSMTXConcat(mast, &m, &m);
+  if (boat->crane != NULL)
+    PSMTXCopy(&m, (MTX34 *)J3DMODEL_MBASETRMTX(boat->crane));
+  mDoMtx_YrotM(&m, BOAT_CANNON_BASE_YROT);
+  if (boat->cannon != NULL)
+    PSMTXCopy(&m, (MTX34 *)J3DMODEL_MBASETRMTX(boat->cannon));
+}
 
 /* daShip_c's joint callbacks, with the peer's values and our drawn yaw:
  *   hull (bodyJointCallBack, d_a_ship.cpp:110-131): anm = anm * Zrot(m0366) on J_FN_STEER1 /
- *     J_FN_KAJI, anm * Zrot(-mSailAngle) on J_FN_SAIL1, anm * scale(m03E8) on J_FN_MAST (the
- *     cannon / crane placement it also does there is skipped: we draw neither);
+ *     J_FN_KAJI, anm * Zrot(-mSailAngle) on J_FN_SAIL1; on J_FN_MAST the cannon / crane bases
+ *     (boat_placeParts), then anm * scale(m03E8);
  *   head (headJointCallBack1, :214-231) on J_FN_KUBI1..6: anm = Yrot(y) * ZXYrot(m03A0, m03A2, 0)
- *     * Yrot(-y) * anm, y = shape_angle.y + m03A2 * (jno - 2), keeping anm's translation.
+ *     * Yrot(-y) * anm, y = shape_angle.y + m03A2 * (jno - 2), keeping anm's translation;
+ *   cannon (cannonJointCallBack, :147-158): anm * Xrot(m0394) on CANON1, anm * Yrot(-m0396) on CANON2;
+ *   crane (craneJointCallBack, :173-179): anm * Zrot(-(m0398 + m039C)) on V_CRANE_ROTATION.
  * Either way the result goes back to J3DSys::mCurrentMtx for the joint's children. */
 static int boat_jointCallBack(J3DNode *node, int timing)
 {
@@ -622,12 +757,13 @@ static int boat_jointCallBack(J3DNode *node, int timing)
 
   if (timing != BOAT_CALC_TIMING_IN || boat == NULL)
     return 1;
+  anm = &J3DMODEL_MPNODEMTX(l_boatCalcModel)[jno];
 
-  if (l_boatCalcHead)
+  switch (l_boatCalcWhich)
   {
+  case BOAT_CALC_HEAD:
     if (jno < BOAT_HEAD_JNT_KUBI1 || jno > BOAT_HEAD_JNT_KUBI6)
       return 1;
-    anm = &J3DMODEL_MPNODEMTX(boat->head)[jno];
     tx = anm->m[0][3];
     ty = anm->m[1][3];
     tz = anm->m[2][3];
@@ -640,33 +776,60 @@ static int boat_jointCallBack(J3DNode *node, int timing)
     m.m[1][3] = ty;
     m.m[2][3] = tz;
     PSMTXCopy(&m, anm);
-  }
-  else
-  {
-    anm = &J3DMODEL_MPNODEMTX(boat->body)[jno];
+    PSMTXCopy(anm, &J3DSys__mCurrentMtx);
+    return 1;
+
+  case BOAT_CALC_BODY:
     if (jno == BOAT_JNT_STEER1 || jno == BOAT_JNT_KAJI)
       mDoMtx_ZrotS(&m, boat->tiller);
     else if (jno == BOAT_JNT_SAIL1)
       mDoMtx_ZrotS(&m, (s16)-boat->sailAngle);
-    else if (jno == BOAT_JNT_MAST && boat->mastHide)
+    else if (jno == BOAT_JNT_MAST)
+    {
+      boat_placeParts(boat, anm);
+      if (!boat->mastHide)
+        return 1; // m03E8 == 1: identity
       PSMTXScale(BOAT_MAST_HIDE_SCALE, BOAT_MAST_HIDE_SCALE, BOAT_MAST_HIDE_SCALE, &m);
+    }
     else
-      return 1; // no callback on this joint in daShip_c (or m03E8 == 1: identity)
-    PSMTXConcat(anm, &m, anm);
+      return 1; // no callback on this joint in daShip_c
+    break;
+
+  case BOAT_CALC_CANNON:
+    if (jno == BOAT_CANNON_JNT_CANON1)
+      mDoMtx_XrotS(&m, boat->cannonYaw);
+    else if (jno == BOAT_CANNON_JNT_CANON2)
+      mDoMtx_YrotS(&m, (s16)-boat->cannonPitch);
+    else
+      return 1;
+    break;
+
+  case BOAT_CALC_CRANE:
+    if (jno != BOAT_CRANE_JNT_ROTATION)
+      return 1;
+    mDoMtx_ZrotS(&m, (s16)-boat->craneAngle);
+    break;
+
+  default:
+    return 1;
   }
+  PSMTXConcat(anm, &m, anm);
   PSMTXCopy(anm, &J3DSys__mCurrentMtx);
   return 1;
 }
 
-/* mDoExt_McaMorf::calc with the local ship's hooks on the (shared) joints swapped out: every
- * joint callback becomes ours and every joint's mMtxCalc is cleared. mDoExt_McaMorf::calc sets
- * joint 0's mMtxCalc to the calling morf and never clears it (m_Do_ext.cpp:1540-1549), so the
- * local ship's morf is left there; J3DJoint::calcIn would run it for our model too
- * (J3DJoint.cpp:212-214), animating our boat with the local ship's anim or calling a freed
- * object once the local ship is gone. Our morf's calc puts itself on joint 0 instead. */
-static void boat_calcModel(PuppetBoat *boat, mDoExt_McaMorf *morf, u8 isHead)
+/* Calc one of our models (a morf's, or a plain one) with the local ship's hooks on the (shared)
+ * joints swapped out: every joint callback becomes ours and every joint's mMtxCalc is cleared.
+ * daShip_c puts its callbacks on the hull, head, cannon and crane joints (d_a_ship.cpp:4577-4629)
+ * and they find their ship through J3DModel::getUserArea(), which is 0 for our models; the head,
+ * cannon and crane ones don't check it. mDoExt_McaMorf::calc sets joint 0's mMtxCalc to the calling
+ * morf and never clears it (m_Do_ext.cpp:1540-1549), so the local ship's morf is left there;
+ * J3DJoint::calcIn would run it for our model too (J3DJoint.cpp:212-214), animating our boat with the
+ * local ship's anim or calling a freed object once the local ship is gone. Our morf's calc puts
+ * itself on joint 0 instead; a plain model has no mMtxCalc of its own. */
+static void boat_calcModel(PuppetBoat *boat, J3DModel *model, mDoExt_McaMorf *morf, u8 which)
 {
-  J3DModelData *data = J3DMODEL_MPMODELDATA(MDOEXT_MCAMORF_MPMODEL(morf));
+  J3DModelData *data = J3DMODEL_MPMODELDATA(model);
   J3DJoint **joints;
   void *savedCallBack[BOAT_MAX_JOINTS];
   void *savedMtxCalc[BOAT_MAX_JOINTS];
@@ -689,8 +852,12 @@ static void boat_calcModel(PuppetBoat *boat, mDoExt_McaMorf *morf, u8 isHead)
   }
 
   l_boatCalc = boat;
-  l_boatCalcHead = isHead;
-  mDoExt_McaMorf__calc(morf);
+  l_boatCalcModel = model;
+  l_boatCalcWhich = which;
+  if (morf != NULL)
+    mDoExt_McaMorf__calc(morf);
+  else
+    J3DModel__calc(model);
   l_boatCalc = NULL;
 
   for (i = 0; i < count; i++)
@@ -698,6 +865,85 @@ static void boat_calcModel(PuppetBoat *boat, mDoExt_McaMorf *morf, u8 isHead)
     J3DNODE_MCALLBACK(joints[i]) = savedCallBack[i];
     J3DJOINT_MMTXCALC(joints[i]) = savedMtxCalc[i];
   }
+}
+
+/* The crane's rope from the arm's tip straight down, and the hook on its end (see "Cannon and
+ * crane"; setRopePos, d_a_ship.cpp:3175-3293). */
+static void boat_ropeExecute(PuppetBoat *boat, u32 flags)
+{
+  cXyz tip;
+  cXyz *seg;
+  MTX34 *m;
+  MTX34 scale;
+  f32 len = ROPE_SEGMENT_LEN * (f32)(boat->ropeCnt > 0 ? boat->ropeCnt - 1 : 0);
+
+  PSMTXMultVec(&J3DMODEL_MPNODEMTX(boat->crane)[BOAT_CRANE_JNT_ROTATION], (cXyz *)&l_boatRopeOffset, &tip);
+  if (boat->rope != NULL)
+  {
+    seg = ROPE_LINE_SEGMENTS(boat->rope); // [0] = the free end, [last] = the tip, as mRopeLine
+    seg[1] = tip;
+    seg[0] = tip;
+    seg[0].y -= len;
+  }
+
+  if (boat->hook == NULL || boat->ropeCnt < ROPE_HOOK_MIN_CNT)
+    return;
+  m = (MTX34 *)J3DMODEL_MBASETRMTX(boat->hook);
+  mDoMtx_ZXYrotS(m, BOAT_HOOK_XROT, boat->rotY, 0);
+  mDoMtx_XrotM(m, BOAT_HOOK_XROT2);
+  if (flags & PUPPET_BOAT_FLAG_MAST_ON)
+  {
+    PSMTXScale(boat->mastScale, boat->mastScale, boat->mastScale, &scale);
+    PSMTXConcat(m, &scale, m);
+  }
+  m->m[0][3] = tip.x;
+  m->m[1][3] = tip.y - len;
+  m->m[2][3] = tip.z;
+  boat_calcModel(boat, boat->hook, NULL, BOAT_CALC_HOOK);
+  boat->hookShow = 1;
+}
+
+/* The peer's cannon / crane: which part (FLAGS), its angles and rope (the slot's cannon / crane
+ * words). Angles ease toward each 20Hz sample; a part that has just come out takes them as they are. */
+static void boat_partsExecute(PuppetBoat *boat, u32 slotIndex, u32 flags)
+{
+  u32 cannon = PUPPET_BOAT_CANNON_BASE(slotIndex);
+  u32 craneBase = PUPPET_BOAT_CRANE_BASE(slotIndex);
+  u8 part = (u8)((flags >> PUPPET_BOAT_PART_SHIFT) & PUPPET_BOAT_PART_MASK);
+  s16 yaw = *(volatile s16 *)(cannon + PUPPET_BOAT_CANNON_OFF_YAW);
+  s16 pitch = *(volatile s16 *)(cannon + PUPPET_BOAT_CANNON_OFF_PITCH);
+  s16 crane = *(volatile s16 *)(craneBase + PUPPET_BOAT_CRANE_OFF_ANGLE);
+  u8 rope = *(volatile u8 *)(craneBase + PUPPET_BOAT_CRANE_OFF_ROPE);
+
+  boat->hookShow = 0;
+  if (!((part == SHIP_PART_CANNON && boat->cannon != NULL) || (part == SHIP_PART_CRANE && boat->crane != NULL)))
+  {
+    boat->part = 0;
+    return;
+  }
+
+  if (part != boat->part || !boat->hasPose)
+  {
+    boat->cannonYaw = yaw;
+    boat->cannonPitch = pitch;
+    boat->craneAngle = crane;
+  }
+  else
+  {
+    cLib_addCalcAngleS(&boat->cannonYaw, yaw, 2, 0x2000, 0x20);
+    cLib_addCalcAngleS(&boat->cannonPitch, pitch, 2, 0x2000, 0x20);
+    cLib_addCalcAngleS(&boat->craneAngle, crane, 2, 0x2000, 0x20);
+  }
+  boat->part = part;
+  boat->ropeCnt = rope < SHIP_ROPE_MAX ? rope : SHIP_ROPE_MAX;
+
+  if (part == SHIP_PART_CANNON)
+  {
+    boat_calcModel(boat, boat->cannon, NULL, BOAT_CALC_CANNON);
+    return;
+  }
+  boat_calcModel(boat, boat->crane, NULL, BOAT_CALC_CRANE);
+  boat_ropeExecute(boat, flags);
 }
 
 /* daShip_c::setWaveAngle (d_a_ship.cpp:832-873): pitch from the front/back wave heights,
@@ -868,9 +1114,10 @@ void puppet_boatExecute(fopAc_ac_c *actor, PuppetBoat *boat, u32 slotIndex)
   bodyMtx->m[1][3] = boat->pos.y;
   bodyMtx->m[2][3] = boat->pos.z;
   boat_animate(boat, base, flags);
-  boat_calcModel(boat, boat->bodyAnm, 0);
+  boat_calcModel(boat, boat->body, boat->bodyAnm, BOAT_CALC_BODY);
   PSMTXCopy(&J3DMODEL_MPNODEMTX(boat->body)[BOAT_JNT_GATTAI], (MTX34 *)J3DMODEL_MBASETRMTX(boat->head));
-  boat_calcModel(boat, boat->headAnm, 1);
+  boat_calcModel(boat, boat->head, boat->headAnm, BOAT_CALC_HEAD);
+  boat_partsExecute(boat, slotIndex, flags);
   boat_sailExecute(boat, base, flags, slotIndex);
 
   boat->hasPose = 1;
@@ -888,6 +1135,37 @@ int puppet_boatSeat(PuppetBoat *boat, cXyz *pos, csXyz *angle)
   return 1;
 }
 
+/* daShip_c::draw's part branch (d_a_ship.cpp:304-317), inside the P1 list. */
+static void boat_partsDraw(PuppetBoat *boat, dKy_tevstr_c *tev)
+{
+  if (boat->part == SHIP_PART_CANNON)
+  {
+    dScnKy_env_light_c__setLightTevColorType(&g_env_light, boat->cannon, tev);
+    mDoExt_modelEntryDL(boat->cannon);
+    return;
+  }
+  if (boat->part != SHIP_PART_CRANE)
+    return;
+  dScnKy_env_light_c__setLightTevColorType(&g_env_light, boat->crane, tev);
+  mDoExt_modelEntryDL(boat->crane);
+  if (boat->rope != NULL && boat->ropeCnt >= 2)
+  {
+    // mRopeLine.update + dComIfGd_set3DlineMat. Entered once a frame: the sort packet chains its
+    // lines through mpNextLineMat, so a second entry would make the chain loop.
+    mDoExt_3DlineMat1_c__update((mDoExt_3DlineMat1_c *)boat->rope, ROPE_POINTS, ROPE_WIDTH,
+                                (_GXColor *)&l_boatRopeColor, 0, tev);
+    mDoExt_3DlineMatSortPacket__setMat(
+        DDLST_LIST_3DLINEMATSORTPACKET(GAMEINFO_DRAWLIST(&g_dComIfG_gameInfo), ROPE_LINE_MAT_ID),
+        (mDoExt_3DlineMat_c *)boat->rope);
+  }
+  if (boat->hookShow)
+  {
+    // The ship draws it with mDoExt_modelUpdateDL (calc + entry); ours was calced in execute.
+    dScnKy_env_light_c__setLightTevColorType(&g_env_light, boat->hook, tev);
+    mDoExt_modelEntryDL(boat->hook);
+  }
+}
+
 void puppet_boatDraw(fopAc_ac_c *actor, PuppetBoat *boat)
 {
   u8 *tev = (u8 *)boat->tevStr;
@@ -902,7 +1180,7 @@ void puppet_boatDraw(fopAc_ac_c *actor, PuppetBoat *boat)
   tev[TEVSTR_OFF_ROOM_NO] = actorTev[TEVSTR_OFF_ROOM_NO];
   tev[TEVSTR_OFF_ENVR_OVERRIDE] = actorTev[TEVSTR_OFF_ENVR_OVERRIDE];
 
-  // daShip_c::draw (d_a_ship.cpp:253-299), hull and head only.
+  // daShip_c::draw (d_a_ship.cpp:253-317): hull, head and the part that's out.
   dScnKy_env_light_c__settingTevStruct(&g_env_light, settingTevStruct__LightType__Actor,
                                        &boat->pos, (dKy_tevstr_c *)tev);
   dScnKy_env_light_c__setLightTevColorType(&g_env_light, boat->body, (dKy_tevstr_c *)tev);
@@ -911,6 +1189,7 @@ void puppet_boatDraw(fopAc_ac_c *actor, PuppetBoat *boat)
   dComIfGd_setListP1();
   mDoExt_modelEntryDL(boat->body);
   mDoExt_modelEntryDL(boat->head);
+  boat_partsDraw(boat, (dKy_tevstr_c *)tev);
   dComIfGd_setList();
 
   if (boat->sailShow)
@@ -940,6 +1219,7 @@ void puppet_boatDelete(PuppetBoat *boat)
     boat->body = NULL;
     boat->head = NULL;
     boat->sail = NULL; // was in the heap
+    boat_clearParts(boat);
   }
 
   boat_releaseRes(&boat->phase, BOAT_ARC_NAME);

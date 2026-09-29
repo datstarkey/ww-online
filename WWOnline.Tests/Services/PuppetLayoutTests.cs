@@ -147,6 +147,77 @@ public class PuppetLayoutTests
     }
 
     [Fact]
+    public void BoatPart_RidesInFlags_BetweenTheFlagBitsAndTheHeadBck()
+    {
+        int part = PuppetLayout.PUPPET_BOAT_PART_MASK << PuppetLayout.PUPPET_BOAT_PART_SHIFT;
+        int flagBits = PuppetLayout.PUPPET_BOAT_FLAG_ACTIVE | PuppetLayout.PUPPET_BOAT_FLAG_FLY |
+                       PuppetLayout.PUPPET_BOAT_FLAG_MAST_ON | PuppetLayout.PUPPET_BOAT_FLAG_MAST_HIDE;
+        Assert.Equal(0, part & flagBits);
+        Assert.Equal(0, part & (PuppetLayout.PUPPET_BOAT_HEAD_BCK_MASK << PuppetLayout.PUPPET_BOAT_HEAD_BCK_SHIFT));
+        Assert.True(PuppetLayout.SHIP_PART_CRANE <= PuppetLayout.PUPPET_BOAT_PART_MASK);
+    }
+
+    [Fact]
+    public void ShipParts_MatchBoatState()
+    {
+        // daShip_c::Part_e (d_a_ship.h): the REL (puppet_shared.h) and BoatState agree.
+        Assert.Equal(PuppetLayout.SHIP_PART_WAIT, (int)BoatState.PartWait);
+        Assert.Equal(PuppetLayout.SHIP_PART_STEER, (int)BoatState.PartSteer);
+        Assert.Equal(PuppetLayout.SHIP_PART_CANNON, (int)BoatState.PartCannon);
+        Assert.Equal(PuppetLayout.SHIP_PART_CRANE, (int)BoatState.PartCrane);
+        Assert.Equal(PuppetLayout.SHIP_ROPE_MAX, (int)BoatState.MaxRopeLength);
+    }
+
+    [Fact]
+    public void BoatCannonAndCraneWords_FillTwoScratchGaps_WithoutTouchingNeighbours()
+    {
+        uint cannonEnd = PuppetLayout.PUPPET_BOAT_CANNON_0 + (uint)(PuppetLayout.PUPPET_BOAT_CANNON_SIZE * PuppetLayout.PUPPET_MAX_SLOTS);
+        uint craneEnd = PuppetLayout.PUPPET_BOAT_CRANE_0 + (uint)(PuppetLayout.PUPPET_BOAT_CRANE_SIZE * PuppetLayout.PUPPET_MAX_SLOTS);
+
+        // Cannon words: between the hook's settle counter and its debug counters.
+        Assert.True(PuppetLayout.PUPPET_BOAT_CANNON_0 >= PuppetLayout.SPAWN_FRAME_COUNTER_ADDR + 4);
+        Assert.True(cannonEnd <= PuppetLayout.DBG_MAGIC_DETECTED_ADDR);
+        // Crane words: between the client's slot-0 gate bitmap and its heartbeat.
+        Assert.True(PuppetLayout.PUPPET_BOAT_CRANE_0 >= PuppetLayout.CLIENT_DBG_SLOT0_GATES + 4);
+        Assert.True(craneEnd <= PuppetLayout.CLIENT_HEARTBEAT_ADDR);
+
+        // Inside the scratch region (above .sbss2), clear of the small-keys reserve 0x803FD1D0..DF.
+        foreach (var (start, end) in new[] { (PuppetLayout.PUPPET_BOAT_CANNON_0, cannonEnd), (PuppetLayout.PUPPET_BOAT_CRANE_0, craneEnd) })
+        {
+            Assert.True(start >= PuppetLayout.SCRATCH_REGION_START);
+            Assert.True(end <= PuppetLayout.SCRATCH_REGION_END);
+            Assert.True(end <= 0x803FD1D0u || start >= 0x803FD1E0u);
+            Assert.Equal(0u, start % 4);
+        }
+
+        // No listed scratch word inside either block.
+        uint[] words =
+        [
+            PuppetLayout.SPAWN_FRAME_COUNTER_ADDR, PuppetLayout.DBG_MAGIC_DETECTED_ADDR, PuppetLayout.DBG_CREATE_ATTEMPTS_ADDR,
+            PuppetLayout.DBG_CREATE_SUCCESSES_ADDR, PuppetLayout.DBG_CREATE_FAILURES_ADDR, PuppetLayout.DBG_LAST_DESIRED_ADDR,
+            PuppetLayout.DBG_LAST_PID_ADDR, PuppetLayout.DBG_DELETE_ISSUED_ADDR, PuppetLayout.CLIENT_DBG_SLOT0_GATES,
+            PuppetLayout.CLIENT_HEARTBEAT_ADDR, PuppetLayout.CLIENT_DBG_UNSTABLE_HITS, PuppetLayout.CLIENT_DBG_STABILITY_BITS,
+            PuppetLayout.CLIENT_DBG_LAST_ACTIVE, PuppetLayout.CLIENT_DBG_WRITE_COUNTER, PuppetLayout.PUPPET_SYNC_BASE,
+        ];
+        Assert.DoesNotContain(words, a => a + 4 > PuppetLayout.PUPPET_BOAT_CANNON_0 && a < cannonEnd);
+        Assert.DoesNotContain(words, a => a + 4 > PuppetLayout.PUPPET_BOAT_CRANE_0 && a < craneEnd);
+
+        Assert.Equal(PuppetLayout.PUPPET_BOAT_CANNON_0 + (uint)PuppetLayout.PUPPET_BOAT_CANNON_SIZE,
+            GameMemoryAddresses.PuppetSync.GetBoatCannonBase(1));
+        Assert.Equal(PuppetLayout.PUPPET_BOAT_CRANE_0 + (uint)PuppetLayout.PUPPET_BOAT_CRANE_SIZE,
+            GameMemoryAddresses.PuppetSync.GetBoatCraneBase(1));
+
+        // Fields fit their word, aligned, and don't overlap.
+        Assert.Equal(0, PuppetLayout.PUPPET_BOAT_CANNON_OFF_YAW % 2);
+        Assert.True(PuppetLayout.PUPPET_BOAT_CANNON_OFF_YAW + 2 <= PuppetLayout.PUPPET_BOAT_CANNON_OFF_PITCH);
+        Assert.True(PuppetLayout.PUPPET_BOAT_CANNON_OFF_PITCH + 2 <= PuppetLayout.PUPPET_BOAT_CANNON_SIZE);
+        Assert.Equal(0, PuppetLayout.PUPPET_BOAT_CANNON_OFF_PITCH % 2);
+        Assert.Equal(0, PuppetLayout.PUPPET_BOAT_CRANE_OFF_ANGLE % 2);
+        Assert.True(PuppetLayout.PUPPET_BOAT_CRANE_OFF_ANGLE + 2 <= PuppetLayout.PUPPET_BOAT_CRANE_OFF_ROPE);
+        Assert.True(PuppetLayout.PUPPET_BOAT_CRANE_OFF_ROPE + 1 <= PuppetLayout.PUPPET_BOAT_CRANE_SIZE);
+    }
+
+    [Fact]
     public void BoatBlocks_LeaveTheReservedWordsFree()
     {
         // docs/small-keys.md reserves 0x803FD1D0..0x803FD1DF (between the boats and world sync).
