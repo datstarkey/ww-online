@@ -20,6 +20,7 @@ services:
       WWO_SHARED_STORY: "true"
       WWO_SHARED_BAIT: "true"
       WWO_SHARED_SPOILS: "true"
+      WWO_SHARED_DELIVERY: "true"
       WWO_SHARED_PROJECTILES: "true"
       WWO_ALLOW_WARPING: "true"   # players can warp to each other (see docs/softlocks.md)
       # A player who enters this in the client's "Owner key" field becomes the room owner.

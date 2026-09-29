@@ -78,16 +78,8 @@ public static class BaitBag
     public const byte NoSlot = 0xFF;  // dInvSlot_NONE_e / dItemNo_NONE_e
 
     /// <summary>Bit i set = bag slot i is on X, Y or Z (<paramref name="selectSlots"/>: the save's mSelectItem).</summary>
-    public static int EquippedMask(ReadOnlySpan<byte> selectSlots)
-    {
-        int mask = 0;
-        for (int b = 0; b < Math.Min(ButtonCount, selectSlots.Length); b++)
-        {
-            int slot = selectSlots[b] - FirstInvSlot;
-            if (slot >= 0 && slot < BaitCounts.SlotCount) mask |= 1 << slot;
-        }
-        return mask;
-    }
+    public static int EquippedMask(ReadOnlySpan<byte> selectSlots) =>
+        BagMemory.EquippedMask(FirstInvSlot, BaitCounts.SlotCount, selectSlots);
 
     /// <summary>
     /// <paramref name="current"/> changed to hold <paramref name="target"/>. If the bag can't hold it all
@@ -193,28 +185,8 @@ public static class BaitBag
     /// anything changed.
     /// </summary>
     public static (byte[] SaveSelect, byte[] PlaySelect, bool Changed) FixButtons(
-        BaitBagSlots before, BaitBagSlots after, ReadOnlySpan<byte> saveSelect, ReadOnlySpan<byte> playSelect)
-    {
-        var save = saveSelect.ToArray();
-        var play = playSelect.ToArray();
-        bool changed = false;
-        for (int b = 0; b < Math.Min(ButtonCount, Math.Min(save.Length, play.Length)); b++)
-        {
-            int slot = save[b] - FirstInvSlot;
-            if (slot < 0 || slot >= BaitCounts.SlotCount || before.Items[slot] == after.Items[slot]) continue;
-            if (after.Items[slot] == BaitBagSlots.Empty)
-            {
-                save[b] = NoSlot;
-                play[b] = NoSlot;
-            }
-            else
-            {
-                play[b] = after.Items[slot];
-            }
-            changed = true;
-        }
-        return (save, play, changed);
-    }
+        BaitBagSlots before, BaitBagSlots after, ReadOnlySpan<byte> saveSelect, ReadOnlySpan<byte> playSelect) =>
+        BagMemory.FixButtons(FirstInvSlot, before.Items, after.Items, saveSelect, playSelect);
 
     /// <summary>mBaitFlags bits for the types <paramref name="after"/> holds (bit 0 All-Purpose Bait, bit 1 Hyoi
     /// Pear: what item_func_bird_esa_5 / item_func_animal_esa set when one is obtained). ORed in, never cleared.</summary>

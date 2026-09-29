@@ -149,6 +149,14 @@ public static class GameMemoryAddresses
         public const uint SpoilsGetFlags = GameInfo + 0x90 + 0x4;
         public const uint SpoilsNums = GameInfo + 0x9C + 0x00;
 
+        // The delivery bag, in the same structs: mBagItem /* 0x10 */ mReserve[8] (item numbers 0x8C-0x9E, 0xFF =
+        // empty; no counts: an item that arrives takes the first empty slot, setReserveItem) and mGetBagItem /* 0x0 */
+        // u32 mReserveFlags (bit item - 0x8C: ever obtained, onReserve). Verified in main.dol: item_func_flower_1
+        // (0x800C468C) calls onReserve(gameInfo + 0x90, 0) then setReserveItem(gameInfo + 0x76, 0x8C), and
+        // setReserveItem (0x8005A7E4) stores at +0x10 + i; onReserve (0x8005AB24) is lwz / or / stw at +0.
+        public const uint DeliveryItems = GameInfo + 0x76 + 0x10;
+        public const uint DeliveryGetFlags = GameInfo + 0x90 + 0x0;
+
         // play.mItemBeastNumCounts[8] (d_com_inf_game.h "/* 0x48E8 */ s16", indexed by dBeastIndex_e;
         // DOL item_func_skull_necklace 0x800C3D3C: lha/sth 0x5B88(gameInfo)). What dComIfGp_setItemBeastNumCount
         // adds to, for every pickup, sale and trade; d_meter applies it next frame: count clamped to 0-99, and a

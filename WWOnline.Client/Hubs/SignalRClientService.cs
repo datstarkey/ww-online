@@ -31,6 +31,7 @@ public class SignalRClientService : IAsyncDisposable
     public event Action<int>? RupeeTotalReceived;
     public event Action<BaitCounts>? BaitTotalReceived;
     public event Action<SpoilsCounts>? SpoilsTotalReceived;
+    public event Action<DeliveryCounts>? DeliveryTotalReceived;
     public event Action<RoomSettings>? RoomSettingsReceived;
     public event Action<RoomInventory>? RoomInventoryReceived;
     public event Action<StoryFlags>? StoryFlagsReceived;
@@ -378,6 +379,11 @@ public class SignalRClientService : IAsyncDisposable
             SpoilsTotalReceived?.Invoke(total);
         });
 
+        connection.On<DeliveryCounts>(HubConstants.ReceiveDeliveryTotal, total =>
+        {
+            DeliveryTotalReceived?.Invoke(total);
+        });
+
         connection.On<RoomSettings>(HubConstants.ReceiveRoomSettings, settings =>
         {
             RoomSettingsReceived?.Invoke(settings);
@@ -472,6 +478,20 @@ public class SignalRClientService : IAsyncDisposable
 
     /// <summary>Report a local spoils bag change (signed per type); false if not connected (nothing sent).</summary>
     public Task<bool> SendSpoilsDeltaAsync(SpoilsCounts delta) => SendAsync(HubConstants.SendSpoilsDelta, delta);
+
+    /// <summary>
+    /// Join the shared delivery bag with this game's bag; returns the room's bag to adopt, or null if offline,
+    /// the rule is off, or the bag is still waiting for its owner to seed it (the client retries).
+    /// </summary>
+    public async Task<DeliveryCounts?> JoinDeliveryAsync(DeliveryCounts current)
+    {
+        var connection = _hubConnection;
+        if (connection?.State != HubConnectionState.Connected) return null;
+        return await connection.InvokeAsync<DeliveryCounts?>(HubConstants.JoinDelivery, current);
+    }
+
+    /// <summary>Report a local delivery bag change (signed per item, plus newly obtained flags); false if not connected (nothing sent).</summary>
+    public Task<bool> SendDeliveryDeltaAsync(DeliveryCounts delta) => SendAsync(HubConstants.SendDeliveryDelta, delta);
 
     /// <summary>Report this game's flags for one stage slot to the shared world; false if not connected.</summary>
     public Task<bool> SendStageFlagsAsync(StageFlags flags) => SendAsync(HubConstants.SendStageFlags, flags);
