@@ -22,26 +22,23 @@ typedef struct
   s16 proc;
   u8 shift;
   u8 mask;
-  u16 lockOff; /* != 0: clear this small-key lock byte of a door in Wait (action byte at actOff); 0: re-create */
-  u16 actOff;
 } LwRule;
 
 static const LwRule l_lwRules[] = {
     /* opened: create sees isTbox and comes up open and empty (funcs 7/8 read STAGE_SEA2's bits: skipped) */
-    {PROC_NAME_TBOX, 7, LW_CHEST, 0, 0},
+    {PROC_NAME_TBOX, 7, LW_CHEST},
     /* create returns ERROR once the switch is set: they are simply gone */
-    {PROC_NAME_WALL, 0, 0xFF, 0, 0},
-    {PROC_NAME_FLOOR, 0, 0xFF, 0, 0},
-    {PROC_NAME_OBJ_ICE, 0, 0xFF, 0, 0},
-    {PROC_NAME_MJDOOR, 0, 0xFF, 0, 0},
+    {PROC_NAME_WALL, 0, 0xFF},
+    {PROC_NAME_FLOOR, 0, 0xFF},
+    {PROC_NAME_OBJ_ICE, 0, 0xFF},
+    {PROC_NAME_MJDOOR, 0, 0xFF},
     /* wooden barricade: lower half, upper half broken */
-    {PROC_NAME_SAKU, 8, 0xFF, 0, 0},
-    {PROC_NAME_SAKU, 16, 0xFF, 0, 0},
+    {PROC_NAME_SAKU, 8, 0xFF},
+    {PROC_NAME_SAKU, 16, 0xFF},
     /* crystal switch shows on (a timed one starts its own timer, as the peer's did) */
-    {PROC_NAME_SWHIT0, 0, 0xFF, 0, 0},
-    /* small-key locks: setKey would give keyOff (docs/small-keys.md §3) */
-    {PROC_NAME_DOOR10, 0, 0xFF, DOOR10_KEYLOCK_OFF, DOOR10_ACTION_OFF},
-    {PROC_NAME_DOOR12, 0, 0xFF, DOOR12_KEYLOCK_OFF, DOOR12_ACTION_OFF},
+    {PROC_NAME_SWHIT0, 0, 0xFF},
+    /* No doors: a small-key lock another player opened stays until the room reloads (actionInit's setKey
+     * then clears it). Clearing mbEnabled at runtime froze the game at that door (ISI at 0, docs/live-world.md). */
 };
 #define LW_RULE_END (l_lwRules + sizeof(l_lwRules) / sizeof(l_lwRules[0]))
 
@@ -50,9 +47,8 @@ typedef struct
   u32 work[LIVEWORLD_BIT_WORDS]; /* the batch of new bits */
   u32 zoneRoom;                  /* the room the zone bits (0xC0+) belong to */
   u32 count;                     /* hits[] used */
-  u32 pending;                   /* matching actors not ready yet (being created, room loading, door busy) */
+  u32 pending;                   /* matching actors not ready yet (being created, room loading) */
   fopAc_ac_c *hits[LW_MAX_HITS];
-  const LwRule *rules[LW_MAX_HITS];
 } LwPass;
 
 /* fopAcIt_Judge callback: collect the actors whose create-time flag is in the batch. Never deletes here. */
@@ -78,9 +74,8 @@ static void *lw_judge(void *proc, void *data)
       else
       {
         word = 1 + (key >> 5);
-        /* 0xFF = none and 0xF0-0xFE are no switches; setKey keeps a lock on a dan/zone switch on;
-         * zone bits are one room's */
-        if (key >= 0xF0 || (r->lockOff != 0 && key >= 0x80) || (key >= 0xC0 && (u32)room != p->zoneRoom))
+        /* 0xFF = none and 0xF0-0xFE are no switches; zone bits are one room's */
+        if (key >= 0xF0 || (key >= 0xC0 && (u32)room != p->zoneRoom))
           continue;
       }
       /* No need to read the live flag here: C# publishes only bits it has read back from the live save
@@ -88,23 +83,19 @@ static void *lw_judge(void *proc, void *data)
       if (((p->work[word] >> (key & 31)) & 1) == 0)
         continue;
 
-      u8 *a = (u8 *)ac;
-      if (r->lockOff != 0 && (a[r->lockOff] == 0 || a[r->actOff] == 0))
-        break; /* no lock left, or Init (action 0), which re-runs setKey itself */
       if (BASE_CREATE_RESULT(ac) != BASE_CREATE_DONE || (FOPAC_ACTOR_CONDITION(ac) & FOPAC_CND_INIT) == 0 ||
-          (r->lockOff != 0 && a[r->actOff] != DOOR_ACTION_WAIT) || p->count >= LW_MAX_HITS ||
-          (r->lockOff == 0 && (u32)room < ROOM_MAX &&
+          p->count >= LW_MAX_HITS ||
+          ((u32)room < ROOM_MAX &&
            (ROOM_STATUS_FLAGS(room) & (ROOM_FLAG_LOADED | ROOM_FLAG_BUSY | LW_ROOM_HIDDEN)) != ROOM_FLAG_LOADED))
       {
         /* Its create may have read the flag before the bit landed; its room scene is loading, going away or
-         * hidden (never create into that); a lock on a door that is closing its bars or opening (not Wait);
-         * or hits[] is full: not now. The batch waits, then is acknowledged with RETRY set. */
+         * hidden (never create into that); or hits[] is full: not now. The batch waits, then is acknowledged
+         * with RETRY set. */
         p->pending++;
       }
       else
       {
-        p->hits[p->count] = ac;
-        p->rules[p->count++] = r;
+        p->hits[p->count++] = ac;
       }
       break; /* one action per actor */
     }
@@ -178,11 +169,12 @@ void puppet_liveworld_draw(void)
   }
   for (u32 i = 0; i < p.count; i++)
   {
-    /* No OSReport per actor (REL space): C# logs each batch's bits and POKE_COUNT. */
-    const LwRule *r = p.rules[i];
-    if (r->lockOff != 0)
-      ((u8 *)p.hits[i])[r->lockOff] = 0; /* dDoor_key2_c::keyOff */
-    else if (!lw_recreate(p.hits[i]))
+    fopAc_ac_c *ac = p.hits[i];
+    int done = lw_recreate(ac);
+    /* One line per actor in the Dolphin log (OSReport): which actor, and whether it was re-created. */
+    OSReport("[PUPPET] live world: %s proc 0x%03x prm 0x%08x room %d\n", done ? "re-created" : "NOT re-created",
+             (int)(u16)BASE_PROC_NAME(ac), BASE_PARAMETERS(ac), (int)FOPAC_HOME_ROOMNO(ac));
+    if (!done)
     {
       p.pending++;
       continue;
