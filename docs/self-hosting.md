@@ -118,7 +118,7 @@ Other proxies (nginx, Traefik) work too if they pass WebSocket upgrades (`Upgrad
 `GET /health` answers `200` with:
 
 ```json
-{"status":"ok","app":"WW-Online","version":"0.4.3","commit":"<git sha>","protocol":9,"players":2}
+{"status":"ok","app":"WW-Online","version":"0.4.3","commit":"<git sha>","protocol":10,"players":2}
 ```
 
 The image's `HEALTHCHECK` polls it, so `docker ps` shows `healthy`. Point an uptime monitor at it if you like. `version` and `protocol` are what players' apps must match (see [Updating](#updating)).
