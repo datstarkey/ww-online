@@ -105,13 +105,22 @@ typedef char puppet_check_dapy_size[(sizeof(daPy_lk_c) >= 0x4C28) ? 1 : -1];
 // Link archive's cl.bdl TEX1): daPy_lk_c::mpCurrLinktex at 0x338, ResTIMG is 0x20 bytes.
 #define PUPPET_RESTIMG_WORDS RESTIMG_WORDS
 
-// Global game state that daPy_lk_c's playerInit/playerDelete write as if the puppet were the
-// one real player. Snapshot before, restore after, so a puppet can never change the local
-// game's event flow (start demo) or the local player's status bits.
+// Global game state that daPy_lk_c's playerInit/makeBgWait/playerDelete write as if the puppet were
+// the one real player. Snapshot before, restore after, so a puppet can never change the local
+// game's event flow (start demo), the local player's status bits, or where the local Link is.
+//
+// l_debug_keep_pos / _shape_angle / _current_angle are file statics of d_a_player_main.cpp shared by
+// every daPy_lk_c: execute starts with current.pos = l_debug_keep_pos (:11251-11255) and ends by
+// saving them (:11716). makeBgWait saves them too (:12637), from the new puppet: it starts at the
+// local Link's position (phase_2) and makeBgWait drops it onto the ground, so the local Link, in the
+// air when another player appeared, was put back on the ground under him the next frame.
 typedef struct
 {
   u32 evtException[GAMEINFO_EVT_EXCEPTION_WORDS]; // play.mEvtManager.mException
   u32 playerStatus[2];                            // play.mPlayerStatus[0][0..1]
+  cXyz keepPos;                                   // d_a_player_main l_debug_keep_pos
+  csXyz keepShapeAngle;                           // l_debug_shape_angle
+  csXyz keepCurrentAngle;                         // l_debug_current_angle
 } PuppetGlobalSnapshot;
 
 static void puppet_saveGlobals(PuppetGlobalSnapshot *s)
@@ -122,6 +131,9 @@ static void puppet_saveGlobals(PuppetGlobalSnapshot *s)
     s->evtException[i] = evt[i];
   s->playerStatus[0] = status[0];
   s->playerStatus[1] = status[1];
+  s->keepPos = d_a_player_main__l_debug_keep_pos;
+  s->keepShapeAngle = d_a_player_main__l_debug_shape_angle;
+  s->keepCurrentAngle = d_a_player_main__l_debug_current_angle;
 }
 
 static void puppet_restoreGlobals(const PuppetGlobalSnapshot *s)
@@ -132,6 +144,9 @@ static void puppet_restoreGlobals(const PuppetGlobalSnapshot *s)
     evt[i] = s->evtException[i];
   status[0] = s->playerStatus[0];
   status[1] = s->playerStatus[1];
+  d_a_player_main__l_debug_keep_pos = s->keepPos;
+  d_a_player_main__l_debug_shape_angle = s->keepShapeAngle;
+  d_a_player_main__l_debug_current_angle = s->keepCurrentAngle;
 }
 
 // Function declarations
