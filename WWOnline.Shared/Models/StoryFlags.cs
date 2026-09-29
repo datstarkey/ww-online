@@ -12,7 +12,8 @@ namespace WWOnline.Shared.Models;
 /// <item>the Nintendo Gallery figurines Carlov has made (<see cref="Figurines"/>): the 17 event registers
 /// the game uses as one bitfield (docs/figurines.md);</item>
 /// <item>which dungeon warp jars are open (<see cref="WarpJars"/>): the 6 registers the three-way jars keep
-/// their "open" bits in (docs/live-world.md §0.2).</item>
+/// their "open" bits in (docs/live-world.md §0.2);</item>
+/// <item>Beedle's membership points (<see cref="BeedlePoints"/>): a counter, merged by MAX.</item>
 /// </list>
 /// Grow-only: players' bits are OR-merged, and only syncable bits are ever stored, sent or applied.
 /// Every other event register (0x79-0xFF) and mTmp are never part of this.
@@ -48,6 +49,12 @@ public class StoryFlags
     /// <summary>The bits of each warp jar register (the registers' 0x07 value mask; the rest of the byte is other flags).</summary>
     public const byte WarpJarMask = 0x07;
 
+    /// <summary>
+    /// The event byte of Beedle's point card: UNK_86FF, +1 per purchase up to 0xFF and never lowered
+    /// (d_a_npc_bs1.cpp:939-941; 30 and 60 points send the silver / gold membership letters).
+    /// </summary>
+    public const int BeedlePointsRegisterByte = 0x86;
+
     private static readonly byte[] Mask = EventFlagCatalog.GetFullSyncMask()[..ByteCount];
 
     private static readonly byte[] FigMask = BuildFigurineMask();
@@ -73,6 +80,10 @@ public class StoryFlags
     /// </summary>
     public byte[] WarpJars { get; set; } = new byte[WarpJarByteCount];
 
+    /// <summary>Beedle's membership points. Merged by MAX: the room keeps the highest card, and everyone's is
+    /// raised to it (two players buying in the same moment can lose a point between them).</summary>
+    public byte BeedlePoints { get; set; }
+
     private static byte[] BuildFigurineMask()
     {
         var m = new byte[FigurineByteCount];
@@ -89,6 +100,7 @@ public class StoryFlags
         for (int i = 0; i < ByteCount; i++) f.Bits[i] = (byte)(eventBytes[i] & Mask[i]);
         for (int i = 0; i < FigurineByteCount; i++) f.Figurines[i] = (byte)(eventBytes[FigurineRegisterBytes[i]] & FigMask[i]);
         for (int i = 0; i < WarpJarByteCount; i++) f.WarpJars[i] = (byte)(eventBytes[WarpJarRegisterBytes[i]] & WarpJarMask);
+        f.BeedlePoints = eventBytes[BeedlePointsRegisterByte];
         return f;
     }
 
@@ -106,7 +118,7 @@ public class StoryFlags
     }
 
     [JsonIgnore]
-    public bool IsEmpty => Bits.All(b => b == 0) && Figurines.All(b => b == 0) && WarpJars.All(b => b == 0);
+    public bool IsEmpty => Bits.All(b => b == 0) && Figurines.All(b => b == 0) && WarpJars.All(b => b == 0) && BeedlePoints == 0;
 
     /// <summary>Set event flags (figurines not included).</summary>
     [JsonIgnore]
@@ -130,6 +142,7 @@ public class StoryFlags
             Figurines[i] = Or(Figurines[i], (byte)(other.Figurines[i] & FigMask[i]), ref changed);
         for (int i = 0; i < WarpJarByteCount; i++)
             WarpJars[i] = Or(WarpJars[i], (byte)(other.WarpJars[i] & WarpJarMask), ref changed);
+        if (other.BeedlePoints > BeedlePoints) { BeedlePoints = other.BeedlePoints; changed = true; }
         return changed;
     }
 
@@ -147,17 +160,19 @@ public class StoryFlags
         for (int i = 0; i < ByteCount; i++) d.Bits[i] = (byte)(Bits[i] & ~other.Bits[i]);
         for (int i = 0; i < FigurineByteCount; i++) d.Figurines[i] = (byte)(Figurines[i] & ~other.Figurines[i]);
         for (int i = 0; i < WarpJarByteCount; i++) d.WarpJars[i] = (byte)(WarpJars[i] & ~other.WarpJars[i]);
+        d.BeedlePoints = BeedlePoints > other.BeedlePoints ? BeedlePoints : (byte)0; // a MAX field: only a higher count is "missing"
         return d;
     }
 
     /// <summary>A copy holding the event flags and warp jars, without the figurines (which wait for an idle game).</summary>
-    public StoryFlags FlagsOnly() => new() { Bits = (byte[])Bits.Clone(), WarpJars = (byte[])WarpJars.Clone() };
+    public StoryFlags FlagsOnly() =>
+        new() { Bits = (byte[])Bits.Clone(), WarpJars = (byte[])WarpJars.Clone(), BeedlePoints = BeedlePoints };
 
     /// <summary>A copy holding only the figurines (no event flags).</summary>
     public StoryFlags FigurinesOnly() => new() { Figurines = (byte[])Figurines.Clone() };
 
     public StoryFlags Clone() =>
-        new() { Bits = (byte[])Bits.Clone(), Figurines = (byte[])Figurines.Clone(), WarpJars = (byte[])WarpJars.Clone() };
+        new() { Bits = (byte[])Bits.Clone(), Figurines = (byte[])Figurines.Clone(), WarpJars = (byte[])WarpJars.Clone(), BeedlePoints = BeedlePoints };
 
     public bool Has(ushort id) => (id >> 8) < ByteCount && (Bits[id >> 8] & (id & 0xFF)) != 0;
 
@@ -185,7 +200,8 @@ public class StoryFlags
     /// <summary>"3 flag(s)", or "3 flag(s) + 2 figurine(s)" when figurines are set, for log lines.</summary>
     public string CountText() =>
         $"{BitCount} flag(s)" + (FigurineCount == 0 ? "" : $" + {FigurineCount} figurine(s)") +
-        (WarpJarCount == 0 ? "" : $" + {WarpJarCount} warp jar(s)");
+        (WarpJarCount == 0 ? "" : $" + {WarpJarCount} warp jar(s)") +
+        (BeedlePoints == 0 ? "" : $" + Beedle {BeedlePoints} pt(s)");
 
     /// <summary>
     /// Names of the set flags for log lines, e.g. "MET_KORL, UNK_0F40", then the figurines made as
@@ -202,6 +218,7 @@ public class StoryFlags
         var jars = Enumerable.Range(0, WarpJarByteCount).Where(i => WarpJars[i] != 0)
             .Select(i => $"0x{WarpJarRegisterBytes[i]:X2}={WarpJars[i]}").ToList();
         if (jars.Count > 0) parts.Add("warp jars " + string.Join(", ", jars));
+        if (BeedlePoints != 0) parts.Add($"Beedle points {BeedlePoints}");
         return parts.Count == 0 ? "(none)" : string.Join(", ", parts);
     }
 
