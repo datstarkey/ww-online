@@ -20,6 +20,11 @@ public class SignalRClientService : IAsyncDisposable
     public event Action<PuppetData>? PuppetDataReceived;
     public event Action<string, GameState>? PlayerGameStateReceived;
     public event Action<string, string>? PlayerJoined;
+    /// <summary>Everyone else in the room (connection id → name), kept up to date from the moment we
+    /// connect: services that start later (GameSyncService starts when Dolphin attaches, after the
+    /// join events already fired) read names from here instead of relying on PlayerJoined.</summary>
+    public IReadOnlyDictionary<string, string> Players => _players;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _players = new();
     public event Action<string>? PlayerLeft;
     public event Action<int>? PlayerCountUpdated;
     public event Action<StageFlags>? StageFlagsReceived;
@@ -134,6 +139,7 @@ public class SignalRClientService : IAsyncDisposable
             {
                 if (p.ConnectionId == selfId) continue;
                 Logger.Information("Existing player: {ConnectionId} ({PlayerName})", p.ConnectionId, p.PlayerName);
+                _players[p.ConnectionId] = p.PlayerName;
                 PlayerJoined?.Invoke(p.ConnectionId, p.PlayerName);
             }
         }
@@ -188,6 +194,7 @@ public class SignalRClientService : IAsyncDisposable
         try
         {
             await DisconnectInternalAsync();
+            _players.Clear();
         }
         finally
         {
@@ -230,6 +237,7 @@ public class SignalRClientService : IAsyncDisposable
         connection.Reconnecting += (error) =>
         {
             Logger.Warning(error, "SignalR connection lost, attempting to reconnect");
+            _players.Clear();
             ConnectionLost?.Invoke();
             return Task.CompletedTask;
         };
@@ -259,6 +267,7 @@ public class SignalRClientService : IAsyncDisposable
                 Logger.Error(error, "SignalR connection closed with error");
             else
                 Logger.Information("SignalR connection closed");
+            _players.Clear();
             ConnectionLost?.Invoke();
             return Task.CompletedTask;
         };
@@ -277,12 +286,15 @@ public class SignalRClientService : IAsyncDisposable
         connection.On<string, string>("PlayerJoined", (connectionId, playerName) =>
         {
             Logger.Information("Player joined: {ConnectionId} ({PlayerName})", connectionId, playerName);
+            if (connectionId != connection.ConnectionId)
+                _players[connectionId] = playerName;
             PlayerJoined?.Invoke(connectionId, playerName);
         });
 
         connection.On<string>("PlayerLeft", connectionId =>
         {
             Logger.Information("Player left: {ConnectionId}", connectionId);
+            _players.TryRemove(connectionId, out _);
             PlayerLeft?.Invoke(connectionId);
         });
 

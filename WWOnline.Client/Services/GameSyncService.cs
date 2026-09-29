@@ -72,6 +72,11 @@ public class GameSyncService : IDisposable
         _signalR.PlayerLeft += OnPlayerLeft;
         _signalR.ConnectionLost += OnConnectionLost;
 
+        // Players who joined before we started (we start when Dolphin attaches, usually after the
+        // room's PlayerJoined events): take their names from the roster for the tags over puppets.
+        foreach (var (id, name) in _signalR.Players)
+            _puppetSync.SetPlayerName(id, name);
+
         // Start puppet sync (writes remote puppet data to Dolphin memory at 20Hz)
         _puppetSync.Start();
 
