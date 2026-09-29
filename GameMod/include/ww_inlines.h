@@ -1010,6 +1010,14 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define PROC_NAME_STONE2         0x1CD // d_a_stone2 (black boulder Ebrock / Ekao: covers DRC's and ET's warp jars)
 #define PROC_NAME_MKIEK          0x04E // d_a_obj_mkiek (wall that dissolves in mirror-shield light)
 #define PROC_NAME_OBJ_WARPT      0x043 // d_a_obj_warpt (warp jar)
+#define PROC_NAME_SS             0x0FD // d_a_ss (Forbidden Woods door plant)
+#define PROC_NAME_MKIE           0x04D // d_a_obj_mkie (Earth Temple statue that dissolves in mirror-shield light)
+#define PROC_NAME_MKNJD          0x04F // d_a_obj_mknjd (Earth God's Lyric / Wind God's Aria statue)
+#define PROC_NAME_VMC            0x036 // d_a_obj_vmc (Wind Temple soil mound + Makar tree)
+#define PROC_NAME_VFAN           0x038 // d_a_obj_vfan (Ganon's Tower Phantom Ganon door)
+#define PROC_NAME_LEAVES         0x092 // d_a_obj_leaves (orange leaf pile, Deku Leaf)
+#define PROC_NAME_KOKIIE         0x064 // d_a_kokiie (Forbidden Woods hanging flower house)
+#define PROC_NAME_MFLFT          0x05D // d_a_mflft (Dragon Roost Cavern flame lift)
 
 // daTbox_c (d_a_tbox.h:35-36, d_a_tbox.cpp:23-31): tbox no. = (prm >> 7) & 0x1F, swNo = (prm >> 12) & 0xFF,
 // funcType = prm & 0x7F. checkOpen (REL .text 0xCD8) reads STAGE_SEA2's tbox for funcs 7/8, else the live one.

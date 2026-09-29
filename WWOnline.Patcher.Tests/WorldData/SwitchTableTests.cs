@@ -39,6 +39,14 @@ public class SwitchTableTests : IDisposable
         ["boulder"] = SwitchTableBuilder.ProcStone2,
         ["lightwall"] = SwitchTableBuilder.ProcMkiek,
         ["jar"] = SwitchTableBuilder.ProcWarpt,
+        ["plant"] = SwitchTableBuilder.ProcSs,
+        ["statue"] = SwitchTableBuilder.ProcMkie,
+        ["song"] = SwitchTableBuilder.ProcMknjD,
+        ["soil"] = SwitchTableBuilder.ProcVmc,
+        ["pgdoor"] = SwitchTableBuilder.ProcVfan,
+        ["leaves"] = SwitchTableBuilder.ProcLeaves,
+        ["house"] = SwitchTableBuilder.ProcKokiie,
+        ["lift"] = SwitchTableBuilder.ProcMflft,
     };
 
     private static PlacedActor A(string name, uint prm, int room = 0, short ax = 0, short az = 0, string stage = "Dun") =>
@@ -118,6 +126,25 @@ public class SwitchTableTests : IDisposable
     }
 
     [Fact]
+    public void DungeonCreateOnlyObjects_LatchTheirSwitch()
+    {
+        // Door plant Ss: prm >> 24 (0 = none); light statue: (prm >> 16) & 0xFF; song statue and PG door: prm & 0xFF;
+        // soil tree: (prm >> 8) & 0xFF; leaves: (prm >> 13) & 0xFF; flower house and flame lift: prm >> 24.
+        var t = Table(
+            A("plant", 0x00000201, room: 1),
+            A("plant", 0xE1000201, room: 1),
+            A("statue", 0x008410FF, room: 1),
+            A("song", 0x000100E2, room: 1),
+            A("soil", 0x0000E300, room: 1),
+            A("pgdoor", 0x000000E4, room: 1),
+            A("leaves", (0xE5u << 13) | 0x1FFF, room: 1),
+            A("house", 0xE6FFFFFF, room: 1),
+            A("lift", 0xE7000000, room: 1));
+        Assert.Equal([0x84], t.Dan["Dun"]);
+        Assert.Equal([0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7], t.Zone["Dun"][1]);
+    }
+
+    [Fact]
     public void Rel_ProcNames_MatchTheTable()
     {
         // puppet_liveworld.c re-creates these; both sides must name the same processes.
@@ -140,6 +167,14 @@ public class SwitchTableTests : IDisposable
         Assert.Equal(SwitchTableBuilder.ProcStone2, Proc("STONE2"));
         Assert.Equal(SwitchTableBuilder.ProcMkiek, Proc("MKIEK"));
         Assert.Equal(SwitchTableBuilder.ProcWarpt, Proc("OBJ_WARPT"));
+        Assert.Equal(SwitchTableBuilder.ProcSs, Proc("SS"));
+        Assert.Equal(SwitchTableBuilder.ProcMkie, Proc("MKIE"));
+        Assert.Equal(SwitchTableBuilder.ProcMknjD, Proc("MKNJD"));
+        Assert.Equal(SwitchTableBuilder.ProcVmc, Proc("VMC"));
+        Assert.Equal(SwitchTableBuilder.ProcVfan, Proc("VFAN"));
+        Assert.Equal(SwitchTableBuilder.ProcLeaves, Proc("LEAVES"));
+        Assert.Equal(SwitchTableBuilder.ProcKokiie, Proc("KOKIIE"));
+        Assert.Equal(SwitchTableBuilder.ProcMflft, Proc("MFLFT"));
     }
 
     [Fact]

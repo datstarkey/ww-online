@@ -36,7 +36,8 @@ public static class SwitchTableBuilder
     /// BUMP whenever <see cref="SettersOf"/> or <see cref="Build"/> classify differently: it is part of the
     /// build stamp's hash (BuildStamp), so games patched with older rules read as stale and get patched again.
     /// </summary>
-    public const int RulesVersion = 3; // 3: boulders (Stone2), light walls (MkieK), normal warp jars
+    public const int RulesVersion = 4; // 3: boulders (Stone2), light walls (MkieK), normal warp jars; 4: door plants,
+                                       // light statues, song statues, soil trees, PG door, leaves, flower house, flame lift
 
     /// <summary>l_objectName (d_stage.cpp:437, symbols.txt .data 0x80372818 size 0x26AC): dStage_objectNameInf
     /// {char name[8]; s16 procname; s8 argument; s8 gbaName;}, 0xC bytes each.</summary>
@@ -46,7 +47,8 @@ public static class SwitchTableBuilder
 
     // Proc names, each read from its REL's g_profile (+0x08) in the vanilla RELS.arc / files/rels.
     public const short ProcAlldie = 0x016, ProcSwpush = 0x01D, ProcSwheavy = 0x01E, ProcMovebox = 0x02D,
-        ProcWarpt = 0x043, ProcMjDoor = 0x047, ProcMkiek = 0x04E, ProcFloor = 0x062, ProcEp = 0x0BA, ProcTbox = 0x126, ProcSwc00 = 0x12C,
+        ProcVmc = 0x036, ProcVfan = 0x038, ProcWarpt = 0x043, ProcMjDoor = 0x047, ProcMkie = 0x04D, ProcMkiek = 0x04E,
+        ProcMknjD = 0x04F, ProcMflft = 0x05D, ProcFloor = 0x062, ProcKokiie = 0x064, ProcLeaves = 0x092, ProcSs = 0x0FD, ProcEp = 0x0BA, ProcTbox = 0x126, ProcSwc00 = 0x12C,
         ProcDoor10 = 0x12E, ProcDoor12 = 0x12F, ProcAndsw0 = 0x135, ProcAndsw2 = 0x136, ProcSaku = 0x191,
         ProcWall = 0x1B1, ProcSwhit0 = 0x1C9, ProcStone2 = 0x1CD, ProcIce = 0x1D2, ProcTimer = 0x1E1;
 
@@ -109,6 +111,33 @@ public static class SwitchTableBuilder
                 // event register and only read angle.x & 0xFF (the switch of whatever covers them).
                 if ((p & 0xF) is not (2 or 3 or 4))
                     yield return new(a.AngleX & 0xFF, room, SwitchUse.Latching);
+                break;
+            // Set for good, each read by its own create only (the REL re-creates them, docs/live-world.md 0.3):
+            // door plant Ss (sw = prm >> 24, 0 = none, REL core_move 0x2948), flower house (d_a_kokiie.cpp:134,
+            // prm >> 24), flame lift (d_a_mflft.cpp:217, prm >> 24).
+            case ProcSs:
+                if ((p >> 24) != 0)
+                    yield return new((int)(p >> 24), room, SwitchUse.Latching);
+                break;
+            case ProcKokiie:
+            case ProcMflft:
+                yield return new((int)(p >> 24), room, SwitchUse.Latching);
+                break;
+            // Light-dissolved statue (d_a_obj_mkie.cpp:365, (prm >> 16) & 0xFF), song statue (d_a_obj_mknjd.cpp:473,
+            // prm & 0xFF), soil tree (d_a_obj_vmc.cpp:260, (prm >> 8) & 0xFF), Phantom Ganon door (d_a_obj_vfan.cpp:191,
+            // prm & 0xFF), leaf pile (d_a_obj_leaves.h:30-33, (prm >> 13) & 0xFF).
+            case ProcMkie:
+                yield return new((int)(p >> 16) & 0xFF, room, SwitchUse.Latching);
+                break;
+            case ProcMknjD:
+            case ProcVfan:
+                yield return new((int)p & 0xFF, room, SwitchUse.Latching);
+                break;
+            case ProcVmc:
+                yield return new((int)(p >> 8) & 0xFF, room, SwitchUse.Latching);
+                break;
+            case ProcLeaves:
+                yield return new((int)(p >> 13) & 0xFF, room, SwitchUse.Latching);
                 break;
             case ProcSaku:
                 yield return new((int)(p >> 8) & 0xFF, room, SwitchUse.Latching);
