@@ -73,7 +73,7 @@ scripts/                   dev-test.ps1 (local multiplayer test harness), check-
                            (CI + release guard), dolphin-crash-context.py + dolphin-link-anm-check.py
                            (read-only crash debugging against a live Dolphin)
 docs/                      design notes (held-items, live-world, small-keys, hearts, event-flags,
-                           delivery-bag, figurines, optional-patches), softlocks, self-hosting,
+                           delivery-bag, figurines, side-quests, optional-patches), softlocks, self-hosting,
                            releasing, release-notes/<tag>.md
   wiki/                    the player wiki's own pages (synced to the GitHub wiki, see below)
 Directory.Build.props      app version + GitHub repo URL (all projects)
