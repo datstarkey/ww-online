@@ -1,0 +1,1 @@
+This wiki is built from the [`docs/`](..) folder of the repository, so edits made here are overwritten. To suggest a change, open an issue or a pull request. WW-Online is a fan project, not affiliated with Nintendo.

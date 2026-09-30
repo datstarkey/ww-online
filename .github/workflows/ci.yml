@@ -38,6 +38,10 @@ jobs:
         shell: pwsh
         run: ./scripts/check-no-nintendo-files.ps1
 
+      # The wiki is built from docs/ (wiki.yml pushes it from main): a broken link fails here first.
+      - name: Wiki builds, links resolve
+        run: python scripts/build-wiki.py
+
       - name: Restore
         run: dotnet restore "${{ env.SOLUTION }}"
 

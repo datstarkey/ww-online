@@ -22,6 +22,7 @@
   <a href="#play"><b>Play</b></a> ·
   <a href="#what-it-does"><b>Features</b></a> ·
   <a href="#troubleshooting"><b>Troubleshooting</b></a> ·
+  <a href="https://github.com/datstarkey/ww-online/wiki"><b>Wiki</b></a> ·
   <a href="#building-from-source"><b>Build from source</b></a> ·
   <a href="#credits"><b>Credits</b></a>
 </p>
@@ -44,7 +45,8 @@
 - They hold and use their items: bow (with aim), boomerang, hookshot, Deku Leaf, Skull Hammer, Wind Waker, bottles, telescope, Picto Box, Tingle Tuner, and a carried bomb with a burning fuse.
 - Each player picks their own tunic colour (black Link, purple Link, anything), and everyone sees it change live.
 - Player names above heads: each player's name floats above their Link, in the game's own font. It shrinks with distance and hides in cutscenes and menus (turn it off under **Appearance**).
-- Out on the Great Sea you see each other sailing in your own King of Red Lions, with the sail in their tunic colour, and their cannon or salvage crane when they take it out.
+- Out on the Great Sea you see each other sailing in your own King of Red Lions, with the sail in their tunic colour, and their cannon or salvage crane when they take it out. Get off your boat and the others still see it parked where you left it. Each player picks their boat's colour (it matches their tunic by default).
+- Everyone on the Great Sea shows up on your sea chart in the pause menu, in their tunic colour and pointing the way they face, even when they're too far away to see.
 - You see up to three other players at once.
 
 **Play one adventure together (a "room")**
@@ -54,9 +56,9 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 | Rule | What it means |
 |------|---------------|
 | **Shared wallet** | One rupee purse. Anyone's rupees count for everyone. |
-| **Shared world** | Chests, switches and pickups are gone for everyone once someone takes them, and it happens live if you're in the same room: a chest opens empty, a bombed wall vanishes, a locked door comes back unlocked, and a ladder drops or a torch lights when another player clears the room. Small keys too: a key anyone finds is everyone's, and a door anyone unlocks uses it up for everyone. |
+| **Shared world** | Chests, switches and pickups are gone for everyone once someone takes them, and it happens live if you're in the same room: a chest opens empty, a bombed wall vanishes, a locked door comes back unlocked, and a ladder drops or a torch lights when another player clears the room. Small keys too: a key anyone finds is everyone's, and a door anyone unlocks uses it up for everyone. Sunken treasure too: once someone salvages it, it's gone for everyone. |
 | **Shared items** | One player finding an item unlocks it for the whole room, including the magic meter, treasure and Triforce charts (owned, deciphered and salvaged) and the squares filled in on the sea chart. Max hearts come from the room's pieces: every Heart Container and Piece of Heart anyone gets counts once for everyone. |
-| **Shared story** | Main story progress is shared, so you can split up and finish different parts of the game. So is the Nintendo Gallery: a figurine Carlov makes for anyone is made for everyone, so you can split the Picto Box photos between you. |
+| **Shared story** | Main story progress is shared, so you can split up and finish different parts of the game. So is the Nintendo Gallery: a figurine Carlov makes for anyone is made for everyone, so you can split the Picto Box photos between you. And the dungeon warp jars anyone has opened, Beedle's point card (the room keeps the highest) and the postboxes (a letter read by one is read for all). |
 | **Shared bait bag** | One stock of All-Purpose Bait and Hyoi Pears. Anyone's purchase, pickup or use counts for everyone. |
 | **Shared spoils bag** | One stock of Joy Pendants, Skull Necklaces, Chu Jellies, Knight's Crests and the other spoils. Anyone's pickup, sale or trade counts for everyone. |
 | **Shared delivery bag** | One bag of quest items: trade goods, letters, the Cabana Deed and Beedle's tickets. An item anyone receives is in everyone's bag, and one anyone hands over, posts or trades is gone from everyone's. If two players trade the same item at once, only the first trade counts. |
@@ -68,6 +70,8 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 - Never shared: health, magic, bomb and arrow counts, bottle contents (the bait, spoils and delivery bags only with their Shared rules), and Picto Box photos (each player gives Carlov their own).
 - The Room page's **Dungeons** card shows each dungeon's small keys, map, compass, big key and boss, and the Room items page shows how many of the 6 Heart Containers and 44 Pieces of Heart the room has.
 - The app's item icons are read from your own game files and stay on your PC.
+
+[Room rules](https://github.com/datstarkey/ww-online/wiki/Room-Rules) on the wiki explains every rule in detail.
 
 **Planned:** shared weather, wind and time of day (off by default), a "no player collision" option (players bump into each other today), PVP and riding in each other's boats.
 
@@ -99,28 +103,20 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 
 ## Install
 
-1. **Download WW-Online** from the [Releases](../../releases) page (`WWOnline-win-Setup.exe`) and run it. It installs for your user only (no admin needed), adds shortcuts, and updates itself when a new version comes out. Everything it needs, including .NET, is bundled.
-   - Windows may say **"Windows protected your PC"** because the installer isn't code-signed yet. Click **More info → Run anyway**.
+1. **Download WW-Online** from the [Releases](../../releases) page (`WWOnline-win-Setup.exe`) and run it. It installs for your user only, updates itself, and bundles everything it needs. (Windows may say **"Windows protected your PC"** because the installer isn't code-signed yet: click **More info → Run anyway**.)
 2. **Get [Dolphin](https://dolphin-emu.org/download/)** (a recent development build) and unzip it anywhere.
-3. **Open WW-Online.** The first time, a short setup walks you through everything (run it again any time from **Settings → Run setup again**):
-   - **Dolphin**: it looks for `Dolphin.exe` for you, or you browse to it.
-   - **Your game**: choose your disc image (ISO, RVZ, GCM…) and WW-Online extracts it with DolphinTool, which comes with Dolphin. (With an older Dolphin that has no DolphinTool, extract it yourself: add the ISO to Dolphin's game list, right-click the game → **Properties** → **Filesystem** → right-click the disc at the top → **Extract Entire Disc…**, then choose that folder.) WW-Online checks it's the US version, `GZLE01`. Then choose a folder for the patched copy: the original is only read, never changed.
-   - **Game patches**: optional extras (skip the intro, instant text, Swift Sail, faster animations, crash fixes and more, from Better Wind Waker). The defaults are a good start. Patches marked **All players should match** change the world, so agree on those with your room.
-   - **You**: your name and tunic colour.
-   - **Patch**: builds your patched game. The first time copies the whole game (about 1.5 GB), so it can take a minute.
+3. **Open WW-Online.** A short setup finds Dolphin, extracts and checks your disc image (`GZLE01`), lets you pick optional game patches, your name and tunic colour, and then patches your game. Your original is only read, never changed.
 
-   Patch again only when WW-Online asks: after an update that changes the game code, or when you change your patches. Until the game is patched and up to date, a banner at the top says so (with **Patch now**), and WW-Online won't start Dolphin or attach to it.
-4. **Dolphin's memory setting.** WW-Online needs Dolphin's 48 MB memory setting, and turns it on by itself (for that session only) when it starts Dolphin for you. If you start Dolphin yourself, open **Config** → **Advanced**, tick **Enable Emulated Memory Size Override** and set **MEM1** to **48 MB**.
+Patch again only when WW-Online asks (after an update with new game code, or when you change your patches). The full guide, including Dolphin's 48 MB memory setting if you start Dolphin yourself, is **[Installing](https://github.com/datstarkey/ww-online/wiki/Installing)** on the wiki.
 
 ## Play
 
-- **Host a room:** on the **Room** page choose **Host a room**. WW-Online starts the room on your PC (port `6969`), then starts your patched game in Dolphin and links up with it (turn that off in **Settings**). You're the room owner: press **Edit room** to pick Full sync, Co-op or your own mix of rules. Rules stay locked until you press Edit, so nothing changes by accident.
-- **Join a room:** enter the host's address and your name, then **Join**. WW-Online starts your game in Dolphin the same way. You see the room's rules and items read-only, and anything you pick up still counts for the room.
-- **Your look:** open **Appearance** to pick your clothes (game default, hero's tunic or pajamas) and your tunic colour. It changes live for everyone. **Show player names** there turns the names above the other Links on or off, for your screen only.
-- **Story flags:** on the **Room** page, see which story events the room has reached. The room owner can edit them.
-- **Warp to a player:** with **Allow warping** on, press **Warp to** next to a player on the **Room** page. In the same area you're moved next to them; anywhere else you arrive at the entrance they came in through (the door or loading zone they used).
-- **Dolphin** shows the connection to your game and your live stats. **Start game** starts it by hand; **Attach** links up with a Dolphin you started yourself.
-- **Tools** holds local-only helpers (warp, stats, memory). They only affect your own game.
+- **Host a room:** on the **Room** page choose **Host a room**. WW-Online starts the room on your PC (port `6969`), starts your patched game in Dolphin and links up with it. You're the room owner: press **Edit room** to pick Full sync, Co-op or your own mix of rules.
+- **Join a room:** enter the host's address and your name, then **Join**. You see the room's rules and items read-only, and anything you pick up still counts for the room.
+- **Your look:** open **Appearance** to pick your clothes, tunic colour and boat colour. Everyone sees it change live.
+- **Warp to a player:** with **Allow warping** on, press **Warp to** next to a player on the **Room** page.
+
+**[Playing together](https://github.com/datstarkey/ww-online/wiki/Playing-Together)** on the wiki covers every page of the app.
 
 ### Playing over the internet
 
@@ -135,14 +131,12 @@ The host's PC must be reachable on port `6969`. The easiest options:
 
 ## Troubleshooting
 
-- **Stuck? Warp to a player.** Shared story and world only ever move forward, so when another player does something that moves them on (say, leaving Outset Island with Tetra), the others can find their own way forward gone. Press **Warp to** next to that player on the **Room** page (the room's **Allow warping** rule must be on). [Softlocks](docs/softlocks.md) lists the known cases and how warping works.
-- **Purple screen with `d_s_play.cpp` / black screen on boot:** the 48 MB memory setting is off (install step 4; only when you start Dolphin yourself), or the game folder isn't a patched `GZLE01` copy.
-- **WW-Online says to patch your game, and won't start Dolphin:** the game isn't patched yet, WW-Online was updated with new game code, or you changed your patches. Press **Patch now** in the banner (or **Settings → Patch game**).
-- **WW-Online won't link up with a Dolphin you started yourself:** the running game must be your patched `GZLE01` copy, with the 48 MB memory setting on (install step 4). A vanilla or PAL game is refused.
+- **Stuck? Warp to a player.** Shared story and world only ever move forward, so another player's progress (say, leaving Outset Island with Tetra) can leave you with no way on. Press **Warp to** next to them on the **Room** page. See [Softlocks](docs/softlocks.md).
+- **Purple screen with `d_s_play.cpp` / black screen on boot:** Dolphin's 48 MB memory setting is off (only when you start Dolphin yourself), or the game folder isn't a patched `GZLE01` copy.
 - **Players don't appear:** everyone must be on the same WW-Online version, in the same room, and past the title screen. You see a player when you're in the same room of the same stage (on the Great Sea, when they're close).
-- **Can't connect:** check the host address and port, and see [Playing over the internet](#playing-over-the-internet). A "different version" message means someone needs to update.
-- **Item icons are missing:** **Settings → Item icons → Read icons from game** reads them from your own game files.
 - **The game crashes or freezes:** please open an issue with WW-Online's logs (`%LocalAppData%\WWOnline\logs`) and what you were doing.
+
+More on the wiki: **[Troubleshooting](https://github.com/datstarkey/ww-online/wiki/Troubleshooting)** and **[Known limitations](https://github.com/datstarkey/ww-online/wiki/Known-Limitations)**.
 
 ## Building from source
 
@@ -158,7 +152,8 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj
 - Copy `GameMod/config.example.json` to `GameMod/config.json` and set `vanilla_game_path` (your extracted game) and `game_path` (the patched output).
 - `.\scripts\dev-test.ps1` runs a local two-player test: two Dolphins and two clients, with Player 1 hosting. `-Patch` also rebuilds the in-game code. Logs go to `logs/latest/`.
 - `python scripts/dolphin-crash-context.py <dolphin pid> tww-decomp/config/GZLE01/symbols.txt` prints the registers and stack of a game crash from the running Dolphin (read-only).
-- `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules. `docs/` has the design notes (held items and projectiles, live world, small keys, hearts, event flags, optional patches), [softlocks and warping](docs/softlocks.md), [self-hosting](docs/self-hosting.md) and [releasing](docs/releasing.md).
+- `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules. `docs/` has the design notes (held items and projectiles, live world, small keys, hearts, event flags, delivery bag, figurines, optional patches), [softlocks and warping](docs/softlocks.md), [self-hosting](docs/self-hosting.md) and [releasing](docs/releasing.md).
+- The [wiki](https://github.com/datstarkey/ww-online/wiki) is built from `docs/wiki/` (plus the softlocks and self-hosting pages) by `scripts/build-wiki.py`, and pushed on every push to `main`. Edit the files here, never the wiki itself.
 
 **How it works, in short:** an Avalonia desktop app reads and writes the running game's memory through Dolphin, and a SignalR server relays each player's state. On the game side, a small injected module (C, built with devkitPPC and linked against [the Wind Waker decompilation](https://github.com/zeldaret/tww)) spawns and animates the other players' Links. The game's own code does the work, so they move, fight and draw just like the real Link.
 

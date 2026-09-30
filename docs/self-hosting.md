@@ -37,7 +37,7 @@ Everything is set through environment variables (`-e NAME=value`, or `environmen
 | `WWO_SHARED_WALLET` | `true` | The room's starting rules. `true`/`false` (also `1`/`0`, `yes`/`no`, `on`/`off`). The room owner can change them any time from the Room page, so these only set how a fresh room starts. `false` for the seven shared-progress rules and `WWO_ALLOW_WARPING` (with projectiles left `true`) is the Co-op preset. |
 | `WWO_SHARED_WORLD` | `true` | |
 | `WWO_SHARED_ITEMS` | `true` | |
-| `WWO_SHARED_STORY` | `true` | Shared story: story, cutscene and side-quest event flags, and the Nintendo Gallery figurines Carlov has made. |
+| `WWO_SHARED_STORY` | `true` | Shared story: story, cutscene and side-quest event flags, the Nintendo Gallery figurines Carlov has made, the dungeon warp jars, Beedle's point card and the postbox letters. |
 | `WWO_SHARED_BAIT` | `true` | Shared bait bag: the bait bag's All-Purpose Bait and Hyoi Pears are one room total. |
 | `WWO_SHARED_SPOILS` | `true` | Shared spoils bag: the spoils bag's counts (Joy Pendants, Skull Necklaces, Chu Jellies...) are one room total. |
 | `WWO_SHARED_DELIVERY` | `true` | Shared delivery bag: the delivery bag's quest items (trade goods, letters, Cabana Deed, Beedle's tickets) are one room bag. |
@@ -147,7 +147,7 @@ The server and the players' apps must speak the same protocol. A player on a dif
 
 ## Room state lives in memory
 
-The room (rules, shared world flags, items, story flags and wallet) lives in the server's memory. **A restart or update empties it.** Every player's own game still has its progress, so when players reconnect, the owner's game seeds the room again and the others' merge in. What doesn't come back: rule changes (the room starts again from the `WWO_SHARED_*` settings), the shared wallet total (it restarts from the owner's rupees), and items the owner had removed from the room if another player still has them. Saving the room to a volume so it survives restarts is planned.
+The room (rules, shared world flags, items, story flags, wallet and bags) lives in the server's memory. **A restart or update empties it.** Every player's own game still has its progress, so when players reconnect, the owner's game seeds the room again and the others' merge in. What doesn't come back: rule changes (the room starts again from the `WWO_SHARED_*` settings), the shared wallet and bag totals (they restart from the owner's game), and items the owner had removed from the room if another player still has them. Saving the room to a volume so it survives restarts is planned.
 
 ## Without Docker
 
