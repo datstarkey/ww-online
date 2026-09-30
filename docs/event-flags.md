@@ -79,6 +79,7 @@ These are synced by design, but the host should know what happens.
    - HYRULE_COURTYARD_CUTSCENE while ZELDA_AWAKENED is not set.
    - 3E10 while 3F80 is not set.
    - A peer standing on an island cannot board KoRL until the other player finishes that Hyrule section, or until the Master Sword arrives through room inventory. 2D10 and 3804 are marked `risky`. 3E10 and 3E01 are risky `Unknown` and are excluded from the mask.
+   - **Built (0.6.2):** `StorySyncService.HeldFlags` holds 2D10 back from a game until its equipped sword is a Master Sword, and 3804 until it has ZELDA_AWAKENED, so the lock never reaches a player who is behind ([softlocks.md](softlocks.md)).
 3. **Stage layers** (`dComIfG_play_c::getLayerNo`, `d_com_inf_game.cpp:192-262`):
    - Flags: 0101/0E20/0520 (Outset), 2D01 (Windfall), 1820 (FF), MET_KORL (Forest), 3280/3B40/2C01/COLORS_IN_HYRULE (Hyrule, kenroom), 3B02/4002 (GanonK, GTower).
    - Receiving them swaps whole island layers: NPCs disappear, and FF switches to its post-rescue state.
