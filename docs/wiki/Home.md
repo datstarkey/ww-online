@@ -16,7 +16,7 @@
 
 - **[Game patches](Game-Patches.md)**: the optional extras (skip the intro, instant text, Swift Sail, crash fixes...) and which ones everyone in a room should match.
 - **[Softlocks and warping](../softlocks.md)**: stuck after another player moved the story on? Warp to them.
-- **[Self-hosting](../self-hosting.md)**: run a dedicated server (Docker, a VPS, a Raspberry Pi) so the room is always up.
+- **[Self-hosting](../self-hosting.md)**: optional. A dedicated server (Docker, a VPS, a Raspberry Pi) keeps a room up without the host. You don't need one when your friends can reach your PC.
 - **[Troubleshooting](Troubleshooting.md)**: black screens, connection problems, missing players, and how to report a bug.
 - **[Known limitations](Known-Limitations.md)**: what doesn't work yet.
 

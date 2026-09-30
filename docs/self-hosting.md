@@ -2,6 +2,8 @@
 
 A WW-Online room is a small relay server. Usually the host's app runs it: **Host a room** starts one on the host's PC. A **dedicated server** runs it on its own, on an always-on machine (a VPS, a home server, a Raspberry Pi), so the room is up even when the host isn't playing, and nobody's PC has to be reachable from the internet.
 
+> **You probably don't need this.** If your friends can reach your PC (the same home network, a shared [Tailscale](https://tailscale.com/) network, or port `6969` forwarded on your router), just press **Host a room** in the app and they join your address. A dedicated server is only worth it when you want a room that stays up without you, or when nobody in the group can make their PC reachable.
+
 The server is published as a Docker image for `linux/amd64` and `linux/arm64`:
 
 ```
