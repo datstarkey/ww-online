@@ -15,10 +15,10 @@ A room's **rules** decide how much of the adventure its players share. The **roo
 | **Shared wallet** | One rupee purse. Anyone's rupees count for everyone. |
 | **Shared world** | Chests, switches, pickups, small keys and sunken treasure: once someone takes it, it's gone for everyone. |
 | **Shared items** | Items, upgrades, songs, pearls, Triforce shards, the magic meter, the sea chart and treasure charts, and max hearts. |
-| **Shared story** | Story progress, the Nintendo Gallery figurines, the dungeon warp jars, Beedle's point card and the postbox letters. |
+| **Shared story** | Story progress, side-quest progress, the Nintendo Gallery figurines, the dungeon warp jars, Beedle's point card and the postbox letters. |
 | **Shared bait bag** | One stock of All-Purpose Bait and Hyoi Pears. |
 | **Shared spoils bag** | One stock of Joy Pendants, Skull Necklaces, Chu Jellies, Knight's Crests and the other spoils. |
-| **Shared delivery bag** | One bag of quest items: trade goods, letters, the Cabana Deed and Beedle's tickets. |
+| **Shared delivery bag** | One bag of quest items: trade goods, letters, the Cabana Deed and Beedle's tickets, and what stands on Windfall's pedestals. |
 | **Other players' projectiles** | Other players' bombs, boat-cannon shots and arrows are real in your game. |
 | **Allow warping** | A **Warp to** button on each player in the Players list. |
 
@@ -51,6 +51,7 @@ One player finding an item unlocks it for the whole room: equipment, the item me
 - **Warp jars**: a dungeon warp jar anyone opens is open for everyone.
 - **Beedle's point card**: the room keeps the highest card, and everyone's is raised to it. Points are never taken away. (Two players buying at the very same moment can lose a point between them.)
 - **Postboxes**: a letter one player has read is read for everyone, so you don't each unlock the same letters. Its reward reaches everyone through the other rules: treasure charts through Shared items, heart pieces through your hearts, the Complimentary ID and Fill-Up Coupon through the delivery bag, rupees through the wallet.
+- **Side quests**: progress the game keeps as a count or a level is the room's too, so nobody redoes it or is paid twice: the Joy Pendants given to Mrs. Marie, Orca's lessons, Koboli's mail sorting, the prizes won at Sploosh Kaboom and barrel shooting, the Ghost Ship once it's cleared, and the pigs in Rose's pen. Hand pendants to Mrs. Marie one player at a time.
 
 The room's story flags are on the Room page (**Story flags**), and the room owner can edit them.
 
@@ -59,6 +60,7 @@ The room's story flags are on the Room page (**Story flags**), and the room owne
 Each bag is one stock for the room. Anyone's purchase, pickup, sale, trade or use counts for everyone.
 
 - **Delivery bag**: an item anyone receives is in everyone's bag, and one anyone hands over, posts or trades is gone from everyone's. If two players trade the same item at the same moment, only the first trade counts: nothing is ever duplicated.
+- **Windfall's pedestals** belong to the delivery bag: a trade good one player sets on a pedestal stands there for everyone (you see it the next time you come to Windfall), and anyone can take it back into the bag. Decorating the town can be shared out.
 - An item that only reached you from another player counts as already obtained, so you won't see its first-pickup message later.
 
 ### Other players' projectiles

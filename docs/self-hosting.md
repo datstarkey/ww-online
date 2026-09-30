@@ -39,10 +39,10 @@ Everything is set through environment variables (`-e NAME=value`, or `environmen
 | `WWO_SHARED_WALLET` | `true` | The room's starting rules. `true`/`false` (also `1`/`0`, `yes`/`no`, `on`/`off`). The room owner can change them any time from the Room page, so these only set how a fresh room starts. `false` for the seven shared-progress rules and `WWO_ALLOW_WARPING` (with projectiles left `true`) is the Co-op preset. |
 | `WWO_SHARED_WORLD` | `true` | |
 | `WWO_SHARED_ITEMS` | `true` | |
-| `WWO_SHARED_STORY` | `true` | Shared story: story, cutscene and side-quest event flags, the Nintendo Gallery figurines Carlov has made, the dungeon warp jars, Beedle's point card and the postbox letters. |
+| `WWO_SHARED_STORY` | `true` | Shared story: story, cutscene and side-quest event flags, the Nintendo Gallery figurines Carlov has made, the dungeon warp jars, Beedle's point card, the postbox letters and side-quest progress (counts, levels and prizes won). |
 | `WWO_SHARED_BAIT` | `true` | Shared bait bag: the bait bag's All-Purpose Bait and Hyoi Pears are one room total. |
 | `WWO_SHARED_SPOILS` | `true` | Shared spoils bag: the spoils bag's counts (Joy Pendants, Skull Necklaces, Chu Jellies...) are one room total. |
-| `WWO_SHARED_DELIVERY` | `true` | Shared delivery bag: the delivery bag's quest items (trade goods, letters, Cabana Deed, Beedle's tickets) are one room bag. |
+| `WWO_SHARED_DELIVERY` | `true` | Shared delivery bag: the delivery bag's quest items (trade goods, letters, Cabana Deed, Beedle's tickets) are one room bag, and Windfall's pedestals are the room's. |
 | `WWO_SHARED_PROJECTILES` | `true` | Other players' projectiles: their bombs, boat-cannon shots and arrows are real in your world (they fly, explode and hit your enemies and walls). `false` drops them; their carried bomb and aim poses still show. On in both presets. |
 | `WWO_ALLOW_WARPING` | `true` | Allow warping: players can warp to each other from the Room page's Players list (same area: next to them; anywhere else: the entrance they came in through). It gets a player unstuck when shared story or world progress closes their way forward ([softlocks](softlocks.md)). `false` hides the button and the server stops passing on where players entered their area. Off in Co-op. |
 | `WWO_OWNER_KEY` | none | A secret. The player who enters it in the app's **Owner key** field becomes the room owner. See [The room owner](#the-room-owner). |
@@ -120,7 +120,7 @@ Other proxies (nginx, Traefik) work too if they pass WebSocket upgrades (`Upgrad
 `GET /health` answers `200` with:
 
 ```json
-{"status":"ok","app":"WW-Online","version":"0.5.0","commit":"<git sha>","protocol":10,"players":2}
+{"status":"ok","app":"WW-Online","version":"0.5.0","commit":"<git sha>","protocol":11,"players":2}
 ```
 
 The image's `HEALTHCHECK` polls it, so `docker ps` shows `healthy`. Point an uptime monitor at it if you like. `version` and `protocol` are what players' apps must match (see [Updating](#updating)).

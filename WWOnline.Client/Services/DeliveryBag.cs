@@ -153,4 +153,34 @@ public static class DeliveryBagMemory
             return BagWriteResult.Failed;
         return BagWriteResult.Written;
     }
+
+    private static uint PedestalStart => EventFlagCatalog.EventBitfieldAddress + DeliveryCounts.FirstPedestalRegister;
+
+    /// <summary>
+    /// Windfall's pedestals (event registers D1FF-F8FF: the trade good on each, or 0), or null. A value that isn't a
+    /// pedestal item (never in the vanilla game) reads as 0 and is never written over.
+    /// </summary>
+    public static byte[]? ReadPedestals(IDolphinService dolphin)
+    {
+        var b = dolphin.ReadMemory(PedestalStart, DeliveryCounts.PedestalCount);
+        if (b is not { Length: DeliveryCounts.PedestalCount }) return null;
+        for (int i = 0; i < b.Length; i++)
+            if (!DeliveryCounts.IsPedestalItem(b[i])) b[i] = 0;
+        return b;
+    }
+
+    /// <summary>
+    /// Write each pedestal that differs between <paramref name="expected"/> and <paramref name="next"/>, only if it
+    /// still holds <paramref name="expected"/>'s item right now (compare-and-swap per register). A pedestal reads its
+    /// register when it is created (d_a_dai.cpp:101), so one already on screen shows the change on the next visit.
+    /// </summary>
+    public static BagWriteResult WritePedestals(IDolphinService dolphin, byte[] expected, byte[] next)
+    {
+        if (ReadPedestals(dolphin) is not { } now) return BagWriteResult.Failed;
+        var changed = Enumerable.Range(0, DeliveryCounts.PedestalCount).Where(i => expected[i] != next[i]).ToList();
+        if (changed.Any(i => now[i] != expected[i])) return BagWriteResult.Raced;
+        foreach (int i in changed)
+            if (!dolphin.WriteMemory(PedestalStart + (uint)i, [next[i]])) return BagWriteResult.Failed;
+        return BagWriteResult.Written;
+    }
 }

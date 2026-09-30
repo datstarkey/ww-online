@@ -44,9 +44,11 @@ public class FigurineFlagsTests
         Assert.Equal(regs.Length, regs.Distinct().Count());
 
         // Every whole-byte OR-safe register in the catalog is a figurine bitfield, and nothing else is
-        // (the warp pots are the only other BitwiseOr registers, 3 bits each).
+        // (the warp pots are the only other BitwiseOr registers, 3 bits each, and Rose's pig pen is a
+        // side-quest register, QuestRegisterTests).
         var bitfields = EventFlagCatalog.Registers
             .Where(r => r.Policy == EventRegisterPolicy.BitwiseOr && r.Mask == 0xFF)
+            .Where(r => StoryFlags.QuestRegisterTable.All(q => q.EventByte != r.ByteIndex))
             .Select(r => (byte)r.ByteIndex).OrderBy(b => b);
         Assert.Equal(bitfields, regs.OrderBy(b => b));
     }
@@ -304,7 +306,7 @@ public class FigurineApplyTests
         Assert.False(warpPot.IsSharedFigurines);
         Assert.True(warpPot.IsSharedWarpJars);
 
-        var unshared = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0xFE07)); // the Battlesquid prize count
+        var unshared = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0xA60F)); // Grandma's daily soup refills
         Assert.Contains("never synced", unshared.Tooltip);
 
         var making = new EventRegisterRow(EventFlagCatalog.Registers.Single(r => r.Id == 0xA9FF));

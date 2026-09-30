@@ -112,9 +112,10 @@ public partial class StoryFlagRow : ObservableObject
 }
 
 /// <summary>
-/// An 8-bit event register (bytes 0x79-0xFF), edited in this game only. Never synced, except the 17
-/// Nintendo Gallery figurine bitfields (<see cref="IsSharedFigurines"/>) and the 6 warp jar registers
-/// (<see cref="IsSharedWarpJars"/>), which Shared story merges.
+/// An 8-bit event register (bytes 0x79-0xFF), edited in this game only. Never synced, except the ones Shared
+/// story merges: the 17 Nintendo Gallery figurine bitfields (<see cref="IsSharedFigurines"/>), the 6 warp jar
+/// registers (<see cref="IsSharedWarpJars"/>), Beedle's points, the letters and the side-quest registers
+/// (<see cref="SharedQuest"/>).
 /// </summary>
 public partial class EventRegisterRow : ObservableObject
 {
@@ -136,6 +137,9 @@ public partial class EventRegisterRow : ObservableObject
     /// <summary>A postbox letter's state (<see cref="StoryFlags.LetterRegisterBytes"/>): shared (MAX) with Shared story on.</summary>
     public bool IsSharedLetter { get; }
 
+    /// <summary>A side-quest register (<see cref="StoryFlags.QuestRegisterTable"/>) shared with Shared story on, or null.</summary>
+    public QuestRegister? SharedQuest { get; }
+
     /// <summary>Current value (byte &amp; mask), null while no game is loaded.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ValueText))]
@@ -154,8 +158,10 @@ public partial class EventRegisterRow : ObservableObject
         IsSharedWarpJars = StoryFlags.WarpJarRegisterBytes.Contains((byte)info.ByteIndex) && info.Mask == StoryFlags.WarpJarMask;
         IsSharedBeedlePoints = info.ByteIndex == StoryFlags.BeedlePointsRegisterByte;
         IsSharedLetter = StoryFlags.LetterRegisterBytes.Contains((byte)info.ByteIndex) && info.Mask == StoryFlags.LetterMask;
+        SharedQuest = StoryFlags.QuestRegisterTable.Where(q => q.EventByte == info.ByteIndex).Select(q => (QuestRegister?)q).FirstOrDefault();
         PolicyText = IsSharedFigurines ? "Figurines (Shared story)" : IsSharedWarpJars ? "Warp jars (Shared story)"
-            : IsSharedBeedlePoints ? "Beedle points (Shared story)" : IsSharedLetter ? "Letters (Shared story)" : info.Policy switch
+            : IsSharedBeedlePoints ? "Beedle points (Shared story)" : IsSharedLetter ? "Letters (Shared story)"
+            : SharedQuest != null ? "Side quest (Shared story)" : info.Policy switch
         {
             EventRegisterPolicy.BitwiseOr => "Bitfield",
             EventRegisterPolicy.Max => "Progress state",
@@ -171,7 +177,11 @@ public partial class EventRegisterRow : ObservableObject
                               ? "Beedle's membership points. With Shared story on, the room keeps the highest card and every player's is raised to it."
                               : IsSharedLetter
                                   ? "A postbox letter: 0 not sent, 1 sent, 2 in the postbox, 3 read. With Shared story on, the room keeps the furthest state: a letter anyone has read is read for everyone (its reward reaches them through the other rules)."
-                                  : "Registers are never synced: this changes your game only.");
+                                  : SharedQuest is { } q
+                                      ? $"{q.What}. With Shared story on, the room keeps " +
+                                        (q.Merge == QuestRegisterMerge.Or ? "every bit anyone has set" : "the highest value anyone has reached") +
+                                        ", so nobody redoes it or is paid for it twice."
+                                      : "Registers are never synced: this changes your game only.");
     }
 }
 
@@ -185,7 +195,8 @@ public partial class EventRegisterRow : ObservableObject
 /// so shared flags can't be unticked there. With the rule off (or offline) it is "Your game only" and
 /// anyone may edit their own game. Every write is gated by <see cref="SceneStabilityGate"/>.
 /// Read-only until Edit flags (<see cref="Edit"/>). Event registers are in an Advanced section, this
-/// game only (never synced, except the figurine bitfields, which Shared story merges).
+/// game only (never synced, except the registers Shared story merges: figurines, warp jars, Beedle's points,
+/// letters and the side-quest registers).
 /// </para>
 /// </summary>
 public partial class RoomFlagsViewModel : ViewModelBase, IDisposable

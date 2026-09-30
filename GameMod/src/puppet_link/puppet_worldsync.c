@@ -12,6 +12,11 @@
  * in the live mMemory.mItem, provided it is idle on the ground (not being collected by the
  * local player, not held by the boomerang/hookshot/another actor).
  *
+ * A boss's Heart Container has no item bit: picking it up sets the stage's STAGE_LIFE dungeon bit instead
+ * (item_func_utuwa_heart, d_item.cpp:587-603), which the client ORs into the live mDungeonItem like any world
+ * flag. ws_heartContainers deletes a container still waiting in this stage once that bit is set, so one
+ * another player picked up vanishes here too (docs/hearts.md §2).
+ *
  * Chests and other actors that read a flag only at create: puppet_liveworld.c (run from the draw).
  * Switch-polling actors need nothing.
  *
@@ -103,6 +108,56 @@ static void *ws_judge(void *proc, void *data)
   return NULL;
 }
 
+/* fopAcIt_Judge callback: a Heart Container still waiting to be picked up (boss drop wait, or idle on the
+ * ground), never one the local player is collecting (7-9) or that another actor holds (2/3). */
+static void *ws_judgeHeart(void *proc, void *data)
+{
+  WsScan *scan = (WsScan *)data;
+  if (!scan || !ws_isValidPtr(proc) || scan->count >= WS_MAX_DESPAWN_PER_SCAN)
+    return NULL;
+  if (BASE_PROC_NAME(proc) != PROC_NAME_ITEM || BASE_CREATE_RESULT(proc) != BASE_CREATE_DONE ||
+      BASE_INIT_STATE(proc) == BASE_INIT_STATE_DELETING)
+    return NULL;
+  if (DAITEM_ITEM_NO(proc) != DAITEM_ITEMNO_HEART_CONTAINER)
+    return NULL;
+  u8 status = DAITEM_ITEM_STATUS(proc);
+  if (status != DAITEM_STATUS_WAIT_BOSS1 && status != DAITEM_STATUS_WAIT_BOSS2 &&
+      status != DAITEM_STATUS_IDLE0 && status != DAITEM_STATUS_IDLE1)
+    return NULL;
+  scan->hits[scan->count++] = (fopAc_ac_c *)proc;
+  return NULL;
+}
+
+/* Delete this stage's waiting Heart Containers once its STAGE_LIFE bit is set in the live copy: the room has
+ * the container (another player picked theirs up), so this one must not be taken again. Independent of the item
+ * mask. Counted with the placed-item despawns (item 0x08, bit 0x7F) for the client's [world] log line. */
+static void ws_heartContainers(void)
+{
+  if (GAMEINFO_NEXT_STAGE_ENABLE(&g_dComIfG_gameInfo) != 0)
+    return;
+  u8 *stag = GAMEINFO_STAGE_STAGINFO(&g_dComIfG_gameInfo);
+  if (!ws_isValidPtr(stag))
+    return;
+  u32 saveTbl = STAGINFO_SAVE_TBL(stag);
+  if (saveTbl >= DSV_STAGE_MAX)
+    return;
+  if ((MEMBIT_DUNGEON_ITEM(GAMEINFO_LIVE_MEMORY(&g_dComIfG_gameInfo)) & MEMBIT_DUNGEON_STAGE_LIFE) == 0)
+    return;
+
+  WsScan scan;
+  scan.candidates = 0;
+  scan.matched = 0;
+  scan.count = 0;
+  fopAcIt_Judge((undefined *)ws_judgeHeart, &scan);
+  for (u32 i = 0; i < scan.count && i < WS_MAX_DESPAWN_PER_SCAN; i++)
+  {
+    fopAcM_delete((base_process_class *)scan.hits[i]);
+    (*(volatile u32 *)WORLDSYNC_DESPAWN_COUNT_ADDR)++;
+    *(volatile u32 *)WORLDSYNC_LAST_DESPAWN_ADDR = (saveTbl << 16) | (DAITEM_ITEMNO_HEART_CONTAINER << 8) | 0x7F;
+    OSReport("[PUPPET] world sync: Heart Container taken by another player, removed (slot %d)\n", saveTbl);
+  }
+}
+
 void puppet_worldsync_tick(void)
 {
   /* Once per game frame, however many puppets call us. */
@@ -113,6 +168,8 @@ void puppet_worldsync_tick(void)
   l_wsLastFrame = frame;
   if ((frame & WS_SCAN_INTERVAL_MASK) != 0)
     return;
+
+  ws_heartContainers();
 
   volatile u32 *tagp = (volatile u32 *)WORLDSYNC_STAGE_TAG_ADDR;
   volatile u32 *maskp = (volatile u32 *)WORLDSYNC_ITEM_MASK_ADDR;

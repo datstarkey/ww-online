@@ -24,6 +24,7 @@ The preferred design (as for small keys, `docs/small-keys.md`) was to derive the
   - an X/Y/Z button on a changed slot is fixed the way `dComIfGp_setSelectItem` does it (`d_com_inf_game.h:2890-2903`): cleared if its slot emptied, showing the new item otherwise (`BagMemory.FixButtons`, shared with the bait bag);
   - obtained bits are ORed in, never cleared. The sync point's bits are the room's, so bits this game has beyond them (its own save, or an arriving item) are sent next tick and become everyone's.
 - **Joining** adopts the room's bag, like the other bags (your own items are replaced by the room's; your obtained bits are added to the room's).
+- **Windfall's pedestals** (protocol 11, [side-quests.md](side-quests.md) §3.2) ride in the same store: `DeliveryCounts.Pedestals` is the trade good on each pedestal (event registers D1FF-F8FF, 0 = none, only 0x8C-0x97). Setting a good down or taking it back changes its bag slot and its pedestal in the same frame (`d_a_dai.cpp:201-202, 320-323`), so they travel as one delta (`PedestalsBefore` / `Pedestals`), and `DeliveryStore` refuses the whole delta when a pedestal no longer holds its "before" (two players at the same pedestal: only the first counts, the second gets the room's bag back). The client writes the registers while idle, compare-and-swap (`DeliveryBagMemory.WritePedestals`); a pedestal on screen shows the change on the next visit (it reads its register at create, `d_a_dai.cpp:101`).
 
 No REL or ASM change: nothing needs a re-patch.
 

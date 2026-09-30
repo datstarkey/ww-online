@@ -15,6 +15,9 @@ namespace WWOnline.Server.Hubs;
 ///     send +1, and the room keeps one.
 ///   - A gain that would overfill the 8 slots (two players receiving the last free slot's item at once) is cut
 ///     down to what fits, later items first.
+///   - Windfall's pedestals (<see cref="DeliveryCounts.Pedestals"/>) change only from what the delta says they held
+///     before: a delta that sets down or takes back an item on a pedestal the room has changed since is refused as
+///     a whole, bag change included, so two players using the same pedestal at once never lose or copy an item.
 /// </summary>
 public class DeliveryStore : BagCountsStore<DeliveryCounts>
 {
@@ -22,6 +25,9 @@ public class DeliveryStore : BagCountsStore<DeliveryCounts>
 
     protected override string? Refusal(DeliveryCounts total, DeliveryCounts delta)
     {
+        var stale = StalePedestals(total, delta).ToList();
+        if (stale.Count > 0)
+            return $"refused: pedestal {string.Join(", ", stale.Select(DeliveryCounts.PedestalName))} changed in the room first";
         var missing = Missing(total, delta).ToList();
         if (missing.Count > 0)
             return $"refused: the room's bag has no {Names(missing)} to give away";
@@ -39,10 +45,18 @@ public class DeliveryStore : BagCountsStore<DeliveryCounts>
     private static IEnumerable<int> Missing(DeliveryCounts total, DeliveryCounts delta) =>
         Enumerable.Range(0, DeliveryCounts.TypeCount).Where(t => total[t] + delta[t] < 0);
 
+    /// <summary>Pedestals the delta changes that no longer hold what it says they held.</summary>
+    private static IEnumerable<int> StalePedestals(DeliveryCounts total, DeliveryCounts delta) =>
+        delta.ChangedPedestals().Where(i => total.Pedestals[i] != delta.PedestalsBefore![i]);
+
     public static DeliveryCounts Add(DeliveryCounts total, DeliveryCounts delta)
     {
         uint obtained = (total.Obtained | delta.Obtained) & DeliveryCounts.KnownObtainedMask;
-        if (Missing(total, delta).Any()) return new DeliveryCounts(total.Counts, obtained);
+        if (Missing(total, delta).Any() || StalePedestals(total, delta).Any())
+            return new DeliveryCounts(total.Counts, obtained, total.Pedestals);
+
+        var pedestals = (byte[])total.Pedestals.Clone();
+        foreach (int i in delta.ChangedPedestals()) pedestals[i] = delta.Pedestals[i];
 
         var sum = new int[DeliveryCounts.TypeCount];
         for (int t = 0; t < DeliveryCounts.TypeCount; t++)
@@ -58,6 +72,6 @@ public class DeliveryStore : BagCountsStore<DeliveryCounts>
             while (sum.Sum() > DeliveryCounts.SlotCount && sum[t] > total[t] && sum[t] > 0)
                 sum[t]--;
         }
-        return new DeliveryCounts(sum, obtained);
+        return new DeliveryCounts(sum, obtained, pedestals);
     }
 }

@@ -694,7 +694,7 @@ public static class EventFlagCatalog
         R(0x85FF, "UNK_85FF", P.LocalOnly),                  // Ghost Ship spawn start code (d_a_ghostship)
         R(0x86FF, "UNK_86FF", P.Max),                        // Beedle points card (npc_bs1 counter, +1 per purchase): Shared story, MAX (StoryFlags.BeedlePoints)
         R(0x870F, "UNK_870F", P.LocalOnly),                  // Manny transient counter, zeroed on create/delete (npc_mn)
-        R(0x8803, "GHOST_SHIP", P.Max),                      // GHOST_SHIP progress 0..3 (tag_ghostship)
+        R(0x8803, "GHOST_SHIP", P.Max),                      // GHOST_SHIP progress 0..3 (tag_ghostship): Shared story (StoryFlags.QuestRegisters)
         R(0x89FF, "UNK_89FF", P.LocalOnly),                  // Picto Box picture count (d_picture_box; preserved by reinit)
         R(0x8AFF, "UNK_8AFF", P.LocalOnly),                  // Koboli/Baito minigame record (npc_bmsw/btsw)
         R(0x8B03, "LETTER_ARYLL", P.Max),                    // LETTER_ARYLL state (auto-stocked by dayproc when 1820)
@@ -739,17 +739,17 @@ public static class EventFlagCatalog
         R(0xB203, "LETTER_TINGLE", P.Max),                   // LETTER_TINGLE state
         R(0xB503, "LETTER_KOMALIS_FATHER", P.Max),           // LETTER_KOMALIS_FATHER state
         R(0xB6FF, "UNK_B6FF", P.Unknown),
-        R(0xB703, "UNK_B703", P.Unknown),
+        R(0xB703, "UNK_B703", P.Max),                        // Barrel shooting prizes won, cap 3 (npc_kg2): Shared story, MAX (StoryFlags.QuestRegisters)
         R(0xB8FF, "UNK_B8FF", P.LocalOnly),                  // Rito dialogue selector; zeroed on DRI room load (d_s_room.cpp:277)
         R(0xB907, "UNK_B907", P.LocalOnly),                  // Windfall NPC state with DAILY increment (dayproc:71)
         R(0xBA0F, "UNK_BA0F", P.LocalOnly),                  // Random door password (tag_event cM_rndF); pair of flag 3B20
         R(0xBB07, "UNK_BB07", P.LocalOnly),                  // Beedle 7-day counter, DAILY increment (dayproc:62)
         R(0xBCFF, "UNK_BCFF", P.LocalOnly),                  // DAILY zeroed (dayproc:31)
         R(0xBEFF, "UNK_BEFF", P.LocalOnly),                  // Flight-platform high score, initialised from daNpc_Kg1_c::m_highscore
-        R(0xBFFF, "UNK_BFFF", P.LocalOnly),                  // Pig counter (d_a_kb)
-        R(0xC0FF, "UNK_C0FF", P.LocalOnly),                  // Joy Pendants given to Mrs. Marie (counter, npc_ho)
+        R(0xBFFF, "UNK_BFFF", P.BitwiseOr),                  // Rose's pigs in the pen, one bit each (d_a_kb): Shared story, OR (StoryFlags.QuestRegisters)
+        R(0xC0FF, "UNK_C0FF", P.Max),                        // Joy Pendants given to Mrs. Marie (counter, npc_ho): Shared story, MAX (StoryFlags.QuestRegisters)
         R(0xC103, "UNK_C103", P.LocalOnly),                  // Windfall NPC 1->2 on day change (dayproc:53)
-        R(0xC203, "UNK_C203", P.Max),                        // Koboli mail-sorting progress 1..3 (npc_bmsw)
+        R(0xC203, "UNK_C203", P.Max),                        // Koboli mail-sorting progress 1..3 (npc_bmsw): Shared story (StoryFlags.QuestRegisters)
         R(0xC3FF, "UNK_C3FF", P.LocalOnly),                  // Ghost Ship spawn room (d_a_ghostship)
         R(0xC407, "UNK_C407", P.LocalOnly),                  // Lenzo quest state; DAILY 6->7 (dayproc:66), forced 7 on New Game+
         R(0xC5FF, "UNK_C5FF", P.Unknown),
@@ -762,7 +762,7 @@ public static class EventFlagCatalog
         R(0xCCFF, "UNK_CCFF", P.LocalOnly),                  // Moblin's-letter day counter, DAILY increment (dayproc:27)
         R(0xCD03, "UNK_CD03", P.LocalOnly),                  // Auction: index of last won item
         R(0xCF03, "UNK_CF03", P.LocalOnly),                  // Orca counter, DAILY increment, reset by ji1
-        R(0xD003, "UNK_D003", P.Max),                        // Orca lesson level (npc_ji1 setClearRecord)
+        R(0xD003, "UNK_D003", P.Max),                        // Orca lesson level (npc_ji1 setClearRecord): Shared story (StoryFlags.QuestRegisters, carried as 0x07)
         R(0xD1FF, "UNK_D1FF", P.LocalOnly),                  // Item placed on pedestal (daDai_c m_savelabel): item number, not a bitfield
         R(0xD2FF, "UNK_D2FF", P.LocalOnly),                  // Pedestal item number
         R(0xD3FF, "UNK_D3FF", P.LocalOnly),                  // Pedestal item number
@@ -808,7 +808,7 @@ public static class EventFlagCatalog
         R(0xFBFF, "UNK_FBFF", P.Unknown),
         R(0xFC03, "UNK_FC03", P.Unknown),
         R(0xFD07, "UNK_FD07", P.Unknown),
-        R(0xFE07, "UNK_FE07", P.Unknown),
+        R(0xFE07, "UNK_FE07", P.Max),                        // Sploosh Kaboom prizes won, cap 3 (npc_kg1): Shared story, MAX (StoryFlags.QuestRegisters)
         R(0xFF07, "UNK_FF07", P.Unknown),
     ];
 
