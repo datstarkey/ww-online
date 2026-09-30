@@ -14,7 +14,9 @@ namespace WWOnline.Shared.Models;
 /// <item>which dungeon warp jars are open (<see cref="WarpJars"/>): the 6 registers the three-way jars keep
 /// their "open" bits in (docs/live-world.md §0.2);</item>
 /// <item>Beedle's membership points (<see cref="BeedlePoints"/>): a counter, merged by MAX;</item>
-/// <item>the postbox letters (<see cref="Letters"/>): each letter's state register, merged by MAX.</item>
+/// <item>the postbox letters (<see cref="Letters"/>): each letter's state register, merged by MAX;</item>
+/// <item>the side quests' counters, levels and prize tiers (<see cref="QuestRegisters"/>, <see cref="QuestRegisterTable"/>):
+/// merged by MAX, or OR for a bitmask (docs/side-quests.md §3).</item>
 /// </list>
 /// Grow-only: players' bits are OR-merged, and only syncable bits are ever stored, sent or applied.
 /// Every other event register (0x79-0xFF) and mTmp are never part of this.
@@ -73,6 +75,35 @@ public class StoryFlags
     /// <summary>The bits of each letter register (dLetterStts_e 0..3).</summary>
     public const byte LetterMask = 0x03;
 
+    /// <summary>
+    /// The side-quest registers the room shares, in wire order (<see cref="QuestRegisters"/>[i] is entry i: only ever
+    /// append). Each keeps progress one player makes that the others' games would otherwise redo or pay again
+    /// (docs/side-quests.md §3): read under <see cref="QuestRegister.Mask"/>, merged by
+    /// <see cref="QuestRegister.Merge"/>, and written back leaving the byte's other bits alone.
+    /// </summary>
+    public static IReadOnlyList<QuestRegister> QuestRegisterTable { get; } =
+    [
+        // d_a_npc_ho receivePendant (:70-82): pendants handed to Mrs. Marie, capped at 99. At 0 she runs her
+        // first-time talk and takes 20 more for a Cabana Deed; 40 given gives the Hero's Charm (1C04).
+        new(0xC0, 0xFF, QuestRegisterMerge.Max, "Joy Pendants given to Mrs. Marie"),
+        // d_a_npc_ji1 setClearRecord (:409-422): Orca's lesson level, 0-4 (4 = the 1000-hit record, 0F20). The
+        // catalogue's value mask is 0x03, but the game writes 4 unmasked, so the byte's 0x07 bits are carried.
+        new(0xD0, 0x07, QuestRegisterMerge.Max, "Orca's lesson level"),
+        // d_a_npc_bmsw (:427-445): Koboli's mail-sorting level, 1-3.
+        new(0xC2, 0x03, QuestRegisterMerge.Max, "Koboli's mail-sorting level"),
+        // d_a_npc_kg1: Sploosh Kaboom prizes won (cap 3), the index into {heart, chart, rupees} (docs/hearts.md §3.3).
+        new(0xFE, 0x07, QuestRegisterMerge.Max, "Sploosh Kaboom prizes won"),
+        // d_a_npc_kg2: barrel shooting prizes won (cap 3), the index into {heart, chart, rupees}.
+        new(0xB7, 0x03, QuestRegisterMerge.Max, "Barrel shooting prizes won"),
+        // d_a_tag_ghostship (:31-39): 3 = cleared; the ship's create fails (d_a_ghostship.cpp:275) and the sea
+        // chart drops its icon (d_menu_fmap.cpp:2537).
+        new(0x88, 0x03, QuestRegisterMerge.Max, "Ghost Ship cleared"),
+        // d_a_kb (:2170-2175): one bit per pig in Rose's pen, 1 << (shape & 3).
+        new(0xBF, 0x0F, QuestRegisterMerge.Or, "Rose's pigs in the pen"),
+    ];
+
+    public const int QuestRegisterCount = 7;
+
     private static readonly byte[] Mask = EventFlagCatalog.GetFullSyncMask()[..ByteCount];
 
     private static readonly byte[] FigMask = BuildFigurineMask();
@@ -105,6 +136,9 @@ public class StoryFlags
     /// <summary>Each postbox letter's state (0-3), in <see cref="LetterRegisterBytes"/> order. Merged by MAX.</summary>
     public byte[] Letters { get; set; } = new byte[LetterByteCount];
 
+    /// <summary>The side-quest registers' values under their masks, in <see cref="QuestRegisterTable"/> order.</summary>
+    public byte[] QuestRegisters { get; set; } = new byte[QuestRegisterCount];
+
     private static byte[] BuildFigurineMask()
     {
         var m = new byte[FigurineByteCount];
@@ -123,13 +157,15 @@ public class StoryFlags
         for (int i = 0; i < WarpJarByteCount; i++) f.WarpJars[i] = (byte)(eventBytes[WarpJarRegisterBytes[i]] & WarpJarMask);
         f.BeedlePoints = eventBytes[BeedlePointsRegisterByte];
         for (int i = 0; i < LetterByteCount; i++) f.Letters[i] = (byte)(eventBytes[LetterRegisterBytes[i]] & LetterMask);
+        for (int i = 0; i < QuestRegisterCount; i++)
+            f.QuestRegisters[i] = (byte)(eventBytes[QuestRegisterTable[i].EventByte] & QuestRegisterTable[i].Mask);
         return f;
     }
 
     /// <summary>Structure check for anything from the network (call <see cref="Normalize"/> after).</summary>
     public bool IsValid() =>
         Bits is { Length: ByteCount } && Figurines is { Length: FigurineByteCount } && WarpJars is { Length: WarpJarByteCount } &&
-        Letters is { Length: LetterByteCount };
+        Letters is { Length: LetterByteCount } && QuestRegisters is { Length: QuestRegisterCount };
 
     /// <summary>Drop every bit outside <see cref="SyncMask"/> / <see cref="FigurineMask"/>. Returns this.</summary>
     public StoryFlags Normalize()
@@ -138,12 +174,13 @@ public class StoryFlags
         for (int i = 0; i < FigurineByteCount; i++) Figurines[i] &= FigMask[i];
         for (int i = 0; i < WarpJarByteCount; i++) WarpJars[i] &= WarpJarMask;
         for (int i = 0; i < LetterByteCount; i++) Letters[i] &= LetterMask;
+        for (int i = 0; i < QuestRegisterCount; i++) QuestRegisters[i] &= QuestRegisterTable[i].Mask;
         return this;
     }
 
     [JsonIgnore]
     public bool IsEmpty => Bits.All(b => b == 0) && Figurines.All(b => b == 0) && WarpJars.All(b => b == 0) && BeedlePoints == 0 &&
-                           Letters.All(b => b == 0);
+                           Letters.All(b => b == 0) && QuestRegisters.All(b => b == 0);
 
     /// <summary>Set event flags (figurines not included).</summary>
     [JsonIgnore]
@@ -161,6 +198,10 @@ public class StoryFlags
     [JsonIgnore]
     public int LetterCount => Letters.Count(b => b != 0);
 
+    /// <summary>Side-quest registers with any value.</summary>
+    [JsonIgnore]
+    public int QuestRegisterCountSet => QuestRegisters.Count(b => b != 0);
+
     /// <summary>OR the syncable bits of <paramref name="other"/> into this. Returns true if any bit was added.</summary>
     public bool MergeFrom(StoryFlags other)
     {
@@ -176,6 +217,13 @@ public class StoryFlags
         {
             byte theirs = (byte)(other.Letters[i] & LetterMask);
             if (theirs > Letters[i]) { Letters[i] = theirs; changed = true; }
+        }
+        for (int i = 0; i < QuestRegisterCount; i++)
+        {
+            var reg = QuestRegisterTable[i];
+            byte theirs = (byte)(other.QuestRegisters[i] & reg.Mask);
+            byte merged = reg.Merge == QuestRegisterMerge.Or ? (byte)(QuestRegisters[i] | theirs) : Math.Max(QuestRegisters[i], theirs);
+            if (merged != QuestRegisters[i]) { QuestRegisters[i] = merged; changed = true; }
         }
         return changed;
     }
@@ -196,11 +244,15 @@ public class StoryFlags
         for (int i = 0; i < WarpJarByteCount; i++) d.WarpJars[i] = (byte)(WarpJars[i] & ~other.WarpJars[i]);
         d.BeedlePoints = BeedlePoints > other.BeedlePoints ? BeedlePoints : (byte)0; // a MAX field: only a higher count is "missing"
         for (int i = 0; i < LetterByteCount; i++) d.Letters[i] = Letters[i] > other.Letters[i] ? Letters[i] : (byte)0; // MAX too
+        for (int i = 0; i < QuestRegisterCount; i++)
+            d.QuestRegisters[i] = QuestRegisterTable[i].Merge == QuestRegisterMerge.Or
+                ? (byte)(QuestRegisters[i] & ~other.QuestRegisters[i])
+                : QuestRegisters[i] > other.QuestRegisters[i] ? QuestRegisters[i] : (byte)0;
         return d;
     }
 
-    /// <summary>A copy holding the event flags, warp jars and Beedle's points, without the figurines and letters
-    /// (which wait for an idle game).</summary>
+    /// <summary>A copy holding the event flags, warp jars and Beedle's points, without the figurines, letters and
+    /// side-quest registers (which wait for an idle game).</summary>
     public StoryFlags FlagsOnly() =>
         new() { Bits = (byte[])Bits.Clone(), WarpJars = (byte[])WarpJars.Clone(), BeedlePoints = BeedlePoints };
 
@@ -211,7 +263,7 @@ public class StoryFlags
         new()
         {
             Bits = (byte[])Bits.Clone(), Figurines = (byte[])Figurines.Clone(), WarpJars = (byte[])WarpJars.Clone(),
-            BeedlePoints = BeedlePoints, Letters = (byte[])Letters.Clone(),
+            BeedlePoints = BeedlePoints, Letters = (byte[])Letters.Clone(), QuestRegisters = (byte[])QuestRegisters.Clone(),
         };
 
     public bool Has(ushort id) => (id >> 8) < ByteCount && (Bits[id >> 8] & (id & 0xFF)) != 0;
@@ -242,7 +294,8 @@ public class StoryFlags
         $"{BitCount} flag(s)" + (FigurineCount == 0 ? "" : $" + {FigurineCount} figurine(s)") +
         (WarpJarCount == 0 ? "" : $" + {WarpJarCount} warp jar(s)") +
         (BeedlePoints == 0 ? "" : $" + Beedle {BeedlePoints} pt(s)") +
-        (LetterCount == 0 ? "" : $" + {LetterCount} letter(s)");
+        (LetterCount == 0 ? "" : $" + {LetterCount} letter(s)") +
+        (QuestRegisterCountSet == 0 ? "" : $" + {QuestRegisterCountSet} side-quest register(s)");
 
     /// <summary>
     /// Names of the set flags for log lines, e.g. "MET_KORL, UNK_0F40", then the figurines made as
@@ -263,6 +316,9 @@ public class StoryFlags
         var letters = Enumerable.Range(0, LetterByteCount).Where(i => Letters[i] != 0)
             .Select(i => $"0x{LetterRegisterBytes[i]:X2}={Letters[i]}").ToList();
         if (letters.Count > 0) parts.Add("letters " + string.Join(", ", letters));
+        var quests = Enumerable.Range(0, QuestRegisterCount).Where(i => QuestRegisters[i] != 0)
+            .Select(i => $"{QuestRegisterTable[i].What} {QuestRegisters[i]}").ToList();
+        if (quests.Count > 0) parts.Add(string.Join(", ", quests));
         return parts.Count == 0 ? "(none)" : string.Join(", ", parts);
     }
 
@@ -273,3 +329,20 @@ public class StoryFlags
 
     public override string ToString() => $"{CountText()}: {Describe()}";
 }
+
+/// <summary>How a side-quest register merges between players.</summary>
+public enum QuestRegisterMerge
+{
+    /// <summary>A counter, level or state that only goes up: the room keeps the highest.</summary>
+    Max,
+
+    /// <summary>A bitmask whose bits are only ever set: the room keeps every bit anyone has.</summary>
+    Or,
+}
+
+/// <summary>One side-quest register the room story shares (<see cref="StoryFlags.QuestRegisterTable"/>).</summary>
+/// <param name="EventByte">Its byte in dSv_event_c (0x79-0xFF).</param>
+/// <param name="Mask">The bits of that byte it owns; the byte's other bits are never read or written.</param>
+/// <param name="Merge">How players' values combine.</param>
+/// <param name="What">What it counts, for logs and the Story flags page.</param>
+public readonly record struct QuestRegister(byte EventByte, byte Mask, QuestRegisterMerge Merge, string What);

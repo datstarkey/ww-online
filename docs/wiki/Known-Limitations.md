@@ -21,6 +21,8 @@ WW-Online is in early development. These are the known gaps; the [releases](http
 - A warp jar whose lid is still on screen when another player opens it updates when you next enter that room (the jar itself works straight away).
 - Items that only reached you from another player (bait, spoils, delivery items) count as obtained, so you won't see their first-pickup message later.
 - Two players reading the same waiting letter at the same moment both get its reward (rupees twice).
+- An item another player sets on (or takes off) a Windfall pedestal shows on your screen the next time you come to Windfall.
+- Two players handing Joy Pendants to Mrs. Marie at the very same moment: only the larger hand-in counts towards her rewards.
 - Two players buying from Beedle at the very same moment can lose a point card point between them.
 
 ## Warping

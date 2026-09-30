@@ -9,8 +9,10 @@ namespace WWOnline.Services;
 /// were ever obtained (<see cref="DeliveryCounts"/>). A pushed bag is written into this one the way the game adds
 /// and takes items (<see cref="DeliveryBag.Apply"/>): leaving items empty their slot, arriving items take the
 /// first empty slot and set their obtained bit, and X/Y/Z buttons on a changed slot are fixed. The write is
-/// compare-and-swap against a fresh read, only while no event runs and the menu is closed. Why a presence store
-/// and not flags: docs/delivery-bag.md.
+/// compare-and-swap against a fresh read, only while no event runs and the menu is closed. Windfall's pedestals
+/// (<see cref="DeliveryCounts.Pedestals"/>) ride along: read with the bag, so setting an item down or taking it
+/// back is one change, and written after it (docs/side-quests.md §3.2). Why a presence store and not flags:
+/// docs/delivery-bag.md.
 /// </summary>
 public class SharedDeliveryService : SharedBagService<DeliveryCounts>
 {
@@ -32,7 +34,9 @@ public class SharedDeliveryService : SharedBagService<DeliveryCounts>
     protected override DeliveryCounts? ReadCounts()
     {
         _bag = DeliveryBagMemory.Read(Dolphin);
-        return _bag?.Count();
+        if (_bag?.Count() is not { } counts || DeliveryBagMemory.ReadPedestals(Dolphin) is not { } pedestals) return null;
+        counts.Pedestals = pedestals;
+        return counts;
     }
 
     protected override (bool Applied, DeliveryCounts? Baseline) ApplyTarget(DeliveryCounts current, DeliveryCounts target)
@@ -44,18 +48,29 @@ public class SharedDeliveryService : SharedBagService<DeliveryCounts>
         {
             case BagWriteResult.Written:
                 var written = next.Count();
+                switch (DeliveryBagMemory.WritePedestals(Dolphin, current.Pedestals, target.Pedestals))
+                {
+                    case BagWriteResult.Written:
+                        written.Pedestals = (byte[])target.Pedestals.Clone();
+                        break;
+                    default:
+                        // The bag is written; the pedestals raced or failed: take what the game holds now as the sync
+                        // point and keep the target to retry.
+                        Logger.Warning("[delivery] writing the pedestals failed; retrying");
+                        return (false, ReadCounts());
+                }
                 if (written.Counts.AsSpan().SequenceEqual(target.Counts))
                     Logger.Information("[delivery] shared bag {Total} → applied ({Delta}): {Slots}", target, target.Minus(current).DeltaText(), next);
                 else
                     Logger.Warning("[delivery] shared bag {Total}: only {Applied} fits this bag ({Slots})", target, written, next);
                 // The sync point's obtained bits are the room's: any this game has beyond them (its own, or an
                 // arriving item's) are sent next tick, so the room's bits become everyone's.
-                return (true, new DeliveryCounts(written.Counts, target.Obtained));
+                return (true, new DeliveryCounts(written.Counts, target.Obtained, written.Pedestals));
             case BagWriteResult.Failed:
                 // Partly written, maybe: adopt what the bag now holds as the sync point (so our own half-write
                 // isn't sent as a local change) and keep the target to retry.
                 Logger.Warning("[delivery] writing the bag failed; retrying");
-                return (false, DeliveryBagMemory.Read(Dolphin)?.Count());
+                return (false, ReadCounts());
             default:
                 // Raced: the game changed the bag since we read it; the next tick sends that change, then applies.
                 return (false, null);

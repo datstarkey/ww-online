@@ -966,6 +966,14 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 // sets the save item bit in the same call (d_a_item.cpp:582-768).
 #define DAITEM_STATUS_IDLE0                0
 #define DAITEM_STATUS_IDLE1                1
+// A boss's Heart Container waits in 0xA/0xB (execWaitMainFromBoss, d_a_item.cpp:298-300, 488-500) until checkGetItem
+// starts the get demo (7-9).
+#define DAITEM_STATUS_WAIT_BOSS1           0xA
+#define DAITEM_STATUS_WAIT_BOSS2           0xB
+#define DAITEM_ITEMNO_HEART_CONTAINER      0x08  // dItemNo_HEART_CONTAINER_e (d_item_data.h:15)
+// dSv_memBit_c::mDungeonItem bit STAGE_LIFE (d_save.h:644; isDungeonItem = mDungeonItem & (1 << i), d_save.cpp:1147):
+// set only by item_func_utuwa_heart, when a Heart Container is picked up (d_item.cpp:587-603).
+#define MEMBIT_DUNGEON_STAGE_LIFE          (1 << 4)
 
 /* ============================================================================ */
 /* LIVE WORLD (puppet_liveworld.c) — actors that read a flag only at create.    */

@@ -12,7 +12,9 @@ namespace WWOnline.Services;
 /// tutorial hints) are OR-merged across players through the server, masked to
 /// <see cref="StoryFlags.SyncMask"/> (the catalog's Full-sync mask: never LocalOnly flags, never
 /// mTmp). So are the Nintendo Gallery figurines Carlov has made (<see cref="StoryFlags.Figurines"/>,
-/// the 17 figurine bitfield registers; docs/figurines.md). No other register (0x79-0xFF) is touched.
+/// the 17 figurine bitfield registers; docs/figurines.md), the warp jars, Beedle's points, the postbox letters
+/// and the side quests' counters and levels (<see cref="StoryFlags.QuestRegisterTable"/>, docs/side-quests.md).
+/// No other register (0x79-0xFF) is touched.
 ///
 ///   - on attach this game JOINS: the room owner's game seeds the room; anyone else's flags merge
 ///     up into it, and the room's flags come back to apply;
@@ -243,7 +245,8 @@ public class StorySyncService : IDisposable
     public static StoryFlags ToApply(StoryFlags room, StoryFlags local, StoryFlags applied, Func<bool> isIdle)
     {
         var missing = room.Except(local).Except(applied);
-        return (missing.FigurineCount > 0 || missing.LetterCount > 0) && !isIdle() ? missing.FlagsOnly() : missing;
+        return (missing.FigurineCount > 0 || missing.LetterCount > 0 || missing.QuestRegisterCountSet > 0) && !isIdle()
+            ? missing.FlagsOnly() : missing;
     }
 
     /// <summary>
@@ -277,6 +280,18 @@ public class StorySyncService : IDisposable
             uint addr = EventFlagCatalog.EventBitfieldAddress + StoryFlags.LetterRegisterBytes[i];
             if (dolphin.ReadMemory(addr, 1) is [byte have] && (have & StoryFlags.LetterMask) < want)
                 dolphin.WriteMemory(addr, [(byte)(have & ~StoryFlags.LetterMask | want)]);
+        }
+        // Side-quest registers: a level / counter raised to the room's, a bitmask ORed in, under the register's mask.
+        for (int i = 0; i < StoryFlags.QuestRegisterCount; i++)
+        {
+            var reg = StoryFlags.QuestRegisterTable[i];
+            byte want = (byte)(bits.QuestRegisters[i] & reg.Mask);
+            if (want == 0) continue;
+            uint addr = EventFlagCatalog.EventBitfieldAddress + reg.EventByte;
+            if (dolphin.ReadMemory(addr, 1) is not [byte have]) continue;
+            byte value = (byte)(have & reg.Mask);
+            byte next = reg.Merge == QuestRegisterMerge.Or ? (byte)(value | want) : Math.Max(value, want);
+            if (next != value) dolphin.WriteMemory(addr, [(byte)(have & ~reg.Mask | next)]);
         }
     }
 
@@ -325,7 +340,7 @@ public class StorySyncService : IDisposable
                     _loggedWaiting = false;
                     var fresh = room.Except(snapshot).Except(_applied);
                     toApply = fresh.BitCount + fresh.FigurineCount + fresh.WarpJarCount + (fresh.BeedlePoints != 0 ? 1 : 0) +
-                              fresh.LetterCount;
+                              fresh.LetterCount + fresh.QuestRegisterCountSet;
                 }
                 Logger.Information("[story] joined room story ({Room} in room, this game brought {Mine}); {N} to apply",
                     room.CountText(), snapshot.CountText(), toApply);
