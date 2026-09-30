@@ -13,7 +13,7 @@
       and links name the repo too; change them by hand if the repo moves.)
     -->
     <PropertyGroup>
-        <Version>0.5.0</Version>
+        <Version>0.6.0</Version>
         <Product>WW-Online</Product>
         <Company>datstarkey</Company>
         <Authors>datstarkey</Authors>
