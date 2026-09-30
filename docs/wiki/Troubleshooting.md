@@ -24,12 +24,12 @@
 
 ## Reporting a bug
 
-Please [open an issue](https://github.com/datstarkey/ww-online/issues) with:
+In WW-Online, open **Settings → Bug report** and press **Save bug report**: it zips your recent logs (and the room's server log if you host, and Dolphin's log if it has one) with a summary of your version and settings, and shows you the file. Your Windows user folder is replaced by `%USERPROFILE%`, so your name isn't in it. Then press **Report an issue** (or [open one here](https://github.com/datstarkey/ww-online/issues)) and attach the zip, with:
 
 - what you were doing, and where (island or dungeon, and room);
 - what the other players had just done;
 - the room's rules (Full sync, Co-op or which rules were on);
 - your WW-Online version (**Settings**);
-- your logs, and the other players' if you can: `%LocalAppData%\WWOnline\logs`.
+- the bug report zip, and the other players' if you can (the logs are in `%LocalAppData%\WWOnline\logs` if you'd rather pick them yourself).
 
 For a softlock, [Softlocks and warping](../softlocks.md#reporting-a-new-one) says what helps most.

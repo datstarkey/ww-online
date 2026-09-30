@@ -49,7 +49,7 @@ WW-Online checks for a new version shortly after it starts and every so often af
 | What | Where |
 |---|---|
 | Settings | `%AppData%\WWOnline` |
-| Logs | `%LocalAppData%\WWOnline\logs` |
+| Logs | `%LocalAppData%\WWOnline\logs` (**Settings → Bug report** zips the recent ones for an issue) |
 | Item icons (read from your own game) | `%LocalAppData%\WWOnline\GameIcons` |
 | Your patched game | the folder you chose in the setup (**Settings**, **Patched game folder**) |
 

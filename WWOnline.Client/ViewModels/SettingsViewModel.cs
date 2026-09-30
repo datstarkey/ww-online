@@ -2,6 +2,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using WWOnline.Services;
+using WWOnline.Shared;
 
 namespace WWOnline.ViewModels;
 
@@ -240,6 +241,65 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         _gameSettingsService.Save(settings);
         IsSaved = true;
         SettingsSaved?.Invoke();
+    }
+
+    /// <summary>Where the last bug report went, or why it couldn't be made (Settings → Bug report).</summary>
+    [ObservableProperty]
+    private string _bugReportStatus = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SaveBugReportCommand))]
+    private bool _isSavingBugReport;
+
+    private bool CanSaveBugReport() => !IsSavingBugReport;
+
+    /// <summary>Zip the recent logs and a summary for an issue (<see cref="BugReport"/>), then show it in Explorer.</summary>
+    [RelayCommand(CanExecute = nameof(CanSaveBugReport))]
+    private async Task SaveBugReport()
+    {
+        IsSavingBugReport = true;
+        BugReportStatus = "Saving...";
+        try
+        {
+            var settings = _gameSettingsService.Load();
+            var buildCheck = PatchOptions.BuildStatusText is { Length: > 0 } s ? s : "not checked";
+            var logFile = Program.StartupOptions.LogFile;
+            var path = await Task.Run(() =>
+            {
+                var now = DateTime.Now;
+                var files = BugReport.CollectFiles(AppPaths.LogsDirectory, logFile, settings.DolphinPath, now);
+                var about = BugReport.About(settings, buildCheck, now);
+                return BugReport.Write(BugReport.ReportsDirectory, files, about,
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), now);
+            });
+            Serilog.Log.Information("[bug-report] saved {Path}", path);
+            BugReportStatus = $"Saved {Path.GetFileName(path)}. Attach it to your issue on GitHub.";
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true });
+            }
+            catch (Exception ex) { Serilog.Log.Warning(ex, "[bug-report] couldn't open Explorer"); }
+        }
+        catch (Exception ex)
+        {
+            Serilog.Log.Warning(ex, "[bug-report] couldn't save a bug report");
+            BugReportStatus = $"Couldn't save a bug report: {ex.Message}";
+        }
+        finally
+        {
+            IsSavingBugReport = false;
+        }
+    }
+
+    /// <summary>Open the GitHub issues page (Settings → Bug report).</summary>
+    [RelayCommand]
+    private void OpenIssues()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppInfo.RepositoryUrl + "/issues/new") { UseShellExecute = true });
+        }
+        catch (Exception ex) { Serilog.Log.Warning(ex, "[bug-report] couldn't open the issues page"); }
     }
 
     public void Dispose()
