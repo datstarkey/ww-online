@@ -25,7 +25,11 @@ Every warp writes `[warp]` lines to your client log (`logs/latest/client-Player<
 
 ## Known softlocks
 
-Each entry says where it happens, what triggers it, what the stuck player sees, and how to get out.
+Each entry says where it happens, what triggers it, what the stuck player sees, and how to get out. The list comes from play and from an audit of the story flags that change where a save loads, which island layout you see, and whether you can board the King of Red Lions (the event flag catalogue's risky flags, checked in the game's code).
+
+**Two general ways out**, besides **Warp to**:
+- **Reload your save.** Save, go back to the title screen and load. Where a save loads follows the story (Outset, the pirate ship, the Forsaken Fortress, then Windfall once anyone has met the King of Red Lions), so after another player got ahead in the prologue, a reload puts you where they are in the story.
+- **Leave and come back.** Island layouts (who stands where, what's open) are chosen when the area loads, so a change another player caused shows after you leave the area and return.
 
 ### Outset Island: leaving with Tetra
 
@@ -33,6 +37,38 @@ Each entry says where it happens, what triggers it, what the stuck player sees, 
 - **Trigger:** one player talks to Tetra and boards the pirate ship.
 - **Symptom:** the other players can no longer board. Tetra and the ship's way on are gone for them, so they are stuck on Outset.
 - **Fix:** **Warp to** the player who left. You arrive where they entered their current area and carry on from there.
+
+### The pirate ship and the Forsaken Fortress, before the boat
+
+- **Where:** the pirate ship, the first visit to the Forsaken Fortress, and Windfall before you've sailed the King of Red Lions.
+- **Trigger:** another player moves the prologue on: the barrel launch to the Forsaken Fortress, then being thrown out of it and meeting the King of Red Lions at Windfall.
+- **Symptom:** the event that would move you on (Tetra's barrel, the Helmaroc King throwing you out) has already happened as far as your game knows, so it doesn't play, and there's no other way off the ship or out of the fortress.
+- **Fix:** **Warp to** the player ahead, as many times as it takes: each warp takes you to where they came in, so if they've moved on again, warp again. Or reload your save: once anyone has met the King of Red Lions, your save loads at Windfall.
+
+### Boarding the King of Red Lions after the first trip to Hyrule (fixed in 0.6.2)
+
+- **Where:** anywhere on the Great Sea, from another player's first descent into Hyrule until the Master Sword.
+- **What happened:** the game doesn't let you board the King of Red Lions after the descent until the Master Sword is equipped (`d_a_ship.cpp:4225`). The descent's flag reached everyone, so anyone who got off their boat couldn't get back on.
+- **Now:** that flag waits until your game has the Master Sword equipped (it comes through Shared items once anyone pulls it). Your client log says `[story] holding back UNK_2D10 until the Master Sword is equipped here`.
+
+### Boarding the King of Red Lions after Hyrule's courtyard (fixed in 0.6.2)
+
+- **Where:** anywhere on the Great Sea, from another player's Hyrule courtyard scene until Zelda awakens.
+- **What happened:** the same boarding lock, until ZELDA_AWAKENED (`d_a_ship.cpp:4226`).
+- **Now:** the courtyard flag waits until your game has ZELDA_AWAKENED. If you reach the courtyard first yourself, the scene plays for you as normal.
+
+### Medli and Makar
+
+- **Where:** Dragon Roost / Headstone Island and the Earth Temple (Medli); Forest Haven / Gale Isle and the Wind Temple (Makar).
+- **Trigger:** another player recruits the companion.
+- **What happens:** your game takes the companion as recruited. Medli then rides your King of Red Lions to Headstone Island (`d_a_npc_md.cpp:604`, until the island's landing), as she would if you had recruited her.
+- **If you're stuck:** follow the player who has the companion through the temple: switches and doors they open open for you too (Shared world). Or **Warp to** them.
+
+### Changed islands
+
+- **Where:** Outset, Windfall, the Forsaken Fortress, Forest Haven and Hyrule change their layout at story points (who is there, what's open).
+- **Symptom:** after another player reaches one of those points, someone you needed to talk to is gone, or a place looks further along than you are.
+- **Fix:** the room's story is past that step, so carry on from where the room is: **Warp to** the player ahead, or leave and come back to see the new layout.
 
 ## Reporting a new one
 

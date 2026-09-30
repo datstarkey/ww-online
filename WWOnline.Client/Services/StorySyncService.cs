@@ -28,6 +28,8 @@ namespace WWOnline.Services;
 /// game sets them itself only in Carlov's talk event, so a write never races daNpcMt_c::setFigure.
 /// Carlov's in-progress figurine (flags 2F01 / 3080 / 3F01 / 4080 / 4040 and register A9FF) is
 /// LocalOnly and never synced.
+/// A few room flags are held back from a game that isn't ready for them (<see cref="HeldFlags"/>): set early,
+/// they stop that player boarding the King of Red Lions (docs/softlocks.md).
 /// </summary>
 public class StorySyncService : IDisposable
 {
@@ -53,6 +55,7 @@ public class StorySyncService : IDisposable
     private StoryFlags _received = new();     // the room's bits as far as we know
     private StoryFlags _applied = new();      // room bits this loaded save has had (written by us, or already set)
     private StoryFlags _clearedLogged = new(); // applied bits the game cleared again (logged once)
+    private readonly HashSet<ushort> _heldLogged = []; // held flags already logged as held
 
     private int _joining;
 
@@ -127,6 +130,7 @@ public class StorySyncService : IDisposable
         {
             _applied = new StoryFlags();
             _clearedLogged = new StoryFlags();
+            _heldLogged.Clear();
         }
     }
 
@@ -227,8 +231,10 @@ public class StorySyncService : IDisposable
             });
         }
 
-        // Inbound: room bits this game is missing and has never had.
-        var missing = ToApply(_received, local, _applied, () => SceneStabilityGate.IsIdle(_dolphin));
+        // Inbound: room bits this game is missing and has never had, minus those it isn't ready for.
+        var hold = new HoldState(local, IsMasterSwordEquipped(_dolphin));
+        LogHeld(_received.Except(local).Except(_applied), hold);
+        var missing = ToApply(_received, local, _applied, () => SceneStabilityGate.IsIdle(_dolphin), hold);
         if (missing.IsEmpty) return;
         ApplyBits(_dolphin, missing);
         _applied.MergeFrom(missing);
@@ -237,16 +243,64 @@ public class StorySyncService : IDisposable
             Logger.Warning("[story] WARNING applied {Flag}: {Effect}", f.Name, EventFlagCatalog.RiskEffect(f.Id));
     }
 
+    /// <summary>What a <see cref="HeldFlag"/> is checked against: this game's flags and its equipped sword.</summary>
+    public readonly record struct HoldState(StoryFlags Local, bool MasterSwordEquipped);
+
+    /// <summary>A room flag held back from this game while <see cref="Hold"/> is true (<see cref="HeldFlags"/>).</summary>
+    public readonly record struct HeldFlag(ushort Id, string Until, Func<HoldState, bool> Hold);
+
+    /// <summary>
+    /// Room flags held back from a game that isn't ready for them. Each one, set in a game that hasn't reached the
+    /// same point, stops that player boarding the King of Red Lions (d_a_ship.cpp:4224-4229, which drops the ship's
+    /// board action), so a player who is behind would be stuck wherever they got off the boat:
+    ///   - 2D10 (the first descent into Hyrule, warp_in.stb) while the Master Sword isn't equipped. Its only other
+    ///     reader is the Tower of the Gods' ending check (d_a_warpf.cpp:230-233): held, that player plays the
+    ///     descent themselves.
+    ///   - 3804 HYRULE_COURTYARD_CUTSCENE while ZELDA_AWAKENED isn't set. Its other readers (d_a_npc_zl1,
+    ///     d_a_obj_YLzou) then play the courtyard scene for that player, the normal order.
+    /// Released as soon as the game catches up (both conditions come from the room too: the sword through Shared
+    /// items, ZELDA_AWAKENED through this sync).
+    /// </summary>
+    public static IReadOnlyList<HeldFlag> HeldFlags { get; } =
+    [
+        new(0x2D10, "the Master Sword is equipped here", s => !s.MasterSwordEquipped),
+        new(0x3804, "Zelda has awoken here (ZELDA_AWAKENED)", s => !s.Local.Has(0x2D02)),
+    ];
+
+    /// <summary>checkMasterSwordEquip (d_a_player.h:600): mSelectEquip[0] is one of the three Master Swords.</summary>
+    public static bool IsMasterSwordEquipped(IDolphinService dolphin) =>
+        dolphin.Read(GameMemoryAddresses.Player.CurrentSword) is ItemIDs.Swords.MasterSword
+            or ItemIDs.Swords.MasterSwordHalf or ItemIDs.Swords.MasterSwordFull;
+
     /// <summary>
     /// What to write this tick: the room's bits this game is missing (<paramref name="local"/>) and has never
     /// had (<paramref name="applied"/>). Figurines wait for an idle game (not talking to Carlov, menu closed):
     /// without <paramref name="isIdle"/> they are left out, stay missing, and a later tick applies them.
+    /// With <paramref name="hold"/>, the <see cref="HeldFlags"/> this game isn't ready for are left out too.
     /// </summary>
-    public static StoryFlags ToApply(StoryFlags room, StoryFlags local, StoryFlags applied, Func<bool> isIdle)
+    public static StoryFlags ToApply(StoryFlags room, StoryFlags local, StoryFlags applied, Func<bool> isIdle, HoldState? hold = null)
     {
         var missing = room.Except(local).Except(applied);
+        if (hold is { } h)
+            foreach (var held in HeldFlags)
+                if (missing.Has(held.Id) && held.Hold(h))
+                    missing.Bits[held.Id >> 8] &= (byte)~(held.Id & 0xFF);
         return (missing.FigurineCount > 0 || missing.LetterCount > 0 || missing.QuestRegisterCountSet > 0) && !isIdle()
             ? missing.FlagsOnly() : missing;
+    }
+
+    /// <summary>Log a held flag once when it's first held, and once when it's released.</summary>
+    private void LogHeld(StoryFlags missing, HoldState hold)
+    {
+        foreach (var held in HeldFlags)
+        {
+            bool holding = missing.Has(held.Id) && held.Hold(hold);
+            var name = EventFlagCatalog.Flags.FirstOrDefault(f => f.Id == held.Id)?.Name ?? $"0x{held.Id:X4}";
+            if (holding && _heldLogged.Add(held.Id))
+                Logger.Information("[story] holding back {Flag} until {Until} (it would stop you boarding the King of Red Lions)", name, held.Until);
+            else if (!holding && missing.Has(held.Id) && _heldLogged.Remove(held.Id))
+                Logger.Information("[story] {Flag} released: {Until}", name, held.Until);
+        }
     }
 
     /// <summary>
