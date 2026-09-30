@@ -6,7 +6,7 @@ The catch: some of the game's progress moves you as well as setting a flag. When
 
 ## How to recover: Warp to player
 
-Each other player on the **Room** page's **Players** list has a **Warp to** button. It is there while the room's **Allow warping** rule is on (on in Full sync, off in Co-op, where nothing syncs and nobody can get stuck this way). The room owner can change it under **Edit room**. A dedicated server sets its starting value with `WWO_ALLOW_WARPING` / `--no-warping` ([self-hosting](self-hosting.md)).
+Each other player on the **Room** page's **Players** list has a **Warp to** button. It is there while the room's **Allow warping** rule is on (on in Full sync, off in Co-op, where no progress is shared and nobody can get stuck this way). The room owner can change it under **Edit room**. A dedicated server sets its starting value with `WWO_ALLOW_WARPING` / `--no-warping` ([self-hosting](self-hosting.md)).
 
 What a warp does depends on where the other player is:
 

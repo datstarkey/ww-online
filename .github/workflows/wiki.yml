@@ -1,0 +1,58 @@
+name: Wiki
+
+# Every push to main: build the GitHub wiki (the player guide) from docs/ with scripts/build-wiki.py
+# and push it to <repo>.wiki.git, replacing what is there. The wiki is never edited on GitHub.
+# The wiki repo only exists once its first page has been created in the web UI (Wiki tab, "Create
+# the first page"); until then this fails at the clone.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'GameMod/src/patches/optional/**'
+      - 'scripts/build-wiki.py'
+      - '.github/workflows/wiki.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync the wiki
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: python3 scripts/build-wiki.py "$RUNNER_TEMP/wiki-build" --repo-url "${{ github.server_url }}/${{ github.repository }}"
+
+      - name: Push
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          wiki_url="https://x-access-token:${TOKEN}@${GITHUB_SERVER_URL#https://}/${GITHUB_REPOSITORY}.wiki.git"
+          if ! git clone --quiet "$wiki_url" "$RUNNER_TEMP/wiki"; then
+            echo "::error::Couldn't clone the wiki. Create its first page on GitHub (Wiki tab) once, then re-run this workflow."
+            exit 1
+          fi
+          cd "$RUNNER_TEMP/wiki"
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R "$RUNNER_TEMP/wiki-build/." .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "The wiki is up to date."
+            exit 0
+          fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "Sync from ${GITHUB_REPOSITORY}@${GITHUB_SHA::7}"
+          git push --quiet
+          git show --stat --oneline HEAD
