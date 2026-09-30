@@ -1,6 +1,6 @@
 # Playing together
 
-Everyone plays their own game in Dolphin on their own PC. A **room** links them up: one player hosts it (or it runs on a [dedicated server](../self-hosting.md)), and everyone else joins.
+Everyone plays their own game in Dolphin on their own PC. A **room** links them up: one player hosts it from the app, and everyone else joins. There is nothing else to install or run: the host's app is the server.
 
 ## Host a room
 
@@ -18,11 +18,15 @@ Everyone in a room needs the same WW-Online version. If yours is different, the 
 
 ## Playing over the internet
 
-The host's PC must be reachable on port `6969`. The easiest options:
+**You don't need a server.** When you press **Host a room**, your app runs the room. Your friends only need to reach your PC on port `6969`:
 
-- **[Tailscale](https://tailscale.com/)** (recommended): everyone installs it and joins the host's tailnet, then connects to the host's Tailscale IP. No router changes needed.
+- **On the same home network:** they join your PC's local IP address (for example `192.168.1.20`; `ipconfig` in a command prompt shows it as the IPv4 address). Nothing else to set up.
+- **[Tailscale](https://tailscale.com/)** (recommended over the internet): everyone installs it and joins the host's tailnet, then connects to the host's Tailscale IP. No router changes needed.
 - **Port forwarding:** forward TCP `6969` on the host's router to the host's PC, and friends connect to the host's public IP.
-- **A dedicated server:** run the room on any always-on machine or VPS, and everyone (the host too) joins it. See [Self-hosting](../self-hosting.md).
+
+If Windows asks whether to let WW-Online use the network when you host, allow it (at least for private networks), or your friends can't connect.
+
+**A dedicated server** is optional: run the room on an always-on machine or VPS, and everyone (the host too) joins it. It's only worth it when you want the room up without the host playing, or when nobody can make their PC reachable. See [Self-hosting](../self-hosting.md).
 
 ## Where you see each other
 

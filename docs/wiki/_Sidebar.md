@@ -8,7 +8,7 @@
 **Guides**
 - [Game patches](Game-Patches.md)
 - [Softlocks and warping](../softlocks.md)
-- [Self-hosting](../self-hosting.md)
+- [Self-hosting (optional)](../self-hosting.md)
 
 **Help**
 - [Troubleshooting](Troubleshooting.md)
