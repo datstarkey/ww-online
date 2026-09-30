@@ -111,7 +111,7 @@ Patch again only when WW-Online asks (after an update with new game code, or whe
 
 ## Play
 
-- **Host a room:** on the **Room** page choose **Host a room**. WW-Online starts the room on your PC (port `6969`), starts your patched game in Dolphin and links up with it. You're the room owner: press **Edit room** to pick Full sync, Co-op or your own mix of rules.
+- **Host a room:** on the **Room** page choose **Host a room**. WW-Online starts the room on your PC (port `6969`), starts your patched game in Dolphin and links up with it. You're the room owner: press **Edit room** to pick Full sync, Co-op or your own mix of rules. The next room you host starts with the rules you left this one on.
 - **Join a room:** enter the host's address and your name, then **Join**. You see the room's rules and items read-only, and anything you pick up still counts for the room.
 - **Your look:** open **Appearance** to pick your clothes, tunic colour and boat colour. Everyone sees it change live.
 - **Warp to a player:** with **Allow warping** on, press **Warp to** next to a player on the **Room** page.
@@ -135,7 +135,7 @@ Patch again only when WW-Online asks (after an update with new game code, or whe
 - **Stuck? Warp to a player.** Shared story and world only ever move forward, so another player's progress (say, leaving Outset Island with Tetra) can leave you with no way on. Press **Warp to** next to them on the **Room** page. See [Softlocks](docs/softlocks.md).
 - **Purple screen with `d_s_play.cpp` / black screen on boot:** Dolphin's 48 MB memory setting is off (only when you start Dolphin yourself), or the game folder isn't a patched `GZLE01` copy.
 - **Players don't appear:** everyone must be on the same WW-Online version, in the same room, and past the title screen. You see a player when you're in the same room of the same stage (on the Great Sea, when they're close).
-- **The game crashes or freezes:** please open an issue with WW-Online's logs (`%LocalAppData%\WWOnline\logs`) and what you were doing.
+- **The game crashes or freezes:** open **Settings → Bug report → Save bug report** (it zips your recent logs), then **Report an issue** and attach the zip with what you were doing.
 
 More on the wiki: **[Troubleshooting](https://github.com/datstarkey/ww-online/wiki/Troubleshooting)** and **[Known limitations](https://github.com/datstarkey/ww-online/wiki/Known-Limitations)**.
 

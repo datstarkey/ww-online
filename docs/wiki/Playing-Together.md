@@ -6,7 +6,7 @@ Everyone plays their own game in Dolphin on their own PC. A **room** links them 
 
 On the **Room** page choose **Host a room**. WW-Online starts the room on your PC (port `6969`), then starts your patched game in Dolphin and links up with it. (To start Dolphin yourself instead, untick **Start Dolphin and attach when you host or join a room** in **Settings**.)
 
-You're the **room owner**: press **Edit room** to pick **Full sync**, **Co-op** or your own mix of rules, then **Done**. The rules stay locked until you press Edit, so nothing changes by accident. See [Room rules](Room-Rules.md) for what each one does.
+You're the **room owner**: press **Edit room** to pick **Full sync**, **Co-op** or your own mix of rules, then **Done**. The rules stay locked until you press Edit, so nothing changes by accident. WW-Online remembers them: the next room you host starts with the rules you left this one on (only the rules; the room's items, story and bags come back from everyone's saves). See [Room rules](Room-Rules.md) for what each one does.
 
 ## Join a room
 
@@ -38,7 +38,7 @@ You see another player when you're in the same room of the same area. Out on the
 - **Appearance**: your clothes (game default, hero's tunic or pajamas), your tunic colour and your boat's colour. Everyone in the room sees changes live. **Show player names** turns the names above the other Links on or off, for your screen only.
 - **Dolphin**: the link to your game and your live stats. **Start game** starts it by hand; **Attach** links up with a Dolphin you started yourself.
 - **Tools**: local-only helpers (warp, stats, memory). They only affect your own game.
-- **Settings**: Dolphin, your game folders, [game patches](Game-Patches.md), item icons, updates and **Run setup again**.
+- **Settings**: Dolphin, your game folders, [game patches](Game-Patches.md), item icons, **Bug report** (your recent logs in one zip for an issue), updates and **Run setup again**.
 
 ## Stuck?
 

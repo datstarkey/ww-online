@@ -78,5 +78,5 @@ Health, magic, bomb and arrow counts, bottle contents, and Picto Box photos. The
 ## Joining a room
 
 - **Joining never throws away progress.** When the room is new, the owner's game fills it (its items, story, wallet and bags). Anyone who is further ahead than the room adds their progress to it when they join.
-- **The room owner** is the player who hosts the room. On a [dedicated server](../self-hosting.md#the-room-owner) it's the first player to join, or whoever enters the server's owner key. If the owner leaves, the player who joined earliest after them takes over.
-- **The room lives in the server's memory.** Restarting the server (or closing the host's app) empties it, but everyone's own game keeps its progress, and the room fills up again when players rejoin. Rule changes don't come back: the room starts again from its default rules.
+- **The room owner** is the player who hosts the room. A room you host starts with the rules you last left one on (the first time: every rule on). On a [dedicated server](../self-hosting.md#the-room-owner) it's the first player to join, or whoever enters the server's owner key. If the owner leaves, the player who joined earliest after them takes over.
+- **The room lives in the server's memory.** Restarting the server (or closing the host's app) empties it, but everyone's own game keeps its progress, and the room fills up again when players rejoin. A room hosted from the app starts again with the host's last rules; a dedicated server starts from its own settings.

@@ -176,6 +176,31 @@
                 </Grid>
             </Border>
 
+            <!-- Bug report -->
+            <Border Classes="ww-card" Padding="20,14">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                    <TextBlock Text="BUG REPORT" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="13"
+                               Foreground="{StaticResource Text2Brush}" Margin="0,0,12,0"
+                               Text="{Binding BugReportStatus, TargetNullValue='', FallbackValue=''}"
+                               IsVisible="{Binding BugReportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="13"
+                               Foreground="{StaticResource Text2Brush}" Margin="0,0,12,0"
+                               Text="Something went wrong? Save your recent logs to a zip and attach it to an issue."
+                               IsVisible="{Binding BugReportStatus, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                    <Button Grid.Column="2" Classes="ww-secondary" MinHeight="36" Padding="14,0" Margin="0,0,8,0"
+                            AutomationProperties.Name="Open the issues page"
+                            Command="{Binding OpenIssuesCommand}">
+                        <TextBlock Text="Report an issue" VerticalAlignment="Center" />
+                    </Button>
+                    <Button Grid.Column="3" Classes="ww-secondary" MinHeight="36" Padding="14,0"
+                            AutomationProperties.Name="Save bug report"
+                            Command="{Binding SaveBugReportCommand}">
+                        <TextBlock Text="Save bug report" VerticalAlignment="Center" />
+                    </Button>
+                </Grid>
+            </Border>
+
             <!-- About -->
             <Border Classes="ww-card" Padding="20,14">
                 <Grid ColumnDefinitions="Auto,*,Auto">

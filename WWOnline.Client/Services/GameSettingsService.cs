@@ -36,6 +36,12 @@ public class GameSettings
     /// Null = never chosen: use each patch's default. See OptionalPatchCatalogService.
     /// </summary>
     public List<string>? OptionalPatches { get; set; }
+
+    /// <summary>
+    /// The room rules this player last left a room they hosted on (Host a room starts the next one with them:
+    /// <see cref="HostedRoomRules"/>). Null = never hosted: every rule on. Only the rules, never the room's state.
+    /// </summary>
+    public WWOnline.Shared.Models.RoomSettings? HostedRoomRules { get; set; }
 }
 
 public class GameSettingsService

@@ -34,6 +34,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     private readonly GameLaunchService _gameLaunchService;
     private readonly PuppetSyncService _puppetSyncService;
     private readonly StartupOptions _startupOptions;
+    private readonly RoomSettingsService _roomSettings;
     private CancellationTokenSource? _gameStartCts;
     private Process? _serverProcess;
     private System.Timers.Timer? _diagnosticsTimer;
@@ -142,7 +143,8 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         GameSettingsService gameSettingsService,
         GameLaunchService gameLaunchService,
         PuppetSyncService puppetSyncService,
-        StartupOptions startupOptions)
+        StartupOptions startupOptions,
+        RoomSettingsService roomSettings)
     {
         _signalRClient = signalRClient;
         _dolphinService = dolphinService;
@@ -153,6 +155,8 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         _gameLaunchService = gameLaunchService;
         _puppetSyncService = puppetSyncService;
         _startupOptions = startupOptions;
+        _roomSettings = roomSettings;
+        _roomSettings.Changed += OnRoomRulesChanged;
 
         _dolphinService.ConnectionChanged += OnDolphinConnectionChanged;
         _signalRClient.PlayerJoined += OnPlayerJoined;
@@ -345,6 +349,21 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         Avalonia.Threading.Dispatcher.UIThread.Post(() => DolphinConnected = isConnected);
     }
 
+    /// <summary>While this app hosts the room and owns it, remember its rules for the next room it hosts.</summary>
+    private void OnRoomRulesChanged(RoomSettings rules)
+    {
+        if (ConnectionState != ConnectionState.Hosting || !_roomSettings.IsOwner) return;
+        try
+        {
+            var settings = _gameSettingsService.Load();
+            if (HostedRoomRules.SameRules(settings.HostedRoomRules, rules)) return;
+            settings.HostedRoomRules = HostedRoomRules.RulesOnly(rules);
+            _gameSettingsService.Save(settings);
+            Logger.Information("[room] saved the hosted room's rules for next time: {Rules}", rules.RulesSummary());
+        }
+        catch (Exception ex) { Logger.Warning(ex, "[room] couldn't save the hosted room's rules"); }
+    }
+
     private void SavePlayerName()
     {
         var settings = _gameSettingsService.Load();
@@ -407,7 +426,11 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
                 : Path.Combine(AppPaths.LogsDirectory, "server.log");
             // One-time token so THIS client becomes host even if another client connects first.
             var hostToken = Guid.NewGuid().ToString("N");
-            var serverArgs = $"{port} --log-file \"{serverLog}\" --host-token {hostToken}";
+            // The rules the host last left a hosted room on (null: never hosted, every rule on).
+            var savedRules = _gameSettingsService.Load().HostedRoomRules;
+            var serverArgs = $"{port} --log-file \"{serverLog}\" --host-token {hostToken}" + HostedRoomRules.ServerArgs(savedRules);
+            if (savedRules != null)
+                Logger.Information("[room] hosting with the rules last used: {Rules}", savedRules.RulesSummary());
 
             _serverProcess = new Process
             {
@@ -611,6 +634,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
         _disposed = true;
 
         _dolphinService.ConnectionChanged -= OnDolphinConnectionChanged;
+        _roomSettings.Changed -= OnRoomRulesChanged;
         _signalRClient.PlayerJoined -= OnPlayerJoined;
         _signalRClient.PlayerLeft -= OnPlayerLeft;
         _signalRClient.PlayerGameStateReceived -= OnRemoteGameState;

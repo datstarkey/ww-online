@@ -41,4 +41,4 @@ If you get stuck and warping doesn't help, or you find a softlock that isn't lis
 - where you were (island or dungeon and room) and what you were trying to do;
 - what the other players had just done (who talked to whom, who opened what);
 - the room's rules (Full sync, Co-op or which rules were on);
-- your client log, and the other players' if you can: `%LocalAppData%\WWOnline\logs`, or `logs/latest/` in a dev test (its `client-Player<N>.log` has the `[story]`, `[world]` and `[warp]` lines).
+- your bug report (**Settings → Bug report → Save bug report** zips your logs), and the other players' if you can; or the logs themselves: `%LocalAppData%\WWOnline\logs`, or `logs/latest/` in a dev test (its `client-Player<N>.log` has the `[story]`, `[world]` and `[warp]` lines).
