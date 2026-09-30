@@ -5,8 +5,9 @@ Players choose which quality-of-life patches go into their patched game. The pat
 [wwrando](https://github.com/LagoLunatic/wwrando) (LagoLunatic). Both are MIT, credited in each
 patch file and in `THIRD_PARTY_NOTICES.md`.
 
-Required patches (`use_extra_memory`, the generated `link_draw_hook`) are always applied and are not
-in this list.
+Required patches (`use_extra_memory`, `seachart_players` and the generated `link_draw_hook`) are always
+applied and are not in this list. This page is the developer view; the player-facing list is the wiki's
+Game patches page, generated from the same headers by `scripts/build-wiki.py`.
 
 ## How it works
 
@@ -75,9 +76,11 @@ the THP videos), so turning a patch off really undoes it. The client fallback do
 
 **Free space.** `free_space_start_offsets.txt` now starts main.dol free space at `0x803FD200`
 (`SCRATCH_REGION_END`), so `@NextFreeSpace` code lands after our scratch block instead of on top of
-it. When a selected patch uses free space, `DolPatcher` adds the Text2 section from `0x803FCFA8`,
+it. When any applied patch uses free space, `DolPatcher` adds the Text2 section from `0x803FCFA8`,
 which covers the scratch block (loaded as zeros), and moves the boot-thread stack above the code,
-the way wwrando does. `AssemblePatchesStep` and a test both enforce the start address.
+the way wwrando does. `AssemblePatchesStep` and a test both enforce the start address. Since 0.5.0 the
+required `seachart_players` patch always has code there, so every patched game has Text2 and the moved
+stack, whatever the selection.
 
 The resulting layout (verified against the vanilla DOL; `puppet_shared.h` documents it too):
 
@@ -89,9 +92,11 @@ The resulting layout (verified against the vanilla DOL; `puppet_shared.h` docume
 | code end (8-aligned) + 0x10000 | boot-thread stack. `_stack_end` (the `0xDEADBABE` magic word) is just past the code, and `_stack_addr` (initial r1) is 0x10000 above it |
 | stack top rounded up to 32 | arena start (`_db_stack_end` in `OSInit`). The vanilla fallback `__ArenaLo` 0x8040EFC0 stays above the stack; `DolPatcher` refuses a layout that would pass it |
 
-With the defaults, the code ends at `0x803FD444`, so the stack is `0x803FD448..0x8040D448` and the
-arena starts at `0x8040D460` (vanilla: `0x8040CFC0`). With every free-space patch, the stack moves
-to `0x803FD5F8..0x8040D5F8`. The patched instructions are `__init_registers` (r1), `__OSThreadInit`
+Measured before 0.5.0 (without `seachart_players`): with the defaults the code ended at `0x803FD444`,
+so the stack was `0x803FD448..0x8040D448` and the arena started at `0x8040D460` (vanilla:
+`0x8040CFC0`); with every free-space patch the stack moved to `0x803FD5F8..0x8040D5F8`. The sea chart
+patch's code moves these up a little more; `DolPatcher` refuses any layout whose stack would pass
+`__ArenaLo`. The patched instructions are `__init_registers` (r1), `__OSThreadInit`
 (stack base/end), `OSInit` (`_db_stack_end`) and `InitMetroTRK` (unused). A scan of the vanilla DOL
 found no other reference to the old stack bounds.
 
@@ -184,13 +189,11 @@ off if it misbehaves.
 | Arrow field-model pointers, custom text commands, new-game save init, progressive items | — | a | not ported: randomizer-only (the save init is a no-op with 0 starting shards) |
 | Fast treasure chests | — | b | not ported: commented out in betterww |
 
-**Multiplayer impact of the defaults.** The default selection is skip_intro plus the bug fixes. It
-now places a few hundred bytes of helper code in main.dol free space. That adds the Text2 section
-and moves the boot-thread stack (and the start of the heap arena) up by 0x4A0 bytes, or 0x650 with
-every free-space patch (see Free space above). The scratch region stays at its fixed addresses and
-is no longer part of any stack. Before the first multiplayer session on a new build, do one test run
-(`scripts\dev-test.ps1 -Patch`) to confirm puppets still spawn. If it misbehaves, try
-`-Patches skip_intro`, which uses no free space and matches the old build.
+**Multiplayer impact of the defaults.** The default selection is skip_intro plus the bug fixes, which
+place a few hundred bytes of helper code in main.dol free space, next to the required sea chart
+patch's. That moves the boot-thread stack (and the start of the heap arena) up by about 0x4A0 bytes
+more than the required patches alone, or 0x650 with every free-space patch (before 0.5.0 figures; see
+Free space above). The scratch region stays at its fixed addresses and is no longer part of any stack.
 
 ## Not yet
 

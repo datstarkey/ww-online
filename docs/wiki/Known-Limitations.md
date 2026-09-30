@@ -20,6 +20,8 @@ WW-Online is in early development. These are the known gaps; the [releases](http
 - Two players opening the same chest at the same moment can both get its contents.
 - A warp jar whose lid is still on screen when another player opens it updates when you next enter that room (the jar itself works straight away).
 - Items that only reached you from another player (bait, spoils, delivery items) count as obtained, so you won't see their first-pickup message later.
+- Two players reading the same waiting letter at the same moment both get its reward (rupees twice).
+- Two players buying from Beedle at the very same moment can lose a point card point between them.
 
 ## Warping
 
