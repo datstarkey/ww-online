@@ -81,6 +81,8 @@
 /* dKy_tevstr_c (d_kankyo.h) */
 #define TEVSTR_OFF_ROOM_NO        0xA9  /* s8 mRoomNo */
 #define TEVSTR_OFF_ENVR_OVERRIDE  0xAA  /* u8 mEnvrIdxOverride */
+#define TEVSTR_NO_OVERRIDE        0xFF  /* mEnvrIdxOverride: none (settingTevStruct, d_kankyo.cpp:1382) */
+#define BOAT_MAX_ROOMS            64    /* dStage_roomControl_c::mStatus[64] (d_stage.h:926) */
 
 /* Motion */
 #define BOAT_MAX_PREDICT_FRAMES   10         /* stop extrapolating a stalled sample after this */
@@ -1205,16 +1207,17 @@ void puppet_boatExecute(fopAc_ac_c *actor, PuppetBoat *boat, u32 slotIndex)
 
   boat->visible = 0;
 
-  if (slotIndex >= PUPPET_MAX_SLOTS || *(volatile u32 *)PUPPET_SYNC_BASE != PUPPET_SYNC_MAGIC ||
-      *(volatile u32 *)(PUPPET_SLOT_BASE(slotIndex) + PUPPET_SLOT_OFF_ACTIVE) == 0)
+  if (slotIndex >= PUPPET_MAX_SLOTS || *(volatile u32 *)PUPPET_SYNC_BASE != PUPPET_SYNC_MAGIC)
   {
     boat->hasPose = 0;
     return;
   }
 
+  // An inactive slot (the puppet parked) still shows a parked boat: C# judges it by the boat's own place.
   base = PUPPET_BOAT_BASE(slotIndex);
   flags = *(volatile u32 *)(base + PUPPET_BOAT_OFF_FLAGS);
-  if ((flags & PUPPET_BOAT_FLAG_ACTIVE) == 0)
+  if ((flags & PUPPET_BOAT_FLAG_ACTIVE) == 0 ||
+      (*(volatile u32 *)(PUPPET_SLOT_BASE(slotIndex) + PUPPET_SLOT_OFF_ACTIVE) == 0 && (flags & PUPPET_BOAT_FLAG_PARKED) == 0))
   {
     boat->hasPose = 0;
     return;
@@ -1306,6 +1309,7 @@ void puppet_boatExecute(fopAc_ac_c *actor, PuppetBoat *boat, u32 slotIndex)
   boat_sailExecute(boat, base, flags, slotIndex);
   boat_hullColor(boat, slotIndex);
   boat->parked = (flags & PUPPET_BOAT_FLAG_PARKED) != 0;
+  boat->room = (s8)((flags >> PUPPET_BOAT_ROOM_SHIFT) & PUPPET_BOAT_ROOM_MASK);
 
   boat->hasPose = 1;
   boat->visible = 1;
@@ -1363,9 +1367,18 @@ void puppet_boatDraw(fopAc_ac_c *actor, PuppetBoat *boat)
 
   // Light it for the room below. On open water daShip_c has no ground and uses the stay room
   // (setRoomInfo, d_a_ship.cpp:3081-3092); the puppet's own setRoomInfo keeps its tevStr on
-  // the room under it, which is the same place.
-  tev[TEVSTR_OFF_ROOM_NO] = actorTev[TEVSTR_OFF_ROOM_NO];
-  tev[TEVSTR_OFF_ENVR_OVERRIDE] = actorTev[TEVSTR_OFF_ENVR_OVERRIDE];
+  // the room under it, which is the same place. A parked boat is in its own room, with no poly colour
+  // override (its puppet may be anywhere, or parked with a stale tevStr).
+  if (boat->parked && boat->room >= 0 && boat->room < BOAT_MAX_ROOMS)
+  {
+    tev[TEVSTR_OFF_ROOM_NO] = (u8)boat->room;
+    tev[TEVSTR_OFF_ENVR_OVERRIDE] = TEVSTR_NO_OVERRIDE;
+  }
+  else
+  {
+    tev[TEVSTR_OFF_ROOM_NO] = actorTev[TEVSTR_OFF_ROOM_NO];
+    tev[TEVSTR_OFF_ENVR_OVERRIDE] = actorTev[TEVSTR_OFF_ENVR_OVERRIDE];
+  }
 
   // daShip_c::draw (d_a_ship.cpp:253-317): hull, head and the part that's out.
   dScnKy_env_light_c__settingTevStruct(&g_env_light, settingTevStruct__LightType__Actor,
@@ -1385,7 +1398,8 @@ void puppet_boatDraw(fopAc_ac_c *actor, PuppetBoat *boat)
 
 /* dComIfG_resDelete for a phase we may have started; resDelete asserts mid-load, so a reference
  * taken while loading is never dropped and that archive stays loaded for the session (harmless at
- * sea, where d_s_play preloads "Ship"; "Cloth" is tiny). */
+ * sea, where d_s_play preloads "Ship", and C# shows a parked boat off the sea only where the local ship is too;
+ * "Cloth" is tiny). */
 static void boat_releaseRes(request_of_phase_process_class *phase, char *name)
 {
   if (phase->mStep == BOAT_PHASE_LOADED)

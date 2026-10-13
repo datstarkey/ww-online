@@ -29,6 +29,7 @@ public class PuppetSyncService : IDisposable
     private float _lastLocalY;
     private float _lastLocalZ;
     private readonly ConcurrentDictionary<string, bool> _lastSlotVisibility = new();
+    private readonly ConcurrentDictionary<string, bool> _lastParkedBoatVisibility = new();
     private System.Timers.Timer? _syncTimer;
     private CancellationTokenSource? _broadcastCts;
     private int _writeCounter;
@@ -233,6 +234,7 @@ public class PuppetSyncService : IDisposable
         _remotePuppets.Clear();
         _lastPuppetReceive.Clear();
         _lastSlotVisibility.Clear();
+        _lastParkedBoatVisibility.Clear();
 
         if (!_dolphin.IsConnected)
             return;
@@ -310,7 +312,8 @@ public class PuppetSyncService : IDisposable
 
     /// <summary>A riding peer's boat FLAGS word (PUPPET_BOAT_OFF_FLAGS).</summary>
     public static uint BoatFlags(BoatState boat) =>
-        PuppetLayout.PUPPET_BOAT_FLAG_ACTIVE
+        (uint)boat.RoomNumber << PuppetLayout.PUPPET_BOAT_ROOM_SHIFT
+        | PuppetLayout.PUPPET_BOAT_FLAG_ACTIVE
         | (boat.Parked ? PuppetLayout.PUPPET_BOAT_FLAG_PARKED : 0u)
         | (boat.Flying ? PuppetLayout.PUPPET_BOAT_FLAG_FLY : 0u)
         | (boat.MastRaised ? PuppetLayout.PUPPET_BOAT_FLAG_MAST_ON : 0u)
@@ -517,6 +520,7 @@ public class PuppetSyncService : IDisposable
         _remotePuppets.TryRemove(playerId, out _);
         _lastPuppetReceive.TryRemove(playerId, out _);
         _lastSlotVisibility.TryRemove(playerId, out _);
+        _lastParkedBoatVisibility.TryRemove(playerId, out _);
         _playerNames.TryRemove(playerId, out _);
 
         if (_dolphin.IsConnected)
@@ -801,8 +805,7 @@ public class PuppetSyncService : IDisposable
             // A pending scene change (play.mNextStage.mEnable) counts as unstable: a sea-to-sea
             // reload (Ballad of Gales, cyclone, game-over restart) keeps the stage name and a room
             // change there isn't a scene change (PuppetVisibility), so this is what catches it.
-            var nextStage = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.NextStageEnable, 1);
-            bool stageChangePending = nextStage != null && nextStage.Length > 0 && nextStage[0] != 0;
+            bool stageChangePending = StageChangePending();
 
             bool stable = linkAlive && !string.IsNullOrEmpty(localStage) && !stageChangePending;
             bool sceneChanged = stable && _hadStableScene &&
@@ -876,6 +879,9 @@ public class PuppetSyncService : IDisposable
 
             int highestActiveSlot = -1;
             DateTime now = DateTime.UtcNow;
+            uint localShip = LocalShip(ReadCurProc(linkPtr!.Value), out _);
+            bool localShipHere = localShip != 0;
+            Vector3? localShipPos = localShipHere ? ReadVector3(localShip + GameMemoryAddresses.Sea.ShipOffsetPosX) : null;
 
             // Per-slot check diagnostics — written to scratch BSS so the UI can show
             // WHERE in the visibility chain we're dropping. Each bit is a gate that
@@ -930,6 +936,23 @@ public class PuppetSyncService : IDisposable
                             fresh, puppet.StageName, puppet.RoomNumber, localStage, localRoom);
                     _lastSlotVisibility[playerId] = sameLocation;
 
+                    // A parked boat is seen where it is, whether its player is or not.
+                    bool boatHadVisibility = _lastParkedBoatVisibility.TryGetValue(playerId, out var boatWasVisible);
+                    bool parkedBoatShown = fresh && ParkedBoatInSight(localStage, localRoom, _lastLocalX, _lastLocalZ,
+                        puppet.StageName, puppet.Boat, localShipPos, boatHadVisibility && boatWasVisible);
+                    if (boatHadVisibility ? boatWasVisible != parkedBoatShown : parkedBoatShown)
+                        Logger.Information("[puppet] slot {Slot} ({Player}) parked boat visible {Old} -> {New} (room {Room})",
+                            i, ShortId(playerId), boatHadVisibility ? boatWasVisible : (bool?)null, parkedBoatShown,
+                            puppet.Boat?.RoomNumber);
+                    _lastParkedBoatVisibility[playerId] = parkedBoatShown;
+                    if (parkedBoatShown && !sameLocation)
+                    {
+                        // Only the boat: the slot stays inactive (the puppet parked), the REL draws the boat.
+                        highestActiveSlot = i;
+                        WriteSlotLook(slotData, puppet.Appearance);
+                        slotBoat = puppet.Boat;
+                    }
+
                     if (sameLocation)
                     {
                         highestActiveSlot = i;
@@ -962,12 +985,7 @@ public class PuppetSyncService : IDisposable
                         slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ProcSeq] = puppet.Action.ProcSeq;
                         WriteBigEndianU16(slotData, GameMemoryAddresses.PuppetSync.SlotOffset_SeqNum, 0);
 
-                        // Appearance data
-                        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ClothesType] = puppet.Appearance.ClothesType;
-                        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorR] = puppet.Appearance.ColorR;
-                        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorG] = puppet.Appearance.ColorG;
-                        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorB] = puppet.Appearance.ColorB;
-                        WriteBigEndianU16(slotData, PuppetLayout.PUPPET_SLOT_OFF_BOAT_COLOR, BoatColor565(puppet.Appearance));
+                        WriteSlotLook(slotData, puppet.Appearance);
 
                         // v2 extended state — full animation-relevant Link fields.
                         WriteBigEndianFloat(slotData, GameMemoryAddresses.PuppetSync.SlotOffset_SpeedF,         puppet.Action.SpeedF);
@@ -985,7 +1003,7 @@ public class PuppetSyncService : IDisposable
                         slotData[GameMemoryAddresses.PuppetSync.SlotOffset_GrabFuse] =
                             grabKind == PuppetLayout.PUPPET_GRAB_KIND_BOMB ? puppet.Equipment.GrabFuse : (byte)0;
 
-                        slotBoat = puppet.Boat;
+                        slotBoat = puppet.Boat is { Parked: true } && !parkedBoatShown ? null : puppet.Boat;
                         _anmEntries[i] = AnimEntry(i, puppet, slotData[GameMemoryAddresses.PuppetSync.SlotOffset_CurProc]);
                     }
                 }
@@ -1017,7 +1035,7 @@ public class PuppetSyncService : IDisposable
 
             int desiredCount = highestActiveSlot + 1;
             if (_despawnWorker.IsNeeded(_dolphin) | _liveWorld.IsNeeded(_dolphin) | LocalLookNeedsRel(linkPtr!.Value, localLook) |
-                chartNeedsRel | BoatLookNeedsRel(localStage, ReadCurProc(linkPtr.Value), localLook))
+                chartNeedsRel | BoatLookNeedsRel(localStage, localShipHere, localLook))
                 desiredCount = Math.Max(desiredCount, 1);
             WriteSyncHeader(GameMemoryAddresses.PuppetSync.Magic, desiredCount);
 
@@ -1096,7 +1114,7 @@ public class PuppetSyncService : IDisposable
     /// Does the local boat need the puppet REL to show the local player's boat and tunic colours
     /// (<see cref="Services.LocalBoatLook"/>)? Logs each change of verdict.
     /// </summary>
-    private bool BoatLookNeedsRel(string stage, byte curProc, AppearanceState want)
+    private bool BoatLookNeedsRel(string stage, bool localShip, AppearanceState want)
     {
         ushort hull = BoatColor565(want);
         uint sail = Services.LocalBoatLook.SailRgb(want);
@@ -1107,7 +1125,7 @@ public class PuppetSyncService : IDisposable
             _boatLookGaveUp = false;
         }
 
-        bool needs = Services.LocalBoatLook.Publish(_dolphin, LocalShip(curProc, stage, out _) != 0, hull, sail);
+        bool needs = Services.LocalBoatLook.Publish(_dolphin, localShip, hull, sail);
         if (!needs)
         {
             _boatLookNeedSince = null;
@@ -1293,19 +1311,18 @@ public class PuppetSyncService : IDisposable
     }
 
     /// <summary>
-    /// The local daShip_c, else 0: while Link rides it, or (not aboard) a live daShip_c on the sea stage, the
-    /// boat left there (play.mpPlayerPtr[2] isn't cleared when a stage without the boat loads). Riding is the
-    /// SHIP_RIDE status bit OR a ship proc: the REL zeroes the status words while a puppet executes
+    /// The local daShip_c, else 0: while Link rides it, or (not aboard) the boat he left in this stage, on the sea
+    /// or wherever it sails (Tower of the Gods). play.mpPlayerPtr[2] is cleared with every stage change
+    /// (dScnPly_Delete -> dComIfGp_init, d_s_play.cpp:1136), and not aboard it must still be a daShip_c. Riding is
+    /// the SHIP_RIDE status bit OR a ship proc: the REL zeroes the status words while a puppet executes
     /// (puppet_execute.c guard), so a status read can land mid-puppet and miss the bit.
     /// </summary>
-    private uint LocalShip(byte curProc, string stageName, out bool riding)
+    private uint LocalShip(byte curProc, out bool riding)
     {
         uint status0 = ReadBigEndianU32FromAddress(GameMemoryAddresses.Player.PlayerStatusBitfield0.Address);
         riding = (status0 & GameMemoryAddresses.Sea.PlayerStatus0ShipRide) != 0
                  || curProc is >= GameMemoryAddresses.Sea.ProcShipFirst and <= GameMemoryAddresses.Sea.ProcShipLast
                  || curProc == GameMemoryAddresses.Sea.ProcDemoShipSit;
-        if (!riding && stageName != GameMemoryAddresses.Sea.SeaStageName)
-            return 0;
         uint ship = ReadPointer(GameMemoryAddresses.Sea.ShipActorPtr);
         if (ship == 0 ||
             (!riding && ReadBigEndianU16FromAddress(ship + GameMemoryAddresses.Sea.ActorOffsetProcName) != GameMemoryAddresses.Sea.ProcNameShip))
@@ -1313,11 +1330,49 @@ public class PuppetSyncService : IDisposable
         return ship;
     }
 
-    /// <summary>The local King of Red Lions (<see cref="LocalShip"/>): ridden, or parked on the Great Sea; else null.</summary>
+    /// <summary>A slot's look: outfit, tunic colour (the sail too) and hull colour.</summary>
+    private static void WriteSlotLook(byte[] slotData, AppearanceState look)
+    {
+        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ClothesType] = look.ClothesType;
+        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorR] = look.ColorR;
+        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorG] = look.ColorG;
+        slotData[GameMemoryAddresses.PuppetSync.SlotOffset_ColorB] = look.ColorB;
+        WriteBigEndianU16(slotData, PuppetLayout.PUPPET_SLOT_OFF_BOAT_COLOR, BoatColor565(look));
+    }
+
+    /// <summary>A peer's parked boat this close to the local ship is the same docked KoRL (scripted stages put
+    /// everyone's at one spot): not drawn twice.</summary>
+    public const float SameBoatDistance = 300f;
+
+    /// <summary>
+    /// Is a peer's parked boat in sight: in this stage, and in this room (on the sea: within sight, like a
+    /// puppet, <see cref="PuppetVisibility"/>), judged by the boat's own place. Off the sea only where the local
+    /// game has its own boat too (<paramref name="localShipPos"/>), so the "Ship" archive is already loaded there;
+    /// never on top of the local ship.
+    /// </summary>
+    public static bool ParkedBoatInSight(string localStage, byte localRoom, float localX, float localZ,
+                                         string? peerStage, BoatState? boat, Vector3? localShipPos, bool wasVisible)
+    {
+        if (boat is not { Parked: true } || (localShipPos == null && !PuppetVisibility.IsSea(localStage)))
+            return false;
+        if (localShipPos != null && boat.Position != null)
+        {
+            float dx = boat.Position.X - localShipPos.X, dz = boat.Position.Z - localShipPos.Z;
+            if (dx * dx + dz * dz < SameBoatDistance * SameBoatDistance)
+                return false;
+        }
+        return PuppetVisibility.IsSameLocation(localStage, localRoom, localX, localZ, peerStage, boat.RoomNumber,
+                                               boat.Position, wasVisible);
+    }
+
+    /// <summary>The local King of Red Lions (<see cref="LocalShip"/>): ridden, or parked; else null, also for a
+    /// parked one while a stage change is pending (it may already be freed: play.mpPlayerPtr[2] is only cleared
+    /// after). Its room: on the sea the square it's in (daShip_c keeps its player's stay room on open water,
+    /// d_a_ship.cpp:3088-3094), else current.roomNo.</summary>
     private BoatState? ReadLocalBoat(byte curProc, string stageName)
     {
-        uint ship = LocalShip(curProc, stageName, out bool riding);
-        if (ship == 0)
+        uint ship = LocalShip(curProc, out bool riding);
+        if (ship == 0 || (!riding && StageChangePending()))
             return null;
 
         var boat = new BoatState
@@ -1333,6 +1388,10 @@ public class PuppetSyncService : IDisposable
             Parked = !riding,
         };
         if (boat.Parked) boat.SpeedF = 0; // drifting to a stop: no prediction on the receiver
+        byte room = stageName == GameMemoryAddresses.Sea.SeaStageName
+            ? PuppetVisibility.SeaRoom(boat.Position.X, boat.Position.Z)
+            : ReadU8(ship + GameMemoryAddresses.Warp.ActorOffRoomNo);
+        boat.RoomNumber = room <= BoatState.MaxRoom ? room : (byte)0; // current.roomNo -1: none
         ReadLocalBoatPose(ship, boat);
         return boat.IsValid() ? boat : null;
     }
@@ -1485,6 +1544,19 @@ public class PuppetSyncService : IDisposable
         byte[]? bytes = _dolphin.ReadMemory(address, 4);
         return bytes == null ? 0u : ReadBigEndianU32(bytes, 0);
     }
+
+    /// <summary>play.mNextStage.mEnable: a stage change (or a sea-to-sea reload) is on its way.</summary>
+    private bool StageChangePending() => ReadU8(GameMemoryAddresses.WorldFlags.NextStageEnable) != 0;
+
+    private byte ReadU8(uint address) => _dolphin.ReadMemory(address, 1) is { Length: 1 } b ? b[0] : (byte)0;
+
+    /// <summary>A big-endian cXyz, or null if unreadable.</summary>
+    private Vector3? ReadVector3(uint address) =>
+        _dolphin.ReadMemory(address, 12) is { Length: 12 } b
+            ? new Vector3 { X = BigEndianF32(b, 0), Y = BigEndianF32(b, 4), Z = BigEndianF32(b, 8) }
+            : null;
+
+    private static float BigEndianF32(byte[] b, int o) => BitConverter.UInt32BitsToSingle(ReadBigEndianU32(b, o));
 
     /// <summary>Read a big-endian u16 from an absolute GameCube memory address.</summary>
     private ushort ReadBigEndianU16FromAddress(uint address)

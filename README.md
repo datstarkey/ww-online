@@ -45,7 +45,7 @@
 - They hold and use their items: bow (with aim), boomerang, hookshot, Deku Leaf, Skull Hammer, Wind Waker, bottles, telescope, Picto Box, Tingle Tuner, and a carried bomb with a burning fuse.
 - Each player picks their own tunic colour (black Link, purple Link, anything), and everyone sees it change live.
 - Player names above heads: each player's name floats above their Link, in the game's own font. It shrinks with distance and hides in cutscenes and menus (turn it off under **Appearance**).
-- Out on the Great Sea you see each other sailing in your own King of Red Lions, with the sail in their tunic colour, and their cannon or salvage crane when they take it out. Get off your boat and the others still see it parked where you left it. Each player picks their boat's colour (it matches their tunic by default).
+- Out on the Great Sea you see each other sailing in your own King of Red Lions, with the sail in their tunic colour, and their cannon or salvage crane when they take it out. Get off your boat and the others still see it parked where you left it (on the sea and in Tower of the Gods). Each player picks their boat's colour (it matches their tunic by default).
 - Everyone on the Great Sea shows up on your sea chart in the pause menu, in their tunic colour and pointing the way they face, even when they're too far away to see.
 - You see up to three other players at once.
 

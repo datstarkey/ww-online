@@ -596,15 +596,18 @@ int daPuppet_Draw(PUPPET_class *this)
   puppet_liveworld_draw(); // create-only actors catch up; after all executes (see puppet_liveworld.h)
   // Parked this frame (execute skipped the model calc): never draw, even if C# flipped the
   // slot ACTIVE between our execute and this draw.
+  // Either way, the peer's parked boat may still be in sight (posed by this frame's execute).
   if (this->parked)
   {
     daPy_lk_c__offBodyEffect(&this->parent);
+    puppet_boatDraw((fopAc_ac_c *)&this->parent, &this->boat);
     return 1;
   }
   // Slot gone inactive between execute and draw: nothing to draw (puppet_drawBody would bail too).
   if (puppet_slotIsParked(this->slotIndex))
   {
     daPy_lk_c__offBodyEffect(&this->parent);
+    puppet_boatDraw((fopAc_ac_c *)&this->parent, &this->boat);
     return 1;
   }
   // The puppet's own animators in the shared model data for its entries only (puppet_sharedanm.h).
@@ -645,8 +648,8 @@ int daPuppet_Execute(PUPPET_class *this)
       puppet_parkEnter(link);
       this->parked = 1;
     }
-    this->boat.visible = 0;
     puppet_parkTick(link);
+    puppet_boatExecute((fopAc_ac_c *)link, &this->boat, this->slotIndex); // a parked boat in sight, else hidden
     return 1;
   }
   if (this->parked)

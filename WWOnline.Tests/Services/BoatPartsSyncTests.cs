@@ -129,6 +129,63 @@ public class BoatPartsSyncTests
         Assert.NotEqual(0u, parked & PuppetLayout.PUPPET_BOAT_FLAG_ACTIVE); // still drawn
     }
 
+    [Fact]
+    public void Flags_CarryTheBoatsRoom()
+    {
+        uint flags = PuppetSyncService.BoatFlags(new BoatState { Parked = true, RoomNumber = 0xC5, HeadBck = 0x0E });
+        Assert.Equal(0xC5u, (flags >> PuppetLayout.PUPPET_BOAT_ROOM_SHIFT) & PuppetLayout.PUPPET_BOAT_ROOM_MASK);
+        Assert.Equal(0x0Eu, (flags >> PuppetLayout.PUPPET_BOAT_HEAD_BCK_SHIFT) & PuppetLayout.PUPPET_BOAT_HEAD_BCK_MASK);
+    }
+
+    private static BoatState Parked(float x, float z, byte room) =>
+        new() { Parked = true, RoomNumber = room, Position = new Vector3 { X = x, Z = z } };
+
+    private static readonly Vector3 Far = new() { X = 1.0e5f, Z = 1.0e5f }; // a local ship nowhere near
+
+    [Fact]
+    public void ParkedBoat_AtSea_IsSeenByItsOwnPlace()
+    {
+        // Beside the boat: seen, wherever its player went.
+        Assert.True(PuppetSyncService.ParkedBoatInSight("sea", 10, 0, 0, "sea", Parked(5000, 0, 12), null, false));
+        // Far from the boat: not seen.
+        Assert.False(PuppetSyncService.ParkedBoatInSight("sea", 10, 0, 0, "sea", Parked(90000, 0, 11), null, false));
+        // A ridden boat goes with its player instead.
+        Assert.False(PuppetSyncService.ParkedBoatInSight("sea", 10, 0, 0, "sea",
+            new BoatState { Position = new Vector3() }, null, false));
+    }
+
+    [Fact]
+    public void ParkedBoat_OffTheSea_InItsRoom_WhereTheLocalBoatIsToo()
+    {
+        Assert.True(PuppetSyncService.ParkedBoatInSight("Siren", 3, 0, 0, "Siren", Parked(0, 0, 3), Far, false));
+        Assert.False(PuppetSyncService.ParkedBoatInSight("Siren", 4, 0, 0, "Siren", Parked(0, 0, 3), Far, false));
+        Assert.False(PuppetSyncService.ParkedBoatInSight("Siren", 3, 0, 0, "Siren", Parked(0, 0, 3), null, false));
+        Assert.False(PuppetSyncService.ParkedBoatInSight("Siren", 3, 0, 0, "sea", Parked(0, 0, 3), Far, false));
+    }
+
+    [Fact]
+    public void ParkedBoat_OnTopOfTheLocalShip_IsTheSameDockedBoat()
+    {
+        var here = new Vector3 { X = 100, Z = -100 };
+        Assert.False(PuppetSyncService.ParkedBoatInSight("Hyrule", 0, 0, 0, "Hyrule", Parked(150, -50, 0), here, false));
+        Assert.True(PuppetSyncService.ParkedBoatInSight("Hyrule", 0, 0, 0, "Hyrule", Parked(2000, -50, 0), here, false));
+    }
+
+    [Theory]
+    [InlineData(100000f, 9740f, 26)]       // logged: Link at sea:26
+    [InlineData(-225030f, 325018f, 44)]    // logged: a player at sea:44
+    [InlineData(-350000f, -350000f, 1)]    // the north-west corner
+    [InlineData(900000f, 900000f, 49)]     // past the edge: clamped like point2Grid
+    public void SeaRoom_IsTheGridSquare(float x, float z, int room) =>
+        Assert.Equal(room, PuppetVisibility.SeaRoom(x, z));
+
+    [Fact]
+    public void BoatRoom_PastTheStagesRooms_IsInvalid()
+    {
+        Assert.True(new BoatState { RoomNumber = BoatState.MaxRoom }.IsValid());
+        Assert.False(new BoatState { RoomNumber = BoatState.MaxRoom + 1 }.IsValid());
+    }
+
     [Theory]
     [InlineData(0, 0, 0, 0x0000)]       // classic red
     [InlineData(255, 255, 255, 0xFFFF)]
