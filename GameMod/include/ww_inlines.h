@@ -540,6 +540,9 @@ static inline daPy_ProcFunc dapy_lk_getCurProcFunc(daPy_lk_c *link)
 // (d_resorce.h) — what dComIfG_getObjectRes(arc, idx) passes to dRes_control_c::getRes.
 #define GAMEINFO_RES_OBJECT_INFO(gameInfo) ((dRes_info_c*)((u8*)(gameInfo) + 0x1BFC0))
 #define GAMEINFO_RES_OBJECT_INFO_COUNT    64
+// dRes_info_c (d_resorce.h, size 0x24)
+#define DRES_INFO_ARCHIVE(info)           (*(void**)((u8*)(info) + 0x14))   // JKRArchive* mpArchive: NULL while mounting
+#define DRES_INFO_RES(info)               (*(void***)((u8*)(info) + 0x20))  // void** mRes: the archive's resources by index
 // play.mEvtManager (0x12A0+0x402C) .mException (+0x24): dEvent_exception_c {s32 mEventInfoIdx; s32 field_0x4; s32 mState;}
 // — the global "start demo" record written by dComIfGp_evmng_startDemo (d_event_manager.cpp setStartDemo).
 #define GAMEINFO_EVT_EXCEPTION(gameInfo)  ((u32*)((u8*)(gameInfo) + 0x52F0))

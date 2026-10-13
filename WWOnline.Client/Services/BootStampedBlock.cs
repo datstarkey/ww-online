@@ -22,9 +22,12 @@ public static class BootStampedBlock
     /// <summary>
     /// The block published at <paramref name="pointerAddress"/> and its current bytes, or null when there
     /// is no usable block: no REL since boot, a bad pointer or magic, or a block from an earlier boot.
+    /// Only the first <paramref name="readSize"/> bytes (default: all) are read.
     /// </summary>
-    public static (uint Address, byte[] Contents)? Read(IDolphinService dolphin, uint pointerAddress, uint magic, int size)
+    public static (uint Address, byte[] Contents)? Read(IDolphinService dolphin, uint pointerAddress, uint magic, int size,
+        int? readSize = null)
     {
+        int read = readSize ?? size;
         var ptr = dolphin.ReadMemory(pointerAddress, 4);
         if (ptr is not { Length: 4 })
             return null;
@@ -32,8 +35,8 @@ public static class BootStampedBlock
         if (!IsValidAddress(block, size))
             return null;
 
-        var contents = dolphin.ReadMemory(block, size);
-        if (contents == null || contents.Length != size || ReadU32(contents, 0) != magic)
+        var contents = dolphin.ReadMemory(block, read);
+        if (contents == null || contents.Length != read || ReadU32(contents, 0) != magic)
             return null;
 
         var bootTime = GameMemoryAddresses.System.OSStartTime;

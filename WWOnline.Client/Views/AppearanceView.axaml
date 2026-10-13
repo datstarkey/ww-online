@@ -220,7 +220,7 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
 
-                            <TextBlock Text="The red of your King of Red Lions, as the other players see it (sailing or parked). Match tunic uses your tunic colour, like the sail. Your own boat stays red on your screen."
+                            <TextBlock Text="The red of your King of Red Lions, as the other players see it (sailing or parked). Match tunic uses your tunic colour, like the sail. Your own boat shows it too."
                                        FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource Text2Brush}" />
                         </StackPanel>
                     </Border>

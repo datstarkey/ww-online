@@ -67,8 +67,8 @@ static u8 *puppet_bootBlock(u32 ptrAddr, u32 magic, u32 size)
   return (u8 *)a;
 }
 
-/* Adopt the block at ptrAddr, or allocate a zeroed one, stamp it and publish it there. */
-static void puppet_bootBlockCreate(u32 ptrAddr, u32 magic, u32 size)
+/* Adopt the block at ptrAddr, or allocate a zeroed one aligned to align bytes, stamp it and publish it there. */
+static void puppet_bootBlockCreateAligned(u32 ptrAddr, u32 magic, u32 size, int align)
 {
   if (puppet_bootBlock(ptrAddr, magic, size))
     return;
@@ -77,7 +77,7 @@ static void puppet_bootBlockCreate(u32 ptrAddr, u32 magic, u32 size)
   /* From the heap's tail (negative alignment, JKRExpHeap::do_alloc JKRExpHeap.cpp:110) so the
    * permanent block doesn't split the free space the stage allocates from. */
   AppAllocFn alloc = (AppAllocFn)(u32)JKRHeap__alloc; /* JKRHeap::alloc(u32, int, JKRHeap*) returns void* */
-  u8 *block = (u8 *)alloc(size, -4, mDoExt_getGameHeap());
+  u8 *block = (u8 *)alloc(size, -align, mDoExt_getGameHeap());
   if (!block)
     return;
   /* Magic last, then the pointer: C# reads the block concurrently and needs magic + stamp to use it
@@ -90,6 +90,11 @@ static void puppet_bootBlockCreate(u32 ptrAddr, u32 magic, u32 size)
   words[PUPPET_NAMES_OFF_BOOT / 4 + 1] = boot[1];
   words[0] = magic;
   *(volatile u32 *)ptrAddr = (u32)block;
+}
+
+static void puppet_bootBlockCreate(u32 ptrAddr, u32 magic, u32 size)
+{
+  puppet_bootBlockCreateAligned(ptrAddr, magic, size, 4);
 }
 
 /* The published names block, or NULL. */

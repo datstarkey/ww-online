@@ -104,6 +104,14 @@ public class PuppetSyncService : IDisposable
 
     // Last LocalAppearance.NeedsRel verdict, for logging transitions only.
     private bool _localLookNeedsRel;
+    private bool _boatLookNeedsRel;
+    private (ushort Hull, uint Sail, string Stage)? _boatLookWant;
+    private DateTime? _boatLookNeedSince;
+    private bool _boatLookGaveUp;
+
+    /// <summary>How long a parked puppet is kept for a boat colour the REL doesn't apply (a modded "Ship" archive,
+    /// no room on the game heap) before giving up until the colours or the stage change.</summary>
+    private static readonly TimeSpan BoatLookGiveUp = TimeSpan.FromSeconds(15);
 
     /// <summary>
     /// "Show player names": whether the REL draws each peer's name above their puppet
@@ -997,7 +1005,8 @@ public class PuppetSyncService : IDisposable
             // spawns it PARKED (invisible, no collision) just to run the scan. Same for the local
             // Link's outfit/colour (applied by the REL), until it shows the local player's choice, and
             // for the live world (LiveWorldPoke) while the REL has a batch of other players' bits to handle, and for
-            // the sea chart while another player is on the sea with us.
+            // the sea chart while another player is on the sea with us, and for the local boat until it shows the
+            // local player's colours.
             // (Non-short-circuit | : every check updates its own state every tick.)
             // The other players on the sea chart (SeaChartMarkers): everyone on the sea, visible or not. The chart
             // calls into the REL while the menu is open, so keep one loaded while they're on the sea with us.
@@ -1007,7 +1016,8 @@ public class PuppetSyncService : IDisposable
             bool chartNeedsRel = SeaChartMarkers.Publish(_dolphin, localStage, chartPlayers);
 
             int desiredCount = highestActiveSlot + 1;
-            if (_despawnWorker.IsNeeded(_dolphin) | _liveWorld.IsNeeded(_dolphin) | LocalLookNeedsRel(linkPtr!.Value, localLook) | chartNeedsRel)
+            if (_despawnWorker.IsNeeded(_dolphin) | _liveWorld.IsNeeded(_dolphin) | LocalLookNeedsRel(linkPtr!.Value, localLook) |
+                chartNeedsRel | BoatLookNeedsRel(localStage, ReadCurProc(linkPtr.Value), localLook))
                 desiredCount = Math.Max(desiredCount, 1);
             WriteSyncHeader(GameMemoryAddresses.PuppetSync.Magic, desiredCount);
 
@@ -1083,6 +1093,49 @@ public class PuppetSyncService : IDisposable
     }
 
     /// <summary>
+    /// Does the local boat need the puppet REL to show the local player's boat and tunic colours
+    /// (<see cref="Services.LocalBoatLook"/>)? Logs each change of verdict.
+    /// </summary>
+    private bool BoatLookNeedsRel(string stage, byte curProc, AppearanceState want)
+    {
+        ushort hull = BoatColor565(want);
+        uint sail = Services.LocalBoatLook.SailRgb(want);
+        if (_boatLookWant != (hull, sail, stage))
+        {
+            _boatLookWant = (hull, sail, stage);
+            _boatLookNeedSince = null;
+            _boatLookGaveUp = false;
+        }
+
+        bool needs = Services.LocalBoatLook.Publish(_dolphin, LocalShip(curProc, stage, out _) != 0, hull, sail);
+        if (!needs)
+        {
+            _boatLookNeedSince = null;
+        }
+        else if ((_boatLookNeedSince ??= DateTime.UtcNow) < DateTime.UtcNow - BoatLookGiveUp && !_boatLookGaveUp)
+        {
+            _boatLookGaveUp = true;
+            Logger.Warning("[boat] local boat look still not applied after {Seconds:F0}s: no longer keeping a puppet for it " +
+                           "until the colours or the stage change", BoatLookGiveUp.TotalSeconds);
+        }
+        needs &= !_boatLookGaveUp;
+        if (needs != _boatLookNeedsRel)
+        {
+            _boatLookNeedsRel = needs;
+            Logger.Information("[boat] local boat look {State}: hull=0x{Hull:X4} sail=0x{Sail:X6}",
+                needs ? "needs the REL (keeping a puppet)" : "matches", hull, sail);
+        }
+        return needs;
+    }
+
+    /// <summary>Link's mCurProc (the low byte of the daPyProc enum), WAIT if unreadable.</summary>
+    private byte ReadCurProc(uint actorBase)
+    {
+        var procBytes = _dolphin.ReadMemory(actorBase + PuppetLayout.DAPY_OFF_CUR_PROC, 4);
+        return procBytes is { Length: >= 4 } ? (byte)(ReadBigEndianU32(procBytes, 0) & 0xFF) : (byte)0x04; // WAIT_e
+    }
+
+    /// <summary>
     /// Read the local player's state from game memory for broadcasting to other players.
     /// </summary>
     public PuppetData? ReadLocalPlayerState()
@@ -1121,13 +1174,7 @@ public class PuppetSyncService : IDisposable
 
             // Current proc (mCurProc) — the full daPyProc enum value, broadcast raw so the
             // puppet can pick the matching proc*_init.
-            byte curProc = 0x04; // Default to WAIT_e
-            var procBytes = _dolphin.ReadMemory(actorBase + PuppetLayout.DAPY_OFF_CUR_PROC, 4);
-            if (procBytes != null && procBytes.Length >= 4)
-            {
-                uint procId = ReadBigEndianU32(procBytes, 0);
-                curProc = (byte)(procId & 0xFF);
-            }
+            byte curProc = ReadCurProc(actorBase);
 
             // While a draw / put-away anim (REST, TAKE*) plays, report the item Link WILL hold, so the
             // puppet starts its own draw / put-away at the same time instead of a whole anim + a tick late.
@@ -1246,25 +1293,31 @@ public class PuppetSyncService : IDisposable
     }
 
     /// <summary>
-    /// The local King of Red Lions while Link rides it, else null. Riding is the SHIP_RIDE status
-    /// bit OR a ship proc: the REL zeroes the status words while a puppet executes (puppet_execute.c
-    /// guard), so a status read can land mid-puppet and miss the bit.
+    /// The local daShip_c, else 0: while Link rides it, or (not aboard) a live daShip_c on the sea stage, the
+    /// boat left there (play.mpPlayerPtr[2] isn't cleared when a stage without the boat loads). Riding is the
+    /// SHIP_RIDE status bit OR a ship proc: the REL zeroes the status words while a puppet executes
+    /// (puppet_execute.c guard), so a status read can land mid-puppet and miss the bit.
     /// </summary>
-    private BoatState? ReadLocalBoat(byte curProc, string stageName)
+    private uint LocalShip(byte curProc, string stageName, out bool riding)
     {
         uint status0 = ReadBigEndianU32FromAddress(GameMemoryAddresses.Player.PlayerStatusBitfield0.Address);
-        bool riding = (status0 & GameMemoryAddresses.Sea.PlayerStatus0ShipRide) != 0
-                      || curProc is >= GameMemoryAddresses.Sea.ProcShipFirst and <= GameMemoryAddresses.Sea.ProcShipLast
-                      || curProc == GameMemoryAddresses.Sea.ProcDemoShipSit;
-        // Not aboard: the boat left on the Great Sea still shows, parked. Only on the sea stage, and only while the
-        // ship pointer is a live daShip_c (play.mpPlayerPtr[2] isn't cleared when a stage without the boat loads).
+        riding = (status0 & GameMemoryAddresses.Sea.PlayerStatus0ShipRide) != 0
+                 || curProc is >= GameMemoryAddresses.Sea.ProcShipFirst and <= GameMemoryAddresses.Sea.ProcShipLast
+                 || curProc == GameMemoryAddresses.Sea.ProcDemoShipSit;
         if (!riding && stageName != GameMemoryAddresses.Sea.SeaStageName)
-            return null;
-
+            return 0;
         uint ship = ReadPointer(GameMemoryAddresses.Sea.ShipActorPtr);
+        if (ship == 0 ||
+            (!riding && ReadBigEndianU16FromAddress(ship + GameMemoryAddresses.Sea.ActorOffsetProcName) != GameMemoryAddresses.Sea.ProcNameShip))
+            return 0;
+        return ship;
+    }
+
+    /// <summary>The local King of Red Lions (<see cref="LocalShip"/>): ridden, or parked on the Great Sea; else null.</summary>
+    private BoatState? ReadLocalBoat(byte curProc, string stageName)
+    {
+        uint ship = LocalShip(curProc, stageName, out bool riding);
         if (ship == 0)
-            return null;
-        if (!riding && ReadBigEndianU16FromAddress(ship + GameMemoryAddresses.Sea.ActorOffsetProcName) != GameMemoryAddresses.Sea.ProcNameShip)
             return null;
 
         var boat = new BoatState
