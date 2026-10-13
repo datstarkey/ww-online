@@ -57,6 +57,12 @@
 // JAIZelBasic::zel_basic (0x803F7710); bgmSetSwordUsing(x) only does field_0x00c9 = x
 // (JAIZelBasic.cpp:426). setSwordModel/deleteEquipItem call it for "this" Link.
 #define JAIZELBASIC_OFF_SWORD_USING  0xC9
+// field_0x0041..0x0046: Link's gear for his sounds, which setItemModel sets every frame
+// (d_a_player_main.cpp:1271-1350): setLinkSwordType / setLinkShieldType (0x41-0x45,
+// JAIZelBasic.cpp:1516-1533) and setLinkBootsType (0x46, :1538; footsteps clank while 1,
+// JAIZelAnime.cpp:65).
+#define JAIZELBASIC_OFF_LINK_GEAR    0x41
+#define JAIZELBASIC_LINK_GEAR_SIZE   6
 
 // daPy_lk_c fields not (yet) in ww_inlines.h — offsets from d_a_player_main.h comments.
 #define PUPPET_DAPY_MPATTENTION(link) (*(u8 **)((u8 *)(link) + 0x3480))  // dAttention_c* mpAttention
@@ -173,6 +179,7 @@
 #define PROC_PULL_MOVE       0x34
 // daPyFlg0_UNK10000 (d_a_player.h:180): sidling crouched under a low wall (ANM_WALLDW variants).
 #define DAPY_FLG0_WHIDE_CROUCH 0x00010000
+#define DAPY_FLG0_EQUIP_HEAVY_BOOTS 0x02000000 // daPyFlg0_EQUIP_HEAVY_BOOTS (d_a_player.h:190)
 // Request-key param bit (bits 16-23, next to the side direction): the peer sidles crouched.
 #define PUPPET_PARAM_WHIDE_CROUCH 0x10
 // procPushMove_init / procPullMove_init's anim (d_a_player_pushpull.inc:129/172; daPy_ANM
@@ -492,6 +499,7 @@ typedef struct
   s16 itemBombCount;  // should reach them (puppet_held.c), this makes sure (d_a_player_main.cpp:3700, d_a_player_bow.inc:144)
   u8 actStatus[6];
   u8 swordUsing;
+  u8 linkGear[JAIZELBASIC_LINK_GEAR_SIZE];
   u8 *zelBasic;
   u8 *attention;
   u8 attnLockState;
@@ -522,7 +530,11 @@ static void puppet_guardBegin(daPy_lk_c *link, PuppetGlobalGuard *g)
   g->zelBasic = (u8 *)JAIZelBasic__zel_basic;
   g->swordUsing = 0;
   if (g->zelBasic != NULL)
+  {
     g->swordUsing = *(g->zelBasic + JAIZELBASIC_OFF_SWORD_USING);
+    for (i = 0; i < JAIZELBASIC_LINK_GEAR_SIZE; i++)
+      g->linkGear[i] = *(g->zelBasic + JAIZELBASIC_OFF_LINK_GEAR + i);
+  }
 
   // Peer's sword/shield ids in the save's select-equip bytes (see PuppetEquipSwap).
   puppet_equipSwapBegin(link, &g->equip);
@@ -568,7 +580,11 @@ static void puppet_guardEnd(PuppetGlobalGuard *g)
   for (i = 0; i < 6; i++)
     *(gameInfo + GAMEINFO_OFF_ACT_STATUS + i) = g->actStatus[i];
   if (g->zelBasic != NULL)
+  {
     *(g->zelBasic + JAIZELBASIC_OFF_SWORD_USING) = g->swordUsing;
+    for (i = 0; i < JAIZELBASIC_LINK_GEAR_SIZE; i++)
+      *(g->zelBasic + JAIZELBASIC_OFF_LINK_GEAR + i) = g->linkGear[i];
+  }
   puppet_equipSwapEnd(&g->equip);
 
   if (g->attention != NULL)
@@ -2165,9 +2181,21 @@ void puppet_readNetworkState(daPy_lk_c *puppet, int slotIndex)
     else
       DAPY_PY_NO_RESET_FLG1(puppet) &= ~0x00008000;
   }
-  // Deliberately NOT syncing mModeFlg / mNoResetFlg0 / the rest of mNoResetFlg1 (yet): writing those
-  // bits without the matching resources (swim anims, water surface setup, heavy-boots
-  // physics) puts the puppet in states this simplified execute can't service.
+  // And the peer's Iron Boots (the peer's own frame-11 flip, d_a_player_main.cpp:8466-8470, arrives
+  // here: the puppet never runs procBootsEquip per frame). setItemModel poses them and puppet_draw
+  // draws them (:1345, :1917); the move anims go heavy (checkHeavyStateOn, :5616). Safe for the
+  // puppet: the heavy-step rumble is undone by the guard, and heavy switches and floors only react
+  // to fpcNm_PLAYER_e (d_a_obj_swheavy.cpp:211, d_a_floor.cpp:21).
+  {
+    u32 netFlg0 = *(volatile u32 *)(slotBase + PUPPET_SLOT_OFF_NO_RESET_FLG0);
+    if (netFlg0 & DAPY_FLG0_EQUIP_HEAVY_BOOTS)
+      DAPY_PY_NO_RESET_FLG0(puppet) |= DAPY_FLG0_EQUIP_HEAVY_BOOTS;
+    else
+      DAPY_PY_NO_RESET_FLG0(puppet) &= ~DAPY_FLG0_EQUIP_HEAVY_BOOTS;
+  }
+  // Deliberately NOT syncing mModeFlg / the rest of mNoResetFlg0 / mNoResetFlg1 (yet): writing those
+  // bits without the matching resources (swim anims, water surface setup) puts the puppet in
+  // states this simplified execute can't service.
 
   // Lerp toward the peer's position each frame, snapping when far off (teleports, scene
   // loads, big jumps). The end-of-execute override re-applies the target after the

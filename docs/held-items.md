@@ -122,7 +122,7 @@ The puppet has its **own item heaps**. `playerInit` → `createHeap` makes `mpIt
 - Also present but unused: `Equipment.LeftHandItem`, `BottleContents` (`PuppetData.cs:210-216`).
 
 **Slot space.** The slot is 0x48, and its last field is at 0x44. There is room:
-- **REL-unused slot fields** C# still writes: `ANIM_SPEED +0x14` (f32), `STATE_FLAGS +0x18` (u32), pad byte `+0x1F`, `SEQ_NUM +0x26`, `SPEED_F +0x30` (duplicate of `VELOCITY_F`, which is what the REL reads), `MODE_FLG +0x3C`, `NO_RESET_FLG0 +0x40` ("deliberately not synced", `puppet_execute.c:1682`). That is about 20 bytes per slot to repurpose, with a re-patch and a protocol bump.
+- **REL-unused slot fields** C# still writes: `ANIM_SPEED +0x14` (f32), `STATE_FLAGS +0x18` (u32), pad byte `+0x1F`, `SEQ_NUM +0x26`, `SPEED_F +0x30` (duplicate of `VELOCITY_F`, which is what the REL reads), `MODE_FLG +0x3C`. (`NO_RESET_FLG0 +0x40` is used: the REL reads its crouched-sidle and Iron Boots bits.) That is about 18 bytes per slot to repurpose, with a re-patch and a protocol bump.
 - `PUPPET_SLOT_SIZE` can grow **0x48 → 0x50** with nothing moving: `0x803FD010 + 3*0x50 = 0x803FD100` = `PUPPET_PROC_IDS_ADDR`, so the existing `puppet_check_slots_before_tracking` still holds.
 - New per-slot state, about 8 bytes: grab kind (u8: 0 none, 1 bomb, 2 pot...), bomb fuse (u8), `bodyAngleX/Y` (2 × s16), upper-anim frame (u8).
 
