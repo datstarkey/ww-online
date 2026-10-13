@@ -42,6 +42,10 @@
 #define GAMEINFO_OFF_VIBRATION       0x59A0  // play.mVibration, dVibration_c (play+0x4700, size 0x84)
 #define DVIBRATION_WORDS             (0x84 / 4)
 #define GAMEINFO_OFF_ITEM_LIFE_COUNT  0x5B5C // play.mItemLifeCount  f32 (play+0x48BC) - pending heart delta
+#define GAMEINFO_OFF_AIR_METER        0x5B64 // play.mAirMeter s32 (play+0x48C4) - swim breath timer
+#define GAMEINFO_OFF_ITEM_TIME_MAX    0x5B68 // play.mItemTimeMax s32 (play+0x48C8)
+#define GAMEINFO_OFF_SWIM_TIMER_ON    0x5BC8 // play.mItemSwimTimerStatus bool (play+0x4928)
+#define SWIM_AIR_FULL                900    // dComIfGp_setItemTimeCount(900) (d_a_player_swim.inc:126)
 #define GAMEINFO_OFF_ITEM_MAGIC_COUNT 0x5B78 // play.mItemMagicCount s16 (play+0x48D8) - pending magic delta
 #define GAMEINFO_OFF_ITEM_ARROW_COUNT 0x5B80 // play.mItemArrowNumCount s16 (play+0x48E0) - pending arrow delta
 #define GAMEINFO_OFF_ITEM_BOMB_COUNT  0x5B84 // play.mItemBombNumCount s16 (play+0x48E4) - pending bomb delta
@@ -377,6 +381,9 @@ static void puppet_callModelCalc(J3DModel *model);
 // Many daPy_lk_c functions assume `this` is the local player and read/poke global state:
 //   - commonProcInit() (every procX_init) clears dComIfGp player status 0/1
 //   - procSwim*_init set SWIM, procCut*_init set SWORD_SWING, etc. on player 0
+//   - commonProcInit leaving swim mode: swimOutAfter -> dComIfGp_clearItemTimeCount, emptying
+//     the LOCAL breath meter (d_a_player_main.cpp:5890, d_a_player_swim.inc:210); the swim procs
+//     also set its max and start/stop it (changeSwimProc, setSwimTimerStartStop)
 //   - procFrontRollCrash/Land/Damage_init, setLightSaver: dVibration_c::StartShock (rumble)
 //   - procCutRoll_init: dComIfGp_setItemMagicCount(-2); procJumpCutLand_init: setDamagePoint
 //     -> dComIfGp_setItemLifeCount (LOCAL hearts/magic)
@@ -387,7 +394,7 @@ static void puppet_callModelCalc(J3DModel *model);
 //     the right arm toward the LOCAL ship (setShipRideArmAngle, d_a_player_main.cpp:299-315);
 //     jointCB0 / setNeckAngle also branch on SHIP_RIDE / WIND_WAKER_CONDUCT.
 // The guard snapshots all of that, presents the puppet with a neutral view (player status 0,
-// no Z-lock), and restores the snapshot afterwards. dVibration_c::StartShock only writes
+// no Z-lock, full breath), and restores the snapshot afterwards. dVibration_c::StartShock only writes
 // fields of the dVibration_c struct (d_vibration.cpp), so restoring the struct cancels it.
 // puppet_execute runs entirely inside one guard; nested guards are harmless.
 
@@ -477,6 +484,9 @@ typedef struct
   u32 status1;
   u32 vibration[DVIBRATION_WORDS];
   f32 itemLifeCount;
+  s32 airMeter;
+  s32 itemTimeMax;
+  u8 swimTimerOn;
   s16 itemMagicCount;
   s16 itemArrowCount; // makeItemType's bomb / the bow shot spend the LOCAL counts; no puppet path
   s16 itemBombCount;  // should reach them (puppet_held.c), this makes sure (d_a_player_main.cpp:3700, d_a_player_bow.inc:144)
@@ -500,6 +510,9 @@ static void puppet_guardBegin(daPy_lk_c *link, PuppetGlobalGuard *g)
   for (i = 0; i < DVIBRATION_WORDS; i++)
     g->vibration[i] = vib[i];
   g->itemLifeCount = *(f32 *)(gameInfo + GAMEINFO_OFF_ITEM_LIFE_COUNT);
+  g->airMeter = *(s32 *)(gameInfo + GAMEINFO_OFF_AIR_METER);
+  g->itemTimeMax = *(s32 *)(gameInfo + GAMEINFO_OFF_ITEM_TIME_MAX);
+  g->swimTimerOn = *(gameInfo + GAMEINFO_OFF_SWIM_TIMER_ON);
   g->itemMagicCount = *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_MAGIC_COUNT);
   g->itemArrowCount = *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_ARROW_COUNT);
   g->itemBombCount = *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_BOMB_COUNT);
@@ -517,6 +530,10 @@ static void puppet_guardBegin(daPy_lk_c *link, PuppetGlobalGuard *g)
   // The puppet is not the local player: it doesn't ride the local ship, conduct, etc.
   *(u32 *)(gameInfo + GAMEINFO_OFF_PLAYER_STATUS0) = 0;
   *(u32 *)(gameInfo + GAMEINFO_OFF_PLAYER_STATUS1) = 0;
+
+  // Full breath, so getSwimTimerRate() gives the puppet a calm swim (0) instead of the local
+  // player's drowning pace (d_a_player_swim.inc:280-294).
+  *(s32 *)(gameInfo + GAMEINFO_OFF_AIR_METER) = SWIM_AIR_FULL;
 
   // Hide the local player's Z-target lock from the puppet for the duration of the call.
   g->attention = PUPPET_DAPY_MPATTENTION(link);
@@ -542,6 +559,9 @@ static void puppet_guardEnd(PuppetGlobalGuard *g)
   for (i = 0; i < DVIBRATION_WORDS; i++)
     vib[i] = g->vibration[i];
   *(f32 *)(gameInfo + GAMEINFO_OFF_ITEM_LIFE_COUNT) = g->itemLifeCount;
+  *(s32 *)(gameInfo + GAMEINFO_OFF_AIR_METER) = g->airMeter;
+  *(s32 *)(gameInfo + GAMEINFO_OFF_ITEM_TIME_MAX) = g->itemTimeMax;
+  *(gameInfo + GAMEINFO_OFF_SWIM_TIMER_ON) = g->swimTimerOn;
   *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_MAGIC_COUNT) = g->itemMagicCount;
   *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_ARROW_COUNT) = g->itemArrowCount;
   *(s16 *)(gameInfo + GAMEINFO_OFF_ITEM_BOMB_COUNT) = g->itemBombCount;
