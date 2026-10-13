@@ -28,8 +28,9 @@
  * physics isn't run here), with the grappling hook at its end. Nothing fires, salvages or plays a
  * sound: they are just models.
  *
- * Parked (PUPPET_BOAT_FLAG_PARKED): the peer got off on the Great Sea; the boat is drawn where it lies,
- * empty (the puppet is never seated in it).
+ * Parked (PUPPET_BOAT_FLAG_PARKED): the peer got off; the boat is drawn where it lies, empty (the puppet is never
+ * seated in it), lit for its own room. C# shows it by the boat's own place, so it is also drawn while the slot is
+ * inactive and the puppet parked (puppet.c).
  *
  * Hull colour (PUPPET_SLOT_OFF_BOAT_COLOR): the red of fn_body.bdl is its fn_main1 texture's palette
  * (C8, 64 RGB565 colours; see puppet_boat.c, "Hull colour").
@@ -107,7 +108,7 @@ typedef struct PuppetBoat
   u8 hookShow;                          /* the hook is posed this frame */
   u8 parked;                            /* PUPPET_BOAT_FLAG_PARKED this frame: nobody aboard, never seats */
   u8 hullCur;                           /* hull palette buffer the recolour key is in */
-  u8 pad4;
+  s8 room;                              /* the boat's own room (PUPPET_BOAT_ROOM_*): lights a parked boat */
   u16 *hullPal;                         /* two recoloured hull palettes (in `heap`), NULL = none */
   u32 hullKey;                          /* their RGB565 colour | 0x01000000, 0 = none yet */
   u16 *hullShow;                        /* the palette this frame's body entry uses, NULL = vanilla */

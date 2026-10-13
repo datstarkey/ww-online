@@ -53,6 +53,17 @@ public class SeaChartMarkersTests
     }
 
     [Fact]
+    public void PlayersOffTheirParkedBoat_ShowWhereTheyAre()
+    {
+        var p = Player("sea", 1000, 2000, 0x0100);
+        p.Boat = new BoatState { Position = new Vector3 { X = 7000, Z = 8000 }, Rotation = 0x1234, Parked = true };
+        var e = SeaChartMarkers.BuildEntries([p]);
+        Assert.Equal(1000f, F(e, PuppetLayout.SEACHART_E_OFF_X));
+        Assert.Equal(2000f, F(e, PuppetLayout.SEACHART_E_OFF_Z));
+        Assert.Equal(0x0100, BinaryPrimitives.ReadInt16BigEndian(e.AsSpan(PuppetLayout.SEACHART_E_OFF_ANGLE)));
+    }
+
+    [Fact]
     public void AtMost_MaxEntries()
     {
         var many = Enumerable.Range(0, 12).Select(i => Player("sea", i, i, 0));

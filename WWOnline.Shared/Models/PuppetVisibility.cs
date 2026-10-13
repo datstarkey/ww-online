@@ -29,6 +29,16 @@ public static class PuppetVisibility
     public static bool IsSea(string stage) => stage == SeaStage;
 
     /// <summary>
+    /// The sea room (grid square) a point is in: dMap_c::point2Grid's square (floor(v / 100000 + 0.5), clamped to
+    /// -3..3, d_map.cpp:1753), numbered 1..49 row by row from the north-west (Link at (100000, 9740) is in sea:26).
+    /// </summary>
+    public static byte SeaRoom(float x, float z)
+    {
+        static int Grid(float v) => Math.Clamp((int)MathF.Floor(v / SeaSquareSize + 0.5f), -3, 3);
+        return (byte)((Grid(z) + 3) * 7 + Grid(x) + 3 + 1);
+    }
+
+    /// <summary>
     /// True when the local player's move needs the puppets despawned (stage change, or a room
     /// change outside the sea). A room change at sea is not a scene change.
     /// </summary>

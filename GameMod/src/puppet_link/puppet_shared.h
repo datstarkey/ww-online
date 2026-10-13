@@ -455,13 +455,16 @@
 #define PUPPET_BOAT_FLAG_FLY      0x02  /* daShip_c mStateFlag daSFLG_FLY_e: airborne, use POSY */
 #define PUPPET_BOAT_FLAG_MAST_ON  0x04  /* m0392 == SHIP_BCK_MAST_ON2 (mast up / rising), else SHIP_BCK_MAST_OFF2 */
 #define PUPPET_BOAT_FLAG_MAST_HIDE 0x08 /* m03E8 == 0.001: J_FN_MAST scaled away (cannon or crane in its place) */
-#define PUPPET_BOAT_FLAG_PARKED   0x40  /* nobody aboard: they got off on the Great Sea; drawn empty, never seats the puppet */
+#define PUPPET_BOAT_FLAG_PARKED   0x40  /* nobody aboard: drawn empty where it is, never seats; shown by its own place, so also for an inactive slot */
 /* FLAGS bits 4..5: mPart (daShip_c::Part_e); the cannon / crane is drawn while it is SHIP_PART_CANNON / _CRANE */
 #define PUPPET_BOAT_PART_SHIFT    4
 #define PUPPET_BOAT_PART_MASK     0x3
 /* FLAGS bits 8..15: m03B4, mpHeadAnm's bck (a SHIP_BCK_* index; 0 = keep the current one) */
 #define PUPPET_BOAT_HEAD_BCK_SHIFT 8
 #define PUPPET_BOAT_HEAD_BCK_MASK 0xFF
+/* FLAGS bits 24..31: current.roomNo, the boat's room (lights a parked boat; a ridden one goes with the puppet) */
+#define PUPPET_BOAT_ROOM_SHIFT    24
+#define PUPPET_BOAT_ROOM_MASK     0xFF
 
 /* "Ship" archive bck indices (tww-decomp assets/GZLE01/res/Object/Ship.h, dRes_INDEX_SHIP_BCK_*) */
 #define SHIP_BCK_FIRST            0x05  /* AKIBI1: first bck in the archive */
@@ -669,7 +672,8 @@ typedef char puppet_check_boat_fits[
      (PUPPET_BOAT_PART_MASK << PUPPET_BOAT_PART_SHIFT) < (1 << PUPPET_BOAT_HEAD_BCK_SHIFT) &&
      (PUPPET_BOAT_FLAG_PARKED & (PUPPET_BOAT_PART_MASK << PUPPET_BOAT_PART_SHIFT)) == 0 &&
      PUPPET_BOAT_FLAG_PARKED > PUPPET_BOAT_FLAG_MAST_HIDE && PUPPET_BOAT_FLAG_PARKED < (1 << PUPPET_BOAT_HEAD_BCK_SHIFT) &&
-     SHIP_PART_CRANE <= PUPPET_BOAT_PART_MASK) ? 1 : -1];
+     SHIP_PART_CRANE <= PUPPET_BOAT_PART_MASK &&
+     PUPPET_BOAT_HEAD_BCK_SHIFT + 8 <= PUPPET_BOAT_ROOM_SHIFT && PUPPET_BOAT_ROOM_SHIFT + 8 <= 32) ? 1 : -1];
 typedef char puppet_check_boats_after_appearance[
     (PUPPET_BOAT_0 >= LOCAL_APPEARANCE_STATUS_ADDR + 4) ? 1 : -1];
 typedef char puppet_check_boats_before_worldsync[

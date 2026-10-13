@@ -462,12 +462,14 @@ public static class PuppetLayout
     public const int PUPPET_BOAT_FLAG_MAST_ON = 0x04;
     /// <summary>m03E8 == 0.001: J_FN_MAST scaled away (cannon or crane in its place)</summary>
     public const int PUPPET_BOAT_FLAG_MAST_HIDE = 0x08;
-    /// <summary>nobody aboard: they got off on the Great Sea; drawn empty, never seats the puppet</summary>
+    /// <summary>nobody aboard: drawn empty where it is, never seats; shown by its own place, so also for an inactive slot</summary>
     public const int PUPPET_BOAT_FLAG_PARKED = 0x40;
     public const int PUPPET_BOAT_PART_SHIFT = 4;
     public const int PUPPET_BOAT_PART_MASK = 0x3;
     public const int PUPPET_BOAT_HEAD_BCK_SHIFT = 8;
     public const int PUPPET_BOAT_HEAD_BCK_MASK = 0xFF;
+    public const int PUPPET_BOAT_ROOM_SHIFT = 24;
+    public const int PUPPET_BOAT_ROOM_MASK = 0xFF;
     /// <summary>AKIBI1: first bck in the archive</summary>
     public const int SHIP_BCK_FIRST = 0x05;
     public const int SHIP_BCK_DAMAGE1 = 0x06;

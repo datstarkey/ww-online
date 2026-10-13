@@ -92,10 +92,20 @@ public class BoatState
     [JsonPropertyName("flying")]
     public bool Flying { get; set; }
 
-    /// <summary>Nobody aboard: the boat is where its player left it (on the sea, they're ashore or swimming).
-    /// Receivers draw it empty; speed is 0.</summary>
+    /// <summary>Nobody aboard: the boat is where its player left it (they're ashore, swimming or out of sight).
+    /// Receivers draw it empty, where it is (<see cref="RoomNumber"/>), whether they can see its player or not;
+    /// speed is 0.</summary>
     [JsonPropertyName("parked")]
     public bool Parked { get; set; }
+
+    /// <summary>current.roomNo: the room the boat is in (on the sea, its square). A parked boat is seen by its
+    /// own place, not its player's (<see cref="PuppetVisibility"/>).</summary>
+    [JsonPropertyName("roomNumber")]
+    public byte RoomNumber { get; set; }
+
+    /// <summary>A stage has at most 64 rooms (dStage_roomControl_c::mStatus, d_stage.h): receivers light a boat
+    /// from its room's entry, so nothing past it is accepted.</summary>
+    public const byte MaxRoom = 63;
 
     // The pose, as daShip_c's body/head joint callbacks and its two morfs use it (d_a_ship.cpp:110-231).
 
@@ -206,7 +216,7 @@ public class BoatState
         HeadX >= MinHeadX && HeadX <= MaxHeadX &&
         HeadY >= -MaxHeadY && HeadY <= MaxHeadY &&
         (HeadBck == 0 || IsHeadBck(HeadBck)) &&
-        Part <= PartCrane &&
+        Part <= PartCrane && RoomNumber <= MaxRoom &&
         CannonPitch >= 0 && CannonPitch <= MaxCannonPitch &&
         CraneAngle >= -MaxCraneAngle && CraneAngle <= MaxCraneAngle &&
         RopeLength <= MaxRopeLength;

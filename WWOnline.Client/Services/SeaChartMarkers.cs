@@ -20,9 +20,10 @@ public static class SeaChartMarkers
         {
             if (n >= PuppetLayout.SEACHART_MAX_ENTRIES) break;
             if (p.StageName != GameMemoryAddresses.Sea.SeaStageName) continue;
-            var pos = p.Boat?.Position ?? p.Position;
+            var sailing = p.Boat is { Parked: false } ? p.Boat : null; // a parked boat isn't where they are
+            var pos = sailing?.Position ?? p.Position;
             if (pos == null || !pos.IsFinite()) continue;
-            short angle = p.Boat?.Rotation ?? (short)p.Rotation;
+            short angle = sailing?.Rotation ?? (short)p.Rotation;
             int o = n * PuppetLayout.SEACHART_ENTRY_SIZE;
             BigEndian.WriteF32(entries, o + PuppetLayout.SEACHART_E_OFF_X, pos.X);
             BigEndian.WriteF32(entries, o + PuppetLayout.SEACHART_E_OFF_Z, pos.Z);
