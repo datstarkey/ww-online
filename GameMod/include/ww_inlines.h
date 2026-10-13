@@ -1125,9 +1125,19 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 #define FMAP_LNK2_PANE(menu)               (*(J2DPane**)((u8*)(menu) + 0x2EE4))  // mLnk2Pane.pane: Link on a zoomed square
 #define FMAP_CLB_SIZE_ORIG_X(menu)         (*(f32*)((u8*)(menu) + 0x30C8))       // mClbPane.mSizeOrig.x
 #define FMAP_CLB_SIZE_ORIG_Y(menu)         (*(f32*)((u8*)(menu) + 0x30CC))
+#define FMAP_LNK2_SIZE_ORIG_X(menu)        (*(f32*)((u8*)(menu) + 0x2F08))       // mLnk2Pane.mSizeOrig.x
+#define FMAP_LNK2_SIZE_ORIG_Y(menu)        (*(f32*)((u8*)(menu) + 0x2F0C))
 #define FMAP_PLAYER_X(menu)                (*(f32*)((u8*)(menu) + 0x511C))       // mPlayerPos.x = Link's current.pos.x
 #define FMAP_PLAYER_Z(menu)                (*(f32*)((u8*)(menu) + 0x5120))       // mPlayerPos.y = Link's current.pos.z
 #define FMAP_ON_SEA(menu)                  (*(u8*)((u8*)(menu) + 0x517F))        // mFishmanActive: the chart opened on the sea stage
+#define FMAP_CLB_PANE(menu)                (*(J2DPane**)((u8*)(menu) + 0x30A4))  // mClbPane.pane: the zoomed square (lnk2's parent)
+#define FMAP_ZOOM_PROC(menu)               (*(u8*)((u8*)(menu) + 0x5114))        // mFmapProcIdx (ZoomProcIdx, d_menu_fmap.cpp:271)
+#define FMAP_ZOOM_PROC_SELECT_GRID         0                                     // the world map, steady
+#define FMAP_ZOOM_PROC_LV1                 2                                     // a zoomed square, steady (after LV1_IN, before LV1_OUT)
+#define FMAP_SV(menu)                      (*(u8**)((u8*)(menu) + 0x2878))       // dMenu_FmapSv_c* fmapSv (getCtCurX/Y)
+#define FMAPSV_CUR_X(sv)                   (*(s8*)((u8*)(sv) + 0x04))            // curX: the square the cursor / zoomed view is on
+#define FMAPSV_CUR_Y(sv)                   (*(s8*)((u8*)(sv) + 0x05))            // curY
+#define FMAP_GRID_MAX                      3                                     // squares are -3..3 (dMap_c::point2Grid clamps)
 #define FMAP_NORMAL_SCALE                  (56.0f / 100000.0f)                  // setDspNormalMapLink: pane units per world unit
 #define FMAP_LARGE_MARGIN                  50.0f                                 // setDspLargeMapLink: (size - 50) / 100000
 #define FMAP_SQUARE                        100000.0f
@@ -1136,8 +1146,13 @@ static inline fopAc_ac_c *dComIfGp_att_getZHint(void)
 // makeMatrix 0x802D0714 (0x9C/0xA0 base position, 0xA4 rotation), playerPointGridAnime (stb 0x104 / 0x108).
 #define J2DPANE_BOUNDS(p)                  ((f32*)((u8*)(p) + 0x0C))   // TBox2<f32> mBounds: i.x, i.y, f.x, f.y
 #define J2DPANE_MTX(p)                     ((u8*)(p) + 0x3C)           // Mtx mMtx (0x30 bytes), rebuilt by calcMtx
+#define J2DPANE_BASE_POS(p)                ((f32*)((u8*)(p) + 0x9C))   // TVec2<f32> mBasePosition: the rotation pivot (rotate's cx, cy)
 #define J2DPANE_ROTATION(p)                (*(f32*)((u8*)(p) + 0xA4))  // mRotation (degrees)
 #define J2DPANE_VISIBLE(p)                 (*(u8*)((u8*)(p) + 0xAA))   // mVisible
+// mPaneTree (0xB0) is a JSUTree: its JSUList (0xC bytes), then its JSULink {mObject, mList, ...}. getParent() is
+// the link's mList (0xC0): the parent's mPaneTree, whose link's mObject (+0xC) is the parent pane, or NULL.
+#define J2DPANE_PARENT_TREE(p)             (*(u8**)((u8*)(p) + 0xC0))
+#define J2DTREE_PANE(t)                    (*(J2DPane**)((u8*)(t) + 0x0C))
 #define J2DPICTURE_WHITE(p)                ((u8*)(p) + 0x104)          // TColor mColorWhite (r, g, b, a)
 #define J2DPICTURE_BLACK(p)                ((u8*)(p) + 0x108)          // TColor mColorBlack
 

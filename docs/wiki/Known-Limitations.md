@@ -10,7 +10,6 @@ WW-Online is in early development. These are the known gaps; the [releases](http
 - Other players' boomerang and hookshot show in their hands, but the thrown boomerang, the hookshot chain and the grappling hook don't. Carrying a pot or barrel shows the pose only.
 - Props that go with an animation aren't shown: the rope, the item held up after a chest, a Boko weapon in hand. Animations that come from cutscene data aren't copied.
 - Some moves are a best guess: a knock-back always looks like a hit from the front, and a side hop with the stick let go goes left.
-- The zoomed-in sea chart shows the other players only on the square you're in (that's when it shows Link).
 
 ## The shared world
 
