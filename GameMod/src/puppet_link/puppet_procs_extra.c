@@ -437,7 +437,8 @@ int puppet_extraInitProc(daPy_lk_c *puppet, int proc, int param)
     return daPy_lk_c__procIceSlipFallUp_init(puppet, cur == XP_ICE_SLIP_FALL ? DAPY_LK_M3570(puppet) : XANM_DAMFB,
                                              XP_DAPY_M34F2(puppet), XP_DAPY_M34F4(puppet));
   case XP_ICE_SLIP_ALMOST_FALL: return daPy_lk_c__procIceSlipAlmostFall_init(puppet);
-  // The per-frame proc toggles the boots at frame 11 (:8465-8471); the param is only kept for it.
+  // Anim only: the per-frame proc that flips the boots at frame 11 never runs on a puppet (:8465-8471);
+  // the boots bit comes from the peer (puppet_readNetworkState).
   case XP_BOOTS_EQUIP:          return daPy_lk_c__procBootsEquip_init(puppet, 0);
   // Throwing the Boko weapon: anims only (weapon.inc:379-386; the throw itself is per-frame).
   case XP_WEAPON_THROW:         return daPy_lk_c__procWeaponThrow_init(puppet);
