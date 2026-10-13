@@ -587,6 +587,18 @@ public static class GameMemoryAddresses
     /// <summary>
     /// Sea and sailing addresses
     /// </summary>
+    /// <summary>The object archives: dComIfG_inf_c::mResControl (d_com_inf_game.h 0x1BFC0) .mObjectInfo[64], dRes_info_c (d_resorce.h).</summary>
+    public static class Res
+    {
+        public const uint ObjectInfo = GameInfo + 0x1BFC0;
+        public const int ObjectInfoCount = 64;
+        public const int InfoSize = 0x24;
+        public const int InfoOffsetName = 0x00;    // char mArchiveName[14]
+        public const int InfoOffsetCount = 0x0E;   // u16 mCount: 0 = a free entry
+        public const int InfoOffsetArchive = 0x14; // JKRArchive* mpArchive: 0 while mounting
+        public const int InfoOffsetRes = 0x20;     // void** mRes: the archive's resources by index
+    }
+
     public static class Sea
     {
         public static readonly MemoryAddress<byte> CurrentSeaSector = new(0x803C9D5C, "CurrentSeaSector", "Current sea sector (quadrant)");

@@ -390,6 +390,42 @@
 #define SEACHART_FLAG_SHOW            0x01        /* a player on the sea: draw them */
 
 /* ============================================================================
+ * Local boat look (puppet_boatlook.c): the local King of Red Lions in the local player's boat colour
+ * (hull) and tunic colour (sail), as the other players see it. The local ship draws from the "Ship"
+ * archive's shared data (fn_body.bdl's fn_main1 palette, new_ho1.bti's palette), so the REL recolours
+ * those palettes in place; the recolour stays after the REL unloads. Peers' boats recolour from the
+ * vanilla copies kept here, and swap them in for the classic red / default sail.
+ * Block made and adopted like the names block (magic, boot stamp, never freed; 32-aligned).
+ * C# writes the WANT_* fields and keeps a (parked) puppet while the live palettes don't show them:
+ * a KEY that isn't the wanted one, a "Ship" archive that isn't the one INFO / RES name any more (it was
+ * unmounted or reloaded elsewhere), or a palette whose checksum isn't SUM (reloaded in place).
+ * ============================================================================ */
+#define BOATLOOK_PTR_ADDR             0x803FD1D0  /* u32 C: boat look block (game heap), 0 = none yet */
+#define BOATLOOK_MAGIC                0x42544C4B  /* "BTLK" */
+#define BOATLOOK_OFF_BOOT             0x08        /* u32[2] C: __OSStartTime of the allocating boot (= PUPPET_NAMES_OFF_BOOT) */
+#define BOATLOOK_OFF_WANT_HULL        0x10        /* u16 C#: hull colour, RGB565 (as PUPPET_SLOT_OFF_BOAT_COLOR); 0 = classic red */
+#define BOATLOOK_OFF_WANT_SAIL        0x14        /* u32 C#: sail colour 0xRRGGBB (the tunic colour); 0 or the default tunic = vanilla */
+#define BOATLOOK_OFF_INFO             0x18        /* u32 C: the "Ship" dRes_info_c (play's mObjectInfo[]) last used, 0 = none */
+#define BOATLOOK_OFF_HULL             0x1C        /* BOATLOOK_PART_SIZE: the hull's state (C) */
+#define BOATLOOK_OFF_SAIL             0x30        /* BOATLOOK_PART_SIZE: the sail's state (C) */
+#define BOATLOOK_HEADER_SIZE          0x44        /* everything C# reads: up to the vanilla copies */
+#define BOATLOOK_PART_SIZE            0x14
+#define BOATLOOK_P_OFF_PAL            0x00        /* u32 C: live palette address the vanilla copy is of, 0 = none */
+#define BOATLOOK_P_OFF_KEY            0x04        /* u32 C: colour | BOATLOOK_KEY_SET written into it, 0 = vanilla */
+#define BOATLOOK_P_OFF_SUM            0x08        /* u32 C: BOATLOOK_SUM of the live palette after the REL's last write */
+#define BOATLOOK_P_OFF_COUNT          0x0C        /* u32 C: palette entries (ResTIMG numColors) */
+#define BOATLOOK_P_OFF_RES            0x10        /* u32 C: the resource it's in (INFO's mRes[BOATLOOK_RES_*]) */
+#define BOATLOOK_KEY_SET              0x01000000
+#define BOATLOOK_RES_HULL             0x11        /* "Ship" dRes_INDEX_SHIP_BDL_FN_BODY_e: fn_main1 is in its TEX1 */
+#define BOATLOOK_RES_SAIL             0x17        /* "Ship" dRes_INDEX_SHIP_BTI_NEW_HO1_e */
+#define BOATLOOK_OFF_HULL_VANILLA     0x60        /* u16[BOATLOOK_PAL_ENTRIES] C: vanilla hull palette (32-aligned: a TLUT) */
+#define BOATLOOK_OFF_SAIL_VANILLA     0x260       /* u16[BOATLOOK_PAL_ENTRIES] C: vanilla sail palette */
+#define BOATLOOK_PAL_ENTRIES          0x100       /* both draws load 256 entries; the tail past COUNT stays 0 */
+#define BOATLOOK_BLOCK_SIZE           0x460
+#define BOATLOOK_ALIGN                32          /* GX TLUTs are 32-byte aligned */
+#define BOATLOOK_SUM_MUL              31          /* BOATLOOK_SUM: s = s * 31 + entry over COUNT u16 entries, from 0 */
+
+/* ============================================================================
  * Per-slot boat: the peer's King of Red Lions while they ride it. Written by C# at 20Hz with
  * the slot; FLAGS == 0 means no boat. Read by puppet_boat.c, which draws its own copy of the
  * boat (hull + head from the "Ship" archive) and seats the puppet in it. Fields mirror the
@@ -399,7 +435,7 @@
  * the cannon / crane pose lives in the slot's PUPPET_BOAT_CANNON_* / PUPPET_BOAT_CRANE_* words (below).
  * ============================================================================ */
 #define PUPPET_BOAT_0             0x803FD170
-#define PUPPET_BOAT_SIZE          0x20  /* 3 slots end at 0x803FD1D0; 0x803FD1D0..DF is reserved (docs/small-keys.md) */
+#define PUPPET_BOAT_SIZE          0x20  /* 3 slots end at 0x803FD1D0 (BOATLOOK_PTR_ADDR) */
 #define PUPPET_BOAT_BASE(i)       (PUPPET_BOAT_0 + ((i) * PUPPET_BOAT_SIZE))
 #define PUPPET_BOAT_OFF_FLAGS     0x00  /* u32 — PUPPET_BOAT_FLAG_* */
 #define PUPPET_BOAT_OFF_POSX      0x04  /* f32 — current.pos */
@@ -638,6 +674,15 @@ typedef char puppet_check_boats_after_appearance[
     (PUPPET_BOAT_0 >= LOCAL_APPEARANCE_STATUS_ADDR + 4) ? 1 : -1];
 typedef char puppet_check_boats_before_worldsync[
     (PUPPET_BOAT_BASE(PUPPET_MAX_SLOTS) <= WORLDSYNC_ITEM_MASK_ADDR) ? 1 : -1];
+typedef char puppet_check_boatlook[
+    (BOATLOOK_PTR_ADDR >= PUPPET_BOAT_BASE(PUPPET_MAX_SLOTS) && BOATLOOK_PTR_ADDR + 4 <= WORLDSYNC_ITEM_MASK_ADDR &&
+     BOATLOOK_OFF_BOOT == PUPPET_NAMES_OFF_BOOT && BOATLOOK_OFF_BOOT + 8 <= BOATLOOK_OFF_WANT_HULL &&
+     BOATLOOK_OFF_WANT_SAIL + 4 <= BOATLOOK_OFF_INFO && BOATLOOK_OFF_INFO + 4 <= BOATLOOK_OFF_HULL &&
+     BOATLOOK_OFF_HULL + BOATLOOK_PART_SIZE <= BOATLOOK_OFF_SAIL && BOATLOOK_OFF_SAIL + BOATLOOK_PART_SIZE <= BOATLOOK_HEADER_SIZE &&
+     BOATLOOK_HEADER_SIZE <= BOATLOOK_OFF_HULL_VANILLA && BOATLOOK_P_OFF_RES + 4 <= BOATLOOK_PART_SIZE &&
+     (BOATLOOK_OFF_HULL_VANILLA % BOATLOOK_ALIGN) == 0 && (BOATLOOK_OFF_SAIL_VANILLA % BOATLOOK_ALIGN) == 0 &&
+     BOATLOOK_OFF_HULL_VANILLA + 2 * BOATLOOK_PAL_ENTRIES <= BOATLOOK_OFF_SAIL_VANILLA &&
+     BOATLOOK_OFF_SAIL_VANILLA + 2 * BOATLOOK_PAL_ENTRIES == BOATLOOK_BLOCK_SIZE) ? 1 : -1];
 typedef char puppet_check_names_word[
     (PUPPET_NAMES_PTR_ADDR >= LOCAL_APPEARANCE_STATUS_ADDR + 4 && PUPPET_NAMES_PTR_ADDR + 4 <= PUPPET_BOAT_0 &&
      (PUPPET_NAMES_PTR_ADDR % 4) == 0) ? 1 : -1];

@@ -23,6 +23,8 @@
 // The peer's name above the puppet
 #include "puppet_nametag.c"
 #include "puppet_seachart.c"
+// The local boat in the local colours (after seachart: puppet_bootBlock; after boat: the recolours)
+#include "puppet_boatlook.c"
 // Create-only actors follow bits other players set (chests, walls, crystals, key locks)
 #include "puppet_liveworld.c"
 // Animator pointers the puppet writes into Link's shared model data (swapped per window)
@@ -242,6 +244,7 @@ static int daPuppet_phase_1(PUPPET_class *this)
   puppet_boatInit(&this->boat);
   puppet_nametag_onCreate();
   puppet_seachart_onCreate();
+  puppet_boatlook_onCreate();
   puppet_fx_onCreate();
   puppet_anmMirrorOnCreate(this->slotIndex);
   puppet_heldInit(&this->held);
@@ -627,9 +630,10 @@ int daPuppet_Execute(PUPPET_class *this)
 
   // Once per game frame regardless of puppet count (guarded inside). Runs for parked
   // puppets too: C# keeps a parked slot-0 puppet alive while despawns are pending, or while
-  // the local Link doesn't show the local player's outfit/colour yet.
+  // the local Link or boat doesn't show the local player's outfit/colours yet.
   puppet_worldsync_tick();
   puppet_appearance_tick();
+  puppet_boatlook_tick();
   puppet_fx_tick();
 
   // Inactive slot -> parked: no execute, no collision/attention, invisible.

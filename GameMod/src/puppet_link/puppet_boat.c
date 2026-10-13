@@ -24,10 +24,11 @@
  */
 
 #include "puppet_boat.h"
+#include "puppet_boatlook.h"
 
 /* "Ship" archive (tww-decomp assets/GZLE01/res/Object/Ship.h) */
 #define BOAT_ARC_NAME             "Ship"
-#define BOAT_RES_BDL_FN_BODY      0x11  /* dRes_INDEX_SHIP_BDL_FN_BODY_e */
+#define BOAT_RES_BDL_FN_BODY      BOATLOOK_RES_HULL  /* dRes_INDEX_SHIP_BDL_FN_BODY_e */
 #define BOAT_RES_BDL_FN_HEAD_H    0x12  /* dRes_INDEX_SHIP_BDL_FN_HEAD_H_e */
 #define BOAT_JNT_GATTAI           0x04  /* FN_BODY_JNT_J_FN_GATTAI_e: the head's base (d_a_ship.cpp:4743) */
 #define BOAT_JNT_KAJI             0x05  /* FN_BODY_JNT_J_FN_KAJI_e: rudder */
@@ -231,7 +232,7 @@ static mDoExt_McaMorf *boat_createMorf(u32 bdl, u32 bck, u32 diffFlag)
 #define TEVSTR_WORDS              (0xB0 / 4)
 
 /* "Ship" new_ho1.bti (Ship.h dRes_INDEX_SHIP_BTI_NEW_HO1_e) and "Cloth" (Cloth.h) */
-#define BOAT_RES_BTI_NEW_HO1      0x17
+#define BOAT_RES_BTI_NEW_HO1      BOATLOOK_RES_SAIL
 #define BOAT_CLOTH_ARC_NAME       "Cloth"
 /* ResTIMG (JUTTexture.h) */
 #define TIMG_FORMAT(t)            (*(u8 *)((u8 *)(t) + 0x00))
@@ -336,15 +337,13 @@ static int boat_ramp(int v, int span)
   return (v * 256) / span;
 }
 
-/* new_ho1's palette with the canvas in rgb (see "Colour" above). */
-static void boat_sailRecolor(u16 *dst, const u32 *timg, u32 rgb)
+/* new_ho1's palette src (count colours) with the canvas in rgb (see "Colour" above), n entries. */
+static void boat_sailRecolor(u16 *dst, const u16 *src, u32 count, u32 n, u32 rgb)
 {
-  const u16 *src = (const u16 *)((const u8 *)timg + TIMG_PAL_OFFSET(timg));
-  u32 count = TIMG_NUM_COLORS(timg);
   u32 i;
   int k;
 
-  for (i = 0; i < SAIL_TLUT_ENTRIES; i++)
+  for (i = 0; i < n; i++)
   {
     u32 c = i < count ? src[i] : 0;
     int ch[3];
@@ -370,7 +369,8 @@ static void boat_sailRecolor(u16 *dst, const u32 *timg, u32 rgb)
   }
 }
 
-/* The slot's tunic colour on the sail: a recoloured palette, or NULL (vanilla) for the default. */
+/* The slot's tunic colour on the sail: a recoloured palette, the vanilla copy for the default while the
+ * local sail is recoloured, or NULL (the live palette). */
 static void boat_sailColor(PuppetBoat *boat, u32 slotIndex)
 {
   volatile u8 *slot = (volatile u8 *)PUPPET_SLOT_BASE(slotIndex);
@@ -380,9 +380,14 @@ static void boat_sailColor(PuppetBoat *boat, u32 slotIndex)
   AppStoreFn store = (AppStoreFn)(u32)os__DCStoreRange;
   u16 *pal;
 
-  if (SAIL_TIMG(sail) == NULL || rgb == 0 || rgb == APP_DEFAULT_RGB)
+  if (SAIL_TIMG(sail) == NULL)
   {
     SAIL_SHOW(sail) = NULL;
+    return;
+  }
+  if (rgb == 0 || rgb == APP_DEFAULT_RGB)
+  {
+    SAIL_SHOW(sail) = (u8 *)boatlook_vanillaShown(BOATLOOK_PART_SAIL, SAIL_TIMG(sail)); // NULL: the live one is vanilla
     return;
   }
   if (boat->sailKey != APP_KEY(rgb))
@@ -390,7 +395,8 @@ static void boat_sailColor(PuppetBoat *boat, u32 slotIndex)
     if (boat->sailKey != 0)
       boat->sailCur ^= 1; // leave the palette the GPU may still be loading
     pal = SAIL_PAL(sail, boat->sailCur);
-    boat_sailRecolor(pal, SAIL_TIMG(sail), rgb);
+    boat_sailRecolor(pal, boatlook_source(BOATLOOK_PART_SAIL, SAIL_TIMG(sail)), TIMG_NUM_COLORS(SAIL_TIMG(sail)),
+                     SAIL_TLUT_ENTRIES, rgb);
     store(pal, SAIL_PAL_BYTES);
     boat->sailKey = APP_KEY(rgb);
   }
@@ -533,10 +539,10 @@ static u16 *boat_createHull(JKRSolidHeap *heap)
   return (u16 *)alloc(2 * HULL_PAL_BYTES, 32, heap);
 }
 
-/* The body's TEX1 headers, and the reference one (the first C8 / RGB565 header), or 0. */
-static u32 boat_hullHeaders(PuppetBoat *boat, u32 **first)
+/* fn_body's TEX1 headers, and the reference one (the first C8 / RGB565 header), or 0. */
+static u32 boat_texHeaders(J3DModelData *data, u32 **first)
 {
-  J3DTexture *tex = J3DMODELDATA_MMATERIALTABLE_MPTEXTURE(J3DMODEL_MPMODELDATA(boat->body));
+  J3DTexture *tex = J3DMODELDATA_MMATERIALTABLE_MPTEXTURE(data);
   u32 n, i;
   u8 *timg;
 
@@ -559,6 +565,11 @@ static u32 boat_hullHeaders(PuppetBoat *boat, u32 **first)
   return 0;
 }
 
+static u32 boat_hullHeaders(PuppetBoat *boat, u32 **first)
+{
+  return boat_texHeaders(J3DMODEL_MPMODELDATA(boat->body), first);
+}
+
 /* Is header t's palette the reference's (same count and colours)? Those are the ones swapped. */
 static int boat_hullSame(const u8 *t, const u32 *ref)
 {
@@ -577,11 +588,10 @@ static int boat_hullSame(const u8 *t, const u32 *ref)
   return 1;
 }
 
-/* fn_main1's palette with the red in the RGB565 colour c, keeping each entry's shading (see above). */
-static void boat_hullRecolor(u16 *dst, const u32 *timg, u32 c)
+/* fn_main1's palette src (count colours) with the red in the RGB565 colour c, keeping each entry's
+ * shading (see above), n entries. */
+static void boat_hullRecolor(u16 *dst, const u16 *src, u32 count, u32 n, u32 c)
 {
-  const u16 *src = (const u16 *)((const u8 *)timg + TIMG_PAL_OFFSET(timg));
-  u32 count = TIMG_NUM_COLORS(timg);
   int want[3];
   u32 i;
   int k;
@@ -589,7 +599,7 @@ static void boat_hullRecolor(u16 *dst, const u32 *timg, u32 c)
   want[0] = (int)((c >> 11) & 0x1F) << 3;
   want[1] = (int)((c >> 5) & 0x3F) << 2;
   want[2] = (int)(c & 0x1F) << 3;
-  for (i = 0; i < HULL_TLUT_ENTRIES; i++)
+  for (i = 0; i < n; i++)
   {
     u32 e = i < count ? src[i] : 0;
     int ch[3];
@@ -614,7 +624,8 @@ static void boat_hullRecolor(u16 *dst, const u32 *timg, u32 c)
   }
 }
 
-/* The slot's hull colour: a recoloured palette for this frame's body entry, or NULL (the classic red). */
+/* The slot's hull colour: a recoloured palette for this frame's body entry, the vanilla copy for the
+ * classic red while the local hull is recoloured, or NULL (the live palette). */
 static void boat_hullColor(PuppetBoat *boat, u32 slotIndex)
 {
   u32 c = *(volatile u16 *)(PUPPET_SLOT_BASE(slotIndex) + PUPPET_SLOT_OFF_BOAT_COLOR);
@@ -623,14 +634,21 @@ static void boat_hullColor(PuppetBoat *boat, u32 slotIndex)
   u16 *pal;
 
   boat->hullShow = NULL;
-  if (c == 0 || boat->hullPal == NULL || boat_hullHeaders(boat, &ref) == 0 || ref == NULL)
+  if (boat_hullHeaders(boat, &ref) == 0 || ref == NULL)
+    return;
+  if (c == 0)
+  {
+    boat->hullShow = (u16 *)boatlook_vanillaShown(BOATLOOK_PART_HULL, ref); // NULL: the live one is vanilla
+    return;
+  }
+  if (boat->hullPal == NULL)
     return;
   if (boat->hullKey != APP_KEY(c))
   {
     if (boat->hullKey != 0)
       boat->hullCur ^= 1; // leave the palette the GPU may still be loading
     pal = boat->hullPal + boat->hullCur * HULL_TLUT_ENTRIES;
-    boat_hullRecolor(pal, ref, c);
+    boat_hullRecolor(pal, boatlook_source(BOATLOOK_PART_HULL, ref), TIMG_NUM_COLORS(ref), HULL_TLUT_ENTRIES, c);
     store(pal, HULL_PAL_BYTES);
     boat->hullKey = APP_KEY(c);
   }

@@ -44,7 +44,7 @@ Exceptions: slot 15 (STAGE_TEST, `K_Test5` / `K_Testc`) has a key chest and a fl
 
 **Room page:** the Dungeons card (`DungeonsCardViewModel`, `DashboardView.axaml`) lists the five key dungeons: keys held (the derived count, or the game's own when not shared), "n of m keys found · n of m doors unlocked", and map / compass / big key / boss pips from `mDungeonItem` bits 0-3 (world flags, shared with Shared world). Read-only for everyone. There is no owner edit: a derived count has nothing to edit, the flags are the state.
 
-**Not used:** the scratch range 0x803FD1D0..0x803FD1DF stays free. There is no REL change: the game mod is untouched and nothing needs a re-patch.
+**Not used:** the scratch range 0x803FD1D0..0x803FD1DF was left free (0x803FD1D0 is now the boat look pointer, `BOATLOOK_PTR_ADDR`). There is no REL change: the game mod is untouched and nothing needs a re-patch.
 
 ### In-game checklist (dev-test, Shared world on)
 

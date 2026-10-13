@@ -193,7 +193,7 @@ public class PuppetLayoutTests
         Assert.True(PuppetLayout.PUPPET_BOAT_CRANE_0 >= PuppetLayout.CLIENT_DBG_SLOT0_GATES + 4);
         Assert.True(craneEnd <= PuppetLayout.CLIENT_HEARTBEAT_ADDR);
 
-        // Inside the scratch region (above .sbss2), clear of the small-keys reserve 0x803FD1D0..DF.
+        // Inside the scratch region (above .sbss2), clear of 0x803FD1D0..DF (the boat look word + 3 free words).
         foreach (var (start, end) in new[] { (PuppetLayout.PUPPET_BOAT_CANNON_0, cannonEnd), (PuppetLayout.PUPPET_BOAT_CRANE_0, craneEnd) })
         {
             Assert.True(start >= PuppetLayout.SCRATCH_REGION_START);
@@ -230,10 +230,25 @@ public class PuppetLayoutTests
     }
 
     [Fact]
-    public void BoatBlocks_LeaveTheReservedWordsFree()
+    public void BoatBlocks_EndAtTheBoatLookWord_BeforeWorldSync()
     {
-        // docs/small-keys.md reserves 0x803FD1D0..0x803FD1DF (between the boats and world sync).
-        Assert.True(PuppetLayout.PUPPET_BOAT_0 + (uint)(PuppetLayout.PUPPET_BOAT_SIZE * PuppetLayout.PUPPET_MAX_SLOTS) <= 0x803FD1D0u);
+        // 0x803FD1D0..DF: the boat look pointer, then 3 free words (between the boats and world sync).
+        Assert.True(PuppetLayout.PUPPET_BOAT_0 + (uint)(PuppetLayout.PUPPET_BOAT_SIZE * PuppetLayout.PUPPET_MAX_SLOTS) <= PuppetLayout.BOATLOOK_PTR_ADDR);
+        Assert.Equal(0x803FD1D0u, PuppetLayout.BOATLOOK_PTR_ADDR);
+        Assert.True(PuppetLayout.BOATLOOK_PTR_ADDR + 4 <= PuppetLayout.WORLDSYNC_ITEM_MASK_ADDR);
+    }
+
+    [Fact]
+    public void BoatLookBlock_HoldsTwoAlignedTluts_AfterItsState()
+    {
+        Assert.Equal(PuppetLayout.PUPPET_NAMES_OFF_BOOT, PuppetLayout.BOATLOOK_OFF_BOOT);
+        Assert.True(PuppetLayout.BOATLOOK_OFF_SAIL + PuppetLayout.BOATLOOK_PART_SIZE <= PuppetLayout.BOATLOOK_HEADER_SIZE);
+        Assert.True(PuppetLayout.BOATLOOK_HEADER_SIZE <= PuppetLayout.BOATLOOK_OFF_HULL_VANILLA);
+        Assert.Equal(0, PuppetLayout.BOATLOOK_OFF_HULL_VANILLA % PuppetLayout.BOATLOOK_ALIGN);
+        Assert.Equal(0, PuppetLayout.BOATLOOK_OFF_HULL_VANILLA % 32);
+        Assert.Equal(0, PuppetLayout.BOATLOOK_OFF_SAIL_VANILLA % 32);
+        Assert.Equal(PuppetLayout.BOATLOOK_OFF_HULL_VANILLA + 2 * PuppetLayout.BOATLOOK_PAL_ENTRIES, PuppetLayout.BOATLOOK_OFF_SAIL_VANILLA);
+        Assert.Equal(PuppetLayout.BOATLOOK_OFF_SAIL_VANILLA + 2 * PuppetLayout.BOATLOOK_PAL_ENTRIES, PuppetLayout.BOATLOOK_BLOCK_SIZE);
     }
 
     [Fact]
