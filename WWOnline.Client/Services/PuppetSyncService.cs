@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using Serilog;
 using WWOnline.Data;
+using WWOnline.Native;
 using WWOnline.Shared.Models;
 
 namespace WWOnline.Services;
@@ -10,6 +11,8 @@ namespace WWOnline.Services;
 /// Manages the bridge between network puppet data and Dolphin's emulated GameCube memory.
 /// Writes remote player positions/state to fixed memory addresses that the puppet C code reads.
 /// Also reads local player state for broadcasting to other players.
+/// On the native backend (<see cref="INativeGame"/>) the local Link comes from libtww's snapshot and the peers
+/// go to tww_set_peer instead (<see cref="WriteNativePeers"/>).
 /// </summary>
 public class PuppetSyncService : IDisposable
 {
@@ -51,10 +54,17 @@ public class PuppetSyncService : IDisposable
     private uint _wipeAllCalls;
     private uint _updateRemotePuppetCalls;
 
-    // Periodic one-line "[diag]" summary for the log file (2s at 20Hz) — the log is the
+    // Periodic one-line "[diag]" summary for the log file (every 2s) — the log is the
     // primary debugging surface for dev-test runs, so everything the Debug page shows lands here too.
-    private const int DiagLogEveryTicks = 40;
+    private const double DiagLogEveryMs = 2000;
     private int _diagTick;
+
+    // The write loop's tick: 20 Hz on Dolphin. Natively 60 Hz, so every game frame (30 Hz) takes the newest states the
+    // hub brought; the game plays them back by their send times (tww_smooth_set_time), whenever they came.
+    private const double DolphinTickMs = 50;
+    /// <summary>The native write loop's and the native puppet broadcast's tick (each game frame is sent once).</summary>
+    public const double NativeTickMs = 1000.0 / 60;
+    private double TickMs => _native != null ? NativeTickMs : DolphinTickMs;
 
     // Local proc (re)start tracking for PuppetData.Action.ProcSeq (see ReadLocalPlayerState).
     private byte _procSeq;
@@ -94,6 +104,11 @@ public class PuppetSyncService : IDisposable
     private DateTime _holdStartedUtc;
 
     public bool IsActive => _syncTimer?.Enabled ?? false;
+
+    /// <summary>On the native backend: the game's last published frame (null on Dolphin, or before the first).</summary>
+    public uint? NativeFrame => _native?.Snapshot?.Frame;
+
+    public bool IsNative => _native != null;
     public int ActiveSlotCount { get { lock (_slotLock) return _slotAssignments.Count; } }
 
     /// <summary>
@@ -136,14 +151,20 @@ public class PuppetSyncService : IDisposable
     private readonly GameSettingsService _settingsService;
     private readonly DespawnWorker _despawnWorker;
     private readonly LiveWorldPoke _liveWorld;
+    private readonly INativeGame? _native;
+    // The native local boat as of the last tick (read on the game thread), and the local boat look last sent.
+    private volatile BoatState? _nativeLocalBoat;
+    private (ushort Hull, uint Sail)? _nativeLocalLook;
 
     // Last equip ids read outside a REL equip swap (see EquipSwapGuard).
     private byte _lastSword, _lastShield;
 
+    /// <param name="native">The embedded game, on the native backend only (null: Dolphin).</param>
     public PuppetSyncService(IDolphinService dolphinService, GameSettingsService settingsService, DespawnWorker despawnWorker,
-        LiveWorldPoke liveWorld)
+        LiveWorldPoke liveWorld, INativeGame? native = null)
     {
         _dolphin = dolphinService;
+        _native = native;
         _settingsService = settingsService;
         _despawnWorker = despawnWorker;
         _liveWorld = liveWorld;
@@ -174,12 +195,12 @@ public class PuppetSyncService : IDisposable
             return;
         }
 
-        Logger.Information("Starting PuppetSyncService (20Hz sync)");
+        Logger.Information("Starting PuppetSyncService ({Hz:0}Hz sync)", 1000 / TickMs);
 
         lock (_writeLock)
             RepairInvalidHookState();
 
-        _syncTimer = new System.Timers.Timer(50); // 20Hz = 50ms
+        _syncTimer = new System.Timers.Timer(TickMs);
         _syncTimer.Elapsed += (_, _) =>
         {
             // Single writer: skip the tick rather than overlap a slow previous tick or a
@@ -188,7 +209,7 @@ public class PuppetSyncService : IDisposable
             try
             {
                 WriteSlotsToMemory();
-                if (Interlocked.Increment(ref _diagTick) % DiagLogEveryTicks == 0)
+                if (Interlocked.Increment(ref _diagTick) % (int)(DiagLogEveryMs / TickMs) == 0)
                     LogDiagnosticsSnapshot();
             }
             finally
@@ -235,6 +256,12 @@ public class PuppetSyncService : IDisposable
         _lastPuppetReceive.Clear();
         _lastSlotVisibility.Clear();
         _lastParkedBoatVisibility.Clear();
+
+        if (_native != null)
+        {
+            _native.Post(ClearPeers);
+            return;
+        }
 
         if (!_dolphin.IsConnected)
             return;
@@ -370,7 +397,7 @@ public class PuppetSyncService : IDisposable
     /// </summary>
     private void RepairInvalidHookState()
     {
-        if (!_dolphin.IsConnected) return;
+        if (!_dolphin.IsConnected || _native != null) return;
 
         var states = _dolphin.ReadMemory(GameMemoryAddresses.PuppetSync.SpawnStateAddr, 4 * GameMemoryAddresses.PuppetSync.MaxSlots);
         if (states == null) return;
@@ -523,7 +550,11 @@ public class PuppetSyncService : IDisposable
         _lastParkedBoatVisibility.TryRemove(playerId, out _);
         _playerNames.TryRemove(playerId, out _);
 
-        if (_dolphin.IsConnected)
+        if (_native != null)
+        {
+            _native.Post(api => ClearPeer(api, slot));
+        }
+        else if (_dolphin.IsConnected)
         {
             lock (_writeLock)
                 ZeroSlotMemory(slot);
@@ -634,7 +665,7 @@ public class PuppetSyncService : IDisposable
     /// </summary>
     public PuppetSpawnCounters? ReadSpawnCounters()
     {
-        if (!_dolphin.IsConnected) return null;
+        if (!_dolphin.IsConnected || _native != null) return null; // the native game has no spawn hook
         return new PuppetSpawnCounters
         {
             MagicDetected    = ReadU32(GameMemoryAddresses.PuppetSync.DbgMagicDetectedAddr),
@@ -669,7 +700,14 @@ public class PuppetSyncService : IDisposable
                 .Select(r => $"{r.Slot}:{r.ShortId} vis={(r.IsVisible ? 1 : 0)} data={(r.HasPuppetData ? 1 : 0)} " +
                              $"age={r.AgeText} at={r.PuppetStage}:{r.PuppetRoom} pos={r.PositionText} dist={r.DistanceText}");
             var c = ReadSpawnCounters();
-            if (c == null) return;
+            if (c == null)
+            {
+                if (_native != null)
+                    Logger.Information("[diag] native local={Stage}:{Room} pos=({X:F0},{Y:F0},{Z:F0}) slots=[{Slots}] rx={Rx} wipes={Wipes}",
+                        _lastLocalStage, _lastLocalRoom, _lastLocalX, _lastLocalY, _lastLocalZ, string.Join(" | ", slots),
+                        _updateRemotePuppetCalls, _wipeAllCalls);
+                return;
+            }
 
             Logger.Information(
                 "[diag] local={Stage}:{Room} pos=({X:F0},{Y:F0},{Z:F0}) hold={Hold} slots=[{Slots}] " +
@@ -757,6 +795,12 @@ public class PuppetSyncService : IDisposable
     /// </summary>
     private void WriteSlotsToMemory()
     {
+        if (_native != null)
+        {
+            WriteNativePeers(_native);
+            return;
+        }
+
         if (!_dolphin.IsConnected)
             return;
 
@@ -1028,10 +1072,7 @@ public class PuppetSyncService : IDisposable
             // (Non-short-circuit | : every check updates its own state every tick.)
             // The other players on the sea chart (SeaChartMarkers): everyone on the sea, visible or not. The chart
             // calls into the REL while the menu is open, so keep one loaded while they're on the sea with us.
-            var chartPlayers = _remotePuppets
-                .Where(kv => !_lastPuppetReceive.TryGetValue(kv.Key, out var rx) || (now - rx).TotalMilliseconds < StaleDataMillis)
-                .Select(kv => kv.Value).ToList();
-            bool chartNeedsRel = SeaChartMarkers.Publish(_dolphin, localStage, chartPlayers);
+            bool chartNeedsRel = SeaChartMarkers.Publish(_dolphin, localStage, FreshRemotePuppets(now));
 
             int desiredCount = highestActiveSlot + 1;
             if (_despawnWorker.IsNeeded(_dolphin) | _liveWorld.IsNeeded(_dolphin) | LocalLookNeedsRel(linkPtr!.Value, localLook) |
@@ -1160,6 +1201,8 @@ public class PuppetSyncService : IDisposable
     {
         if (!_dolphin.IsConnected)
             return null;
+        if (_native != null)
+            return ReadNativeLocalState(_native);
 
         try
         {
@@ -1282,16 +1325,7 @@ public class PuppetSyncService : IDisposable
                     GrabKind = grabKind,
                     GrabFuse = grabFuse,
                 },
-                Appearance = new AppearanceState
-                {
-                    ClothesType = appearance.ClothesType,
-                    ColorR = appearance.ColorR,
-                    ColorG = appearance.ColorG,
-                    ColorB = appearance.ColorB,
-                    BoatR = appearance.BoatR,
-                    BoatG = appearance.BoatG,
-                    BoatB = appearance.BoatB,
-                },
+                Appearance = CopyAppearance(appearance),
                 StageName = stageName,
                 RoomNumber = roomNumber ?? 0,
                 Timestamp = DateTime.UtcNow,
@@ -1308,6 +1342,176 @@ public class PuppetSyncService : IDisposable
             Logger.Error(ex, "Error reading local player state");
             return null;
         }
+    }
+
+    private static AppearanceState CopyAppearance(AppearanceState a) => new()
+    {
+        ClothesType = a.ClothesType,
+        ColorR = a.ColorR,
+        ColorG = a.ColorG,
+        ColorB = a.ColorB,
+        BoatR = a.BoatR,
+        BoatG = a.BoatG,
+        BoatB = a.BoatB,
+    };
+
+    /// <summary>The native backend's <see cref="ReadLocalPlayerState"/>: libtww's last snapshot of the local Link.</summary>
+    private PuppetData? ReadNativeLocalState(INativeGame native)
+    {
+        if (native.Snapshot is not { } snapshot || NativePuppets.FromLocal(snapshot.Local) is not { } data)
+            return null;
+        data.Timestamp = snapshot.Time;
+        data.Appearance = CopyAppearance(LocalAppearance);
+        var puppet = (native as INativePuppetGame)?.PuppetSnapshot;
+        if (puppet != null)
+            NativePuppetFidelity.AddLocal(data, puppet);
+        // Proc (re)start detection: a new proc, or the lower-body anim's frame jumping back (a combo swing
+        // re-inits the same proc; no combo counter natively).
+        float underFrame = puppet?.Anim.Track[0].Frame ?? 0f;
+        if (data.Action.CurProc != _lastProc || underFrame < _lastUnderFrame - 0.5f)
+            _procSeq++;
+        _lastProc = data.Action.CurProc;
+        _lastUnderFrame = underFrame;
+        data.Action.ProcSeq = _procSeq;
+        data.Boat = _nativeLocalBoat;
+        // Read on the game thread, where its game reads are direct: a send never waits for frames (that held the
+        // native broadcast to ~16 a second). It reaches this send in the test's inline fake, else the next one.
+        string stage = data.StageName;
+        native.Post(_ => LocalWarp = _warpReader.Read(_dolphin, stage));
+        data.Warp = LocalWarp;
+        return data;
+    }
+
+    /// <summary>
+    /// The native backend's 20Hz tick: each slot's peer goes to tww_set_peer while they are fresh and in sight
+    /// (<see cref="PuppetVisibility"/>, as on Dolphin), NULL otherwise and while the local game isn't idle
+    /// (TWW_LOC_IDLE: loading, no player). The game spawns and deletes the puppets itself, so there is no hook
+    /// header, settle delay or hold window here.
+    /// </summary>
+    private void WriteNativePeers(INativeGame native)
+    {
+        if (!native.IsRunning || native.Snapshot is not { } snapshot)
+            return;
+
+        try
+        {
+            var local = snapshot.Local;
+            var location = local.Valid != 0 ? local.Loc : snapshot.Location;
+            string localStage = location.Stage.ToString();
+            byte localRoom = unchecked((byte)location.Room);
+            _lastLocalStage = localStage;
+            _lastLocalRoom = localRoom;
+            if (local.Valid != 0)
+                (_lastLocalX, _lastLocalY, _lastLocalZ) = (local.Pos[0], local.Pos[1], local.Pos[2]);
+            bool idle = local.Valid != 0 && location.Flags.HasFlag(TwwLocationFlags.Idle);
+
+            var peers = new TwwPeerState?[TwwNative.MaxPeers];
+            var anims = new TwwPuppetAnim?[TwwNative.MaxPeers];
+            var looks = new TwwPuppetLook?[TwwNative.MaxPeers];
+            var boats = new TwwBoatState?[TwwNative.MaxPeers];
+            var boatLooks = new TwwBoatLook[TwwNative.MaxPeers];
+            var sentAt = new double[TwwNative.MaxPeers];
+            Vector3? localShipPos = _nativeLocalBoat?.Position;
+            DateTime now = DateTime.UtcNow;
+            for (int i = 0; i < peers.Length; i++)
+            {
+                if (!idle || GetPlayerInSlot(i) is not { } playerId || !_remotePuppets.TryGetValue(playerId, out var puppet))
+                    continue;
+                sentAt[i] = TwwNative.SentAt(puppet.Timestamp);
+
+                bool fresh = !_lastPuppetReceive.TryGetValue(playerId, out var lastRx)
+                             || (now - lastRx).TotalMilliseconds < StaleDataMillis;
+                bool hadVisibility = _lastSlotVisibility.TryGetValue(playerId, out var wasVisible);
+                bool visible = fresh && PuppetVisibility.IsSameLocation(localStage, localRoom, _lastLocalX, _lastLocalZ, puppet,
+                                                                        hadVisibility && wasVisible);
+                if (!hadVisibility || wasVisible != visible)
+                    Logger.Information(
+                        "[puppet] slot {Slot} ({Player}) visible {Old} -> {New} (native, fresh={Fresh} theirs={TheirStage}:{TheirRoom} ours={OurStage}:{OurRoom})",
+                        i, ShortId(playerId), hadVisibility ? wasVisible : (bool?)null, visible,
+                        fresh, puppet.StageName, puppet.RoomNumber, localStage, localRoom);
+                _lastSlotVisibility[playerId] = visible;
+                if (visible)
+                {
+                    peers[i] = NativePuppets.ToPeer(puppet);
+                    anims[i] = NativePuppetFidelity.ToAnim(puppet);
+                    looks[i] = NativePuppetFidelity.ToLook(puppet);
+                }
+
+                // A parked boat is seen where it is, whether its player is or not.
+                bool boatHadVisibility = _lastParkedBoatVisibility.TryGetValue(playerId, out var boatWasVisible);
+                bool parkedBoatShown = fresh && ParkedBoatInSight(localStage, localRoom, _lastLocalX, _lastLocalZ,
+                    puppet.StageName, puppet.Boat, localShipPos, boatHadVisibility && boatWasVisible);
+                _lastParkedBoatVisibility[playerId] = parkedBoatShown;
+                if (NativeBoats.Shown(puppet, visible, parkedBoatShown) is { } boat)
+                {
+                    boats[i] = NativeBoats.ToPeer(boat, puppet.StageName);
+                    boatLooks[i] = NativeBoats.Look(puppet.Appearance);
+                }
+            }
+
+            // Name tags and the other players on the sea chart (everyone fresh on the sea, visible or not).
+            var names = ShowPlayerNames ? GetSlotNames() : [];
+            var markers = SeaChartMarkers.Markers(FreshRemotePuppets(now));
+            var look = LocalAppearance;
+            TwwBoatLook localLook = NativeBoats.Look(LocalAppearance);
+            bool lookChanged = _nativeLocalLook != (localLook.HullRgb565, localLook.SailRgb);
+            _nativeLocalLook = (localLook.HullRgb565, localLook.SailRgb);
+            native.Post(api =>
+            {
+                if (api is ITwwSmoothApi smooth)
+                {
+                    for (int i = 0; i < sentAt.Length; i++)
+                        smooth.SetPeerTime(i, sentAt[i]);
+                }
+                for (int i = 0; i < peers.Length; i++)
+                    api.SetPeer(i, peers[i]);
+                NativeOverlay.Publish(api, names, markers);
+                if (api is ITwwPuppetApi puppets)
+                {
+                    for (int i = 0; i < peers.Length; i++)
+                    {
+                        puppets.SetPuppetAnim(i, anims[i]);
+                        puppets.SetPuppetLook(i, looks[i]);
+                    }
+                    puppets.SetLocalOutfit((TwwPuppetClothes)look.ClothesType, look.ColorR, look.ColorG, look.ColorB);
+                }
+                if (api is ITwwBoatApi boatApi)
+                {
+                    for (int i = 0; i < boats.Length; i++)
+                        boatApi.SetPeerBoat(i, boats[i], boats[i] != null ? boatLooks[i] : null);
+                    if (lookChanged)
+                        boatApi.SetLocalBoatLook(localLook);
+                    _nativeLocalBoat = boatApi.GetLocalBoat(out var local) ? NativeBoats.FromLocal(local) : null;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Error writing native puppet peers");
+        }
+    }
+
+    /// <summary>The remote players heard from within <see cref="StaleDataMillis"/>.</summary>
+    private List<PuppetData> FreshRemotePuppets(DateTime now) => _remotePuppets
+        .Where(kv => !_lastPuppetReceive.TryGetValue(kv.Key, out var rx) || (now - rx).TotalMilliseconds < StaleDataMillis)
+        .Select(kv => kv.Value).ToList();
+
+    private static void ClearPeers(ITwwApi api)
+    {
+        for (int i = 0; i < TwwNative.MaxPeers; i++)
+            ClearPeer(api, i);
+        NativeOverlay.Publish(api, [], []);
+    }
+
+    private static void ClearPeer(ITwwApi api, int slot)
+    {
+        api.SetPeer(slot, null);
+        if (api is ITwwPuppetApi puppets)
+        {
+            puppets.SetPuppetAnim(slot, null);
+            puppets.SetPuppetLook(slot, null);
+        }
+        (api as ITwwBoatApi)?.SetPeerBoat(slot, null, null);
     }
 
     /// <summary>
@@ -1483,7 +1687,7 @@ public class PuppetSyncService : IDisposable
     }
 
     /// <summary>Returns the player ID assigned to the given slot, or null if empty.</summary>
-    private string? GetPlayerInSlot(int slot)
+    public string? GetPlayerInSlot(int slot)
     {
         lock (_slotLock)
         {

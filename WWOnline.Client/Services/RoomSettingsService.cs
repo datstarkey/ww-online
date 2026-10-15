@@ -42,7 +42,7 @@ public class RoomSettingsService : IDisposable
     });
 
     public Task SetAsync(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory, bool sharedProjectiles,
-                         bool sharedBait, bool sharedSpoils, bool sharedDelivery, bool allowWarping)
+                         bool sharedBait, bool sharedSpoils, bool sharedDelivery, bool allowWarping, bool pvp)
     {
         var requested = Current.Clone();
         requested.SharedWallet = sharedWallet;
@@ -54,6 +54,15 @@ public class RoomSettingsService : IDisposable
         requested.SharedSpoils = sharedSpoils;
         requested.SharedDelivery = sharedDelivery;
         requested.AllowWarping = allowWarping;
+        requested.Pvp = pvp;
+        return _signalR.SetRoomSettingsAsync(requested);
+    }
+
+    /// <summary>Room owner: turn PVP on or off, the other rules as they are.</summary>
+    public Task SetPvpAsync(bool on)
+    {
+        var requested = Current.Clone();
+        requested.Pvp = on;
         return _signalR.SetRoomSettingsAsync(requested);
     }
 
@@ -63,7 +72,7 @@ public class RoomSettingsService : IDisposable
         var requested = Current.Clone().ApplyPreset(preset);
         return SetAsync(requested.SharedWallet, requested.SharedWorld, requested.SharedItems, requested.SharedStory,
                         requested.SharedProjectiles, requested.SharedBait, requested.SharedSpoils,
-                        requested.SharedDelivery, requested.AllowWarping);
+                        requested.SharedDelivery, requested.AllowWarping, requested.Pvp);
     }
 
     private void Apply(RoomSettings settings)
@@ -74,7 +83,7 @@ public class RoomSettingsService : IDisposable
             old.SharedItems != settings.SharedItems || old.SharedStory != settings.SharedStory ||
             old.SharedProjectiles != settings.SharedProjectiles || old.SharedBait != settings.SharedBait ||
             old.SharedSpoils != settings.SharedSpoils || old.SharedDelivery != settings.SharedDelivery || old.AllowWarping != settings.AllowWarping ||
-            old.OwnerConnectionId != settings.OwnerConnectionId)
+            old.Pvp != settings.Pvp || old.OwnerConnectionId != settings.OwnerConnectionId)
         {
             Logger.Information("[room] rules: {Rules}; owner {Owner}{Me}",
                 settings.RulesSummary(), settings.OwnerName, IsOwner ? " (me)" : "");

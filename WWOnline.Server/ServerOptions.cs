@@ -20,6 +20,7 @@ public sealed record ServerOptions
     public const string SharedSpoilsVar = "WWO_SHARED_SPOILS";
     public const string SharedDeliveryVar = "WWO_SHARED_DELIVERY";
     public const string AllowWarpingVar = "WWO_ALLOW_WARPING";
+    public const string PvpVar = "WWO_PVP";
     public const string OwnerKeyVar = "WWO_OWNER_KEY";
     public const string LogFileVar = "WWO_LOG_FILE";
 
@@ -29,7 +30,7 @@ public sealed record ServerOptions
                                [--no-shared-wallet] [--no-shared-world] [--no-shared-items] [--no-shared-story]
                                [--no-shared-bait] [--no-shared-spoils] [--no-shared-delivery]
                                [--no-shared-projectiles]
-                               [--no-warping]
+                               [--no-warping] [--pvp]
                                [--version] [--help]
 
         Environment variables (a command-line flag wins over its variable):
@@ -43,6 +44,7 @@ public sealed record ServerOptions
           WWO_SHARED_DELIVERY the delivery bag's quest items (trade goods, letters...) are one room bag
           WWO_SHARED_PROJECTILES  other players' bombs, cannon shots and arrows are real in your world
           WWO_ALLOW_WARPING   players can warp to each other (Warp to on the Room page)
+          WWO_PVP             players can hurt each other (native games only; default false)
           WWO_OWNER_KEY       a player who enters this key in the client becomes the room owner
           WWO_LOG_FILE        also log to this file (the console log is always on)
         """;
@@ -58,6 +60,7 @@ public sealed record ServerOptions
     public bool SharedSpoils { get; init; } = true;
     public bool SharedDelivery { get; init; } = true;
     public bool AllowWarping { get; init; } = true;
+    public bool Pvp { get; init; }
 
     /// <summary>
     /// The secret that claims room ownership (GameHub.ClaimRoomOwner). A client that hosts the
@@ -91,6 +94,7 @@ public sealed record ServerOptions
             SharedSpoils = EnvBool(getEnv, SharedSpoilsVar, o.SharedSpoils, errors),
             SharedDelivery = EnvBool(getEnv, SharedDeliveryVar, o.SharedDelivery, errors),
             AllowWarping = EnvBool(getEnv, AllowWarpingVar, o.AllowWarping, errors),
+            Pvp = EnvBool(getEnv, PvpVar, o.Pvp, errors),
             OwnerKey = Env(getEnv, OwnerKeyVar),
             LogFile = Env(getEnv, LogFileVar),
         };
@@ -117,6 +121,7 @@ public sealed record ServerOptions
                 case "--no-shared-spoils": o = o with { SharedSpoils = false }; break;
                 case "--no-shared-delivery": o = o with { SharedDelivery = false }; break;
                 case "--no-warping": o = o with { AllowWarping = false }; break;
+                case "--pvp": o = o with { Pvp = true }; break;
                 default:
                     // A bare number is the port (an out-of-range or overflowing one is an error).
                     // Anything else is left for ASP.NET's own command-line configuration

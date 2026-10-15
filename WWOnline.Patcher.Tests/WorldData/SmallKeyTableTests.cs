@@ -109,11 +109,17 @@ public class SmallKeyTableTests(ITestOutputHelper output)
 
     /// <summary>The vanilla dungeons have exactly as many small keys as key doors (docs/small-keys.md).</summary>
     [VanillaGameFact]
-    public void VanillaGame_EveryDungeonHasAsManyKeysAsKeyDoors()
-    {
+    public void VanillaGame_EveryDungeonHasAsManyKeysAsKeyDoors() => AssertKeysMatchDoors(TestRepo.VanillaGamePath()!);
+
+    /// <summary>The same, from the disc image (the native backend has no extracted game).</summary>
+    [DiscFact]
+    public void TheDisc_EveryDungeonHasAsManyKeysAsKeyDoors() => AssertKeysMatchDoors(Environment.GetEnvironmentVariable(DiscFactAttribute.Variable)!);
+
+    private void AssertKeysMatchDoors(string game)
+{
         var watch = Stopwatch.StartNew();
         var skipped = new List<string>();
-        var table = SmallKeyTableBuilder.BuildFromGame(TestRepo.VanillaGamePath()!, skipped.Add);
+        var table = SmallKeyTableBuilder.BuildFromGame(game, skipped.Add);
         output.WriteLine($"built in {watch.ElapsedMilliseconds} ms from {table?.StageCount} stages; {table?.Summary()}");
         Assert.NotNull(table);
         Assert.Empty(skipped);

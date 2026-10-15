@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:WWOnline.ViewModels"
+             xmlns:views="using:WWOnline.Views"
              x:Class="WWOnline.Views.SetupWizardView"
              x:DataType="vm:SetupWizardViewModel">
 
@@ -149,7 +150,36 @@
                             </Grid>
                         </Border>
 
-                        <Border Classes="ww-card" Padding="22,18">
+                        <Border Classes="ww-card" Padding="22,18" IsVisible="{Binding IsNative}">
+                            <StackPanel Spacing="14">
+                                <TextBlock Text="THIS SETUP WILL" Classes="ww-label" />
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto">
+                                    <Border Grid.Row="0" Classes="ww-icon-tile" Margin="0,0,14,12">
+                                        <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconChest}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                    </Border>
+                                    <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2" VerticalAlignment="Center" Margin="0,0,0,12">
+                                        <TextBlock Text="Find your disc" FontWeight="SemiBold" />
+                                        <TextBlock Classes="hint" Text="Your GZLE01 .iso, checked to be the right one. It is only read, never changed." />
+                                    </StackPanel>
+                                    <Border Grid.Row="1" Classes="ww-icon-tile" Margin="0,0,14,12">
+                                        <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSliders}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                    </Border>
+                                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2" VerticalAlignment="Center" Margin="0,0,0,12">
+                                        <TextBlock Text="Pick your look" FontWeight="SemiBold" />
+                                        <TextBlock Classes="hint" Text="Your name and tunic colour." />
+                                    </StackPanel>
+                                    <Border Grid.Row="2" Classes="ww-icon-tile" Margin="0,0,14,0">
+                                        <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
+                                    </Border>
+                                    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="Build the game" FontWeight="SemiBold" />
+                                        <TextBlock Classes="hint" Text="Builds the game on this Mac from the native port's source and your disc." />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="ww-card" Padding="22,18" IsVisible="{Binding IsDolphinBackend}">
                             <StackPanel Spacing="14">
                                 <TextBlock Text="THIS SETUP WILL" Classes="ww-label" />
                                 <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">
@@ -188,7 +218,19 @@
                     </StackPanel>
 
                     <!-- ── 3. Your game (after Dolphin: its DolphinTool extracts the disc) ── -->
-                    <StackPanel Spacing="22" IsVisible="{Binding IsGame}">
+                    <!-- ── Your disc (native backend) ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding ShowNativeGame}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Your disc" Classes="ww-title" />
+                            <TextBlock Classes="lead"
+                                       Text="The game runs straight from your disc image. Choose it and WW-Online checks that it is the right one." />
+                        </StackPanel>
+                        <Border Classes="ww-card" Padding="22,18">
+                            <views:NativeDiscView DataContext="{Binding Native}" />
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Spacing="22" IsVisible="{Binding ShowDolphinGame}">
                         <StackPanel Spacing="10">
                             <TextBlock Text="Your game" Classes="ww-title" />
                             <TextBlock Classes="lead"
@@ -415,7 +457,19 @@
                     </StackPanel>
 
                     <!-- ── 6. Patch ── -->
-                    <StackPanel Spacing="22" IsVisible="{Binding IsPatch}">
+                    <!-- ── Build the game (native backend) ── -->
+                    <StackPanel Spacing="22" IsVisible="{Binding ShowNativeBuild}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Build the game" Classes="ww-title" />
+                            <TextBlock Classes="lead"
+                                       Text="WW-Online builds the game on this Mac from the native port's source and your disc. It needs Xcode's command line tools, cmake, ninja and Python (brew install cmake ninja python)." />
+                        </StackPanel>
+                        <Border Classes="ww-card" Padding="22,18">
+                            <views:NativeBuildView DataContext="{Binding Native}" />
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Spacing="22" IsVisible="{Binding ShowDolphinPatch}">
                         <StackPanel Spacing="10">
                             <TextBlock Text="Patch your game" Classes="ww-title" />
                             <TextBlock Classes="lead"
@@ -484,7 +538,19 @@
                             <TextBlock Classes="lead" Text="{Binding DolphinHint}" />
                         </StackPanel>
 
-                        <Border Classes="ww-warn-banner" IsVisible="{Binding !IsGameReady}">
+                        <Border Classes="ww-warn-banner" IsVisible="{Binding ShowNotBuiltWarning}">
+                            <Grid ColumnDefinitions="Auto,*">
+                                <Viewbox Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,10,0">
+                                    <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />
+                                </Viewbox>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="The game isn't built yet" FontWeight="SemiBold" Foreground="{StaticResource GoldTextBrush}" />
+                                    <TextBlock FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource GoldTextSoftBrush}"
+                                               Text="Build it from Settings before you host or join a room." />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Classes="ww-warn-banner" IsVisible="{Binding ShowNotPatchedWarning}">
                             <Grid ColumnDefinitions="Auto,*">
                                 <Viewbox Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,10,0">
                                     <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />

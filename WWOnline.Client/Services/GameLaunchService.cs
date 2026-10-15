@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Serilog;
+using WWOnline.Native;
 using WWOnline.Patcher.Pipeline;
 
 namespace WWOnline.Services;
@@ -61,6 +62,23 @@ public sealed record LaunchReadiness(bool CanLaunch, string? Problem)
             return new(false, NotPatchedMessage);
         if (!File.Exists(Path.Combine(settings.GamePath, "sys", "main.dol")))
             return new(false, NotPatchedMessage);
+        return Ready;
+    }
+
+    /// <summary>
+    /// The native backend's rule: a libtww to load (<paramref name="library"/>, <see cref="NativePaths.Library(GameSettings)"/>)
+    /// and a disc image (<paramref name="disc"/>, <see cref="NativePaths.Disc(GameSettings)"/>), both existing.
+    /// </summary>
+    public static LaunchReadiness EvaluateNative(string? library, string? disc)
+    {
+        if (library == null)
+            return new(false, $"The native game isn't built yet. Set {NativePaths.LibraryVariable} to your libtww.dylib.");
+        if (!File.Exists(library))
+            return new(false, $"libtww not found: {library}");
+        if (disc == null)
+            return new(false, $"No disc image is set. Set {NativePaths.DiscVariable} to your Wind Waker (GZLE01) disc image.");
+        if (!File.Exists(disc))
+            return new(false, $"Disc image not found: {disc}");
         return Ready;
     }
 
@@ -170,7 +188,8 @@ public sealed class DolphinProcessStarter : IDolphinStarter
 }
 
 /// <summary>
-/// Starts the patched game in Dolphin and attaches to it: after hosting or joining a room (when
+/// Starts the game. On the native backend (<see cref="GameHost"/>): the embedded game, then the sync once it runs.
+/// Otherwise the patched game in Dolphin, attaching to it: after hosting or joining a room (when
 /// <see cref="GameSettings.AutoLaunchDolphin"/> is on), from the Dolphin page's Start game, and the
 /// CLI's --auto-attach. Also the one "attach to this Dolphin" implementation (the Dolphin page's
 /// Attach button uses <see cref="AttachAsync"/>).
@@ -192,15 +211,18 @@ public sealed class GameLaunchService : IDisposable
     private readonly Func<Action, Task> _runOnUi;
     private readonly SemaphoreSlim _attachLock = new(1, 1);
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly GameHost? _nativeHost;
+    private bool _nativeSyncStarted;
     private int _busy;
     private GameLaunchStatus _status = GameLaunchStatus.Idle;
 
     public GameLaunchService(GameSettingsService settings, OptionalPatchCatalogService patchCatalog, IDolphinService dolphin,
-        GameMemoryMonitorService memoryMonitor, GameSyncService gameSync)
+        GameMemoryMonitorService memoryMonitor, GameSyncService gameSync, GameHost? nativeHost = null)
         : this(settings, patchCatalog.CheckGameBuild, dolphin, () => { memoryMonitor.Start(); gameSync.Start(); },
             new DolphinProcessStarter(), TimeSpan.FromSeconds(2), maxAttachAttempts: 90,
             a => Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(a).GetTask())
     {
+        _nativeHost = nativeHost;
     }
 
     /// <param name="settings">Dolphin path and patched game folder.</param>
@@ -266,6 +288,9 @@ public sealed class GameLaunchService : IDisposable
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _shutdown.Token);
         try
         {
+            if (_nativeHost != null)
+                return await StartNativeAsync(_nativeHost, linked.Token).ConfigureAwait(false);
+
             if (_dolphin.IsConnected)
                 return SetStatus(new(GameLaunchState.Attached, $"Already attached to Dolphin (PID {_dolphin.ConnectedProcessId})."));
 
@@ -342,6 +367,60 @@ public sealed class GameLaunchService : IDisposable
         {
             Interlocked.Exchange(ref _busy, 0);
         }
+    }
+
+    /// <summary>How long tww_init may take before Start game gives up waiting (the game keeps starting).</summary>
+    private static readonly TimeSpan NativeStartTimeout = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Start the embedded game (once per process: it cannot restart), wait until it runs, then start the sync.
+    /// MainViewModel hosts its view as soon as it starts (<see cref="GameHost.Started"/>): the game thread waits for it.
+    /// </summary>
+    private async Task<GameLaunchStatus> StartNativeAsync(GameHost host, CancellationToken ct)
+    {
+        if (host.IsRunning && _nativeSyncStarted)
+            return SetStatus(new(GameLaunchState.Attached, "The game is running."));
+        if (host.HasFailed)
+            return SetStatus(new(GameLaunchState.Failed, host.FatalCode >= 0
+                ? $"The game stopped (code {host.FatalCode}). Restart WW-Online to start it again."
+                : "The game couldn't start (see the log). Restart WW-Online to try again."));
+        if (!host.IsStarted)
+        {
+            var settings = _settings.Load();
+            string? library = NativePaths.Library(settings), disc = NativePaths.Disc(settings);
+            var readiness = LaunchReadiness.EvaluateNative(library, disc);
+            if (!readiness.CanLaunch)
+                return SetStatus(new(GameLaunchState.Blocked, readiness.Problem!));
+            Directory.CreateDirectory(NativePaths.UserDirectory);
+            // --hidden: the view is outside any window (App.RunWithoutWindow), so the game runs headless.
+            host.Start(library!, disc!, $"COS_USER_DIR={NativePaths.UserDirectory}" + (Program.StartupOptions.Hidden ? ";COS_HEADLESS=1" : ""));
+        }
+
+        if (!host.IsRunning)
+        {
+            SetStatus(new(GameLaunchState.WaitingForGame, "Starting the game…"));
+            var deadline = DateTime.UtcNow + NativeStartTimeout;
+            while (!host.IsRunning)
+            {
+                if (host.HasFailed)
+                    return SetStatus(new(GameLaunchState.Failed, "The game couldn't start (see the log). Restart WW-Online to try again."));
+                if (DateTime.UtcNow > deadline)
+                    return SetStatus(new(GameLaunchState.Failed, "The game is taking too long to start. Press Start game again to keep waiting."));
+                await Task.Delay(100, ct).ConfigureAwait(false);
+            }
+        }
+
+        await _attachLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await _runOnUi(_onAttached).ConfigureAwait(false);
+            _nativeSyncStarted = true;
+        }
+        finally
+        {
+            _attachLock.Release();
+        }
+        return SetStatus(new(GameLaunchState.Attached, "The game is running."));
     }
 
     /// <summary>

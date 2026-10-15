@@ -26,6 +26,7 @@ internal sealed class FakeDolphin : IDolphinService
 
     public uint GetU32(uint addr) => (uint)(Get(addr) << 24 | Get(addr + 1) << 16 | Get(addr + 2) << 8 | Get(addr + 3));
 
+    public IPlayInventory Play => new DolphinPlayInventory(this);
     public bool IsConnected => true;
     public int? ConnectedProcessId => 1;
     public long? EmulatedMemorySize => null;

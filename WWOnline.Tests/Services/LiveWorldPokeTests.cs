@@ -39,7 +39,7 @@ public class LiveWorldPokeTests
     private static LiveWorldPoke.TickResult? Tick(LiveWorldPoke poke, FakeDolphin game, uint[] live)
     {
         poke.SetLive(0, live);
-        return poke.Tick(game);
+        return poke.Tick(new DolphinWorldGame(game));
     }
 
     private static uint[] Chest(int n) { var w = new uint[LiveWorldPoke.Words]; w[0] = 1u << n; return w; }

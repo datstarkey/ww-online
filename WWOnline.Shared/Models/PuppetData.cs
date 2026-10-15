@@ -293,11 +293,19 @@ public class AnimationState
     [JsonPropertyName("handR")]
     public byte HandRight { get; set; }
 
+    /// <summary>
+    /// upper[2], the item track (aim holds, throws, carrying), with its frame and rate; null: not sent (older
+    /// clients and the Dolphin REL path go by <see cref="UpperBodyAnimation"/> alone). Its bck is the same index.
+    /// </summary>
+    [JsonPropertyName("itemTrack")]
+    public AnimTrack? ItemTrack { get; set; }
+
     /// <summary>under[0..1] + upper[0..1]; PUPPET_ANM_TRACKS in puppet_shared.h (a test keeps them equal).</summary>
     public const int TrackCount = 4;
 
-    public bool IsValid() => Tracks == null ||
-        (Tracks.Length <= TrackCount && Tracks.All(t => t != null && t.IsValid()));
+    public bool IsValid() => (Tracks == null ||
+        (Tracks.Length <= TrackCount && Tracks.All(t => t != null && t.IsValid()))) &&
+        (ItemTrack == null || ItemTrack.IsValid());
 }
 
 /// <summary>
@@ -357,6 +365,10 @@ public class EquipmentState
 
     [JsonPropertyName("shieldId")]
     public byte ShieldId { get; set; }
+
+    /// <summary>The bracelet equip slot (mSelectEquip[2]: 0x28 Power Bracelets, 0xFF none); null: not sent.</summary>
+    [JsonPropertyName("braceletId")]
+    public byte? BraceletId { get; set; }
 
     [JsonPropertyName("itemInHand")]
     public ushort ItemInHand { get; set; }
@@ -483,6 +495,11 @@ public class ActionState
     /// <summary>mBodyAngle.y (+0x2B6): aim yaw, relative to the facing.</summary>
     [JsonPropertyName("bodyAngleY")]
     public short BodyAngleY { get; set; }
+
+    /// <summary>Hurt and flashing red (daPy_lk_c::mDamageWaitTimer &gt; 0): the puppet flashes the same. Native clients
+    /// only; false from Dolphin.</summary>
+    [JsonPropertyName("damageFlash")]
+    public bool DamageFlash { get; set; }
 
     [JsonPropertyName("pressedButtons")]
     public byte PressedButtons { get; set; }

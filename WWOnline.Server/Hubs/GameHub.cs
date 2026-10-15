@@ -58,6 +58,8 @@ public class GameHub : Hub<IGameHubClient>
         ConnectedPlayers.TryRemove(connectionId, out _);
         EventRelay.Forget(connectionId);
         DroppedEvents.TryRemove(connectionId, out _);
+        PvpGate.Forget(connectionId);
+        DroppedHits.TryRemove(connectionId, out _);
         OwnerKeyGate.Forget(connectionId);
         ItemsSeedGate.Forget(connectionId);
         StorySeedGate.Forget(connectionId);
@@ -101,6 +103,7 @@ public class GameHub : Hub<IGameHubClient>
         var result = ProtocolCheck.Evaluate(request, HubConstants.ProtocolVersion, AppInfo.Version);
         var playerName = ProtocolCheck.SanitizeName(request?.PlayerName);
         var clientVersion = ProtocolCheck.SanitizeVersion(request?.AppVersion);
+        var platform = ProtocolCheck.SanitizeVersion(request?.Platform); // same character rules as a version
 
         if (!result.Accepted)
         {
@@ -123,15 +126,18 @@ public class GameHub : Hub<IGameHubClient>
             return result;
         }
 
+        var capabilities = request!.Capabilities & ClientCapabilities.PvpHits; // known flags only
         ConnectedPlayers[connectionId] = new PlayerInfo
         {
             ConnectionId = connectionId,
             PlayerName = playerName,
-            JoinedAt = existing.JoinedAt
+            JoinedAt = existing.JoinedAt,
+            Capabilities = capabilities,
         };
+        PvpGate.Join(connectionId, capabilities);
 
-        Logger.Information("{Player} joined the game ({AppName} {Version}, protocol {Protocol}) ({Count} online)",
-            playerName, AppInfo.DisplayName, clientVersion, request!.ProtocolVersion, ConnectedPlayers.Count);
+        Logger.Information("{Player} joined the game ({AppName} {Version}, protocol {Protocol}, {Platform}, {Capabilities}) ({Count} online)",
+            playerName, AppInfo.DisplayName, clientVersion, request.ProtocolVersion, platform, capabilities, ConnectedPlayers.Count);
 
         await Clients.All.PlayerJoined(connectionId, playerName);
         await Clients.All.ReceiveRoomSettings(CurrentRoomSettings()); // first named player becomes room owner (unless claimed)
@@ -159,14 +165,14 @@ public class GameHub : Hub<IGameHubClient>
     /// <summary>Server defaults from the command line (Program.cs), before anyone connects.</summary>
     public static void ConfigureRoomDefaults(bool sharedWallet, bool sharedWorld, bool sharedItems, bool sharedStory,
                                              bool sharedProjectiles = true, bool sharedBait = true, bool sharedSpoils = true,
-                                             bool allowWarping = true, bool sharedDelivery = true)
+                                             bool allowWarping = true, bool sharedDelivery = true, bool pvp = false)
     {
         lock (RoomLock)
             _roomSettings = new RoomSettings
             {
                 SharedWallet = sharedWallet, SharedWorld = sharedWorld, SharedItems = sharedItems, SharedStory = sharedStory,
                 SharedProjectiles = sharedProjectiles, SharedBait = sharedBait, SharedSpoils = sharedSpoils,
-                SharedDelivery = sharedDelivery, AllowWarping = allowWarping,
+                SharedDelivery = sharedDelivery, AllowWarping = allowWarping, Pvp = pvp,
             };
     }
 
@@ -274,9 +280,10 @@ public class GameHub : Hub<IGameHubClient>
             return;
         }
 
-        bool walletTurnedOff, worldTurnedOff, baitTurnedOff, spoilsTurnedOff, deliveryTurnedOff;
+        bool walletTurnedOff, worldTurnedOff, baitTurnedOff, spoilsTurnedOff, deliveryTurnedOff, pvpChanged;
         lock (RoomLock)
         {
+            pvpChanged = _roomSettings.Pvp != requested.Pvp;
             walletTurnedOff = _roomSettings.SharedWallet && !requested.SharedWallet;
             worldTurnedOff = _roomSettings.SharedWorld && !requested.SharedWorld;
             baitTurnedOff = _roomSettings.SharedBait && !requested.SharedBait;
@@ -291,7 +298,10 @@ public class GameHub : Hub<IGameHubClient>
             _roomSettings.SharedSpoils = requested.SharedSpoils;
             _roomSettings.SharedDelivery = requested.SharedDelivery;
             _roomSettings.AllowWarping = requested.AllowWarping;
+            _roomSettings.Pvp = requested.Pvp;
         }
+        if (pvpChanged)
+            Logger.Information("[pvp] owner {Player} turned PVP {OnOff}", GetPlayerName(Context.ConnectionId), requested.Pvp ? "on" : "off");
         if (walletTurnedOff)
         {
             // Everyone keeps their own rupees now. When it's back on the wallet re-seeds (owner
@@ -371,7 +381,8 @@ public class GameHub : Hub<IGameHubClient>
             {
                 ConnectionId = p.ConnectionId,
                 PlayerName = p.PlayerName,
-                JoinedAt = p.JoinedAt
+                JoinedAt = p.JoinedAt,
+                Capabilities = p.Capabilities,
             })
             .ToList();
         return Task.FromResult(list);
@@ -398,7 +409,7 @@ public class GameHub : Hub<IGameHubClient>
         if (puppetData.Warp != null && !RoomRules.AllowWarping)
             puppetData.Warp = null;
         puppetData.PlayerId = Context.ConnectionId;
-        EventRelay.UpdateLocation(Context.ConnectionId, puppetData, DateTime.UtcNow);
+        EventRelay.UpdateLocation(Context.ConnectionId, puppetData, DateTime.UtcNow); // PvpGate reads it too
         PuppetRelayCounts.AddOrUpdate(Context.ConnectionId, 1, (_, n) => n + 1);
         await Clients.Others.ReceivePuppetData(puppetData);
     }
@@ -852,6 +863,33 @@ public class GameHub : Hub<IGameHubClient>
         var recipients = EventRelay.Recipients(sender, evt, now);
         if (recipients.Count == 0) return;
         await Clients.Clients(recipients).ReceivePlayerEvent(evt);
+    }
+
+    // ── PVP (hits between Links) ──────────────────────────────────────────────
+
+    private static readonly PvpHitGate PvpGate = new(EventRelay);
+    private static readonly ConcurrentDictionary<string, int> DroppedHits = new();
+
+    /// <summary>
+    /// A hit the caller's Link landed on another player's puppet: relayed to that player alone, whose game applies it to
+    /// their Link. Dropped unless PvpHitGate lets it through (rule on, both games take hits, both where the hit says).
+    /// </summary>
+    public async Task SendPvpHit(PvpHit hit)
+    {
+        var sender = Context.ConnectionId;
+        var verdict = PvpGate.Check(sender, hit, RoomRules.Pvp, DateTime.UtcNow);
+        if (verdict != PvpHitGate.Verdict.Relay)
+        {
+            int n = DroppedHits.AddOrUpdate(sender, 1, (_, c) => c + 1);
+            if (n == 1 || n % LogDroppedEvery == 0)
+                Logger.Warning("[pvp] dropped a hit from {Player} ({Verdict}, {Count} dropped so far): {Hit}",
+                    GetPlayerName(sender), verdict, n, hit?.ToString() ?? "null"); // ToString is safe unvalidated
+            return;
+        }
+
+        hit.AttackerId = sender;
+        Logger.Information("[pvp] {Attacker} hit {Target}: {Hit}", GetPlayerName(sender), GetPlayerName(hit.TargetId), hit);
+        await Clients.Client(hit.TargetId).ReceivePvpHit(hit);
     }
 
     // Per-connection count of relayed puppet packets since the last stats line.

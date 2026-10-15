@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             x:Class="WWOnline.Views.NativeDiscView"
+             x:DataType="vm:NativeSetupViewModel">
+    <!-- The native game's disc image: picked, then verified (SHA-1) before it is saved -->
+    <StackPanel Spacing="8">
+        <TextBlock Text="Disc image" FontWeight="SemiBold" />
+        <TextBlock FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
+                   Text="The Wind Waker, USA (GZLE01), revision 0, as a plain .iso dumped from your own disc. The game reads everything from it every time it starts; nothing is copied out of it." />
+        <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBox Grid.Column="0" Text="{Binding DiscImagePath}" Classes="mono" Watermark="Path to GZLE01.iso" />
+            <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDiscCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+            <Button Grid.Column="2" Content="Verify" Command="{Binding VerifyDiscCommand}" Classes="ww-ghost" Margin="6,0,0,0" />
+        </Grid>
+        <ProgressBar Minimum="0" Maximum="1" Value="{Binding DiscProgress}" IsVisible="{Binding IsVerifyingDisc}"
+                     Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding DiscOk}">
+            <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0">
+                <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
+            </Viewbox>
+            <TextBlock Grid.Column="1" Text="{Binding DiscStatus}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource RupeeLightBrush}" />
+        </Grid>
+        <TextBlock Text="{Binding DiscStatus}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}"
+                   IsVisible="{Binding !DiscOk}" />
+    </StackPanel>
+</UserControl>

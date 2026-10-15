@@ -38,10 +38,5 @@ public static class EquipSwapGuard
         return dolphin.Write(equipByte, value);
     }
 
-    private static uint? ReadSeq(IDolphinService dolphin)
-    {
-        var b = dolphin.ReadMemory(PuppetLayout.PUPPET_EQUIP_SWAP_SEQ_ADDR, 4);
-        if (b == null || b.Length < 4) return null;
-        return (uint)(b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]);
-    }
+    private static uint? ReadSeq(IDolphinService dolphin) => dolphin.Play.ReadEquipSwapSeq();
 }

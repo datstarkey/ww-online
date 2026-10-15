@@ -1,4 +1,5 @@
 using WWOnline.Data;
+using WWOnline.Native;
 using WWOnline.Patcher.WorldData;
 
 namespace WWOnline.Services;
@@ -34,17 +35,11 @@ public static class HeartMemory
         int maxLife = U16(save, GameMemoryAddresses.Hearts.OffMaxLife);
         int life = U16(save, GameMemoryAddresses.Hearts.OffLife);
 
-        var pending = dolphin.Read(GameMemoryAddresses.Hearts.PendingMaxLife);
-        var evt = dolphin.ReadMemory(GameMemoryAddresses.Events.EventMode, 1);
-        var menu = dolphin.ReadMemory(GameMemoryAddresses.Events.MenuPause, 1);
-        var minigame = dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.MiniGameType, 1);
-        bool idle = pending == 0 && evt is [0] && menu is [0] && minigame is [0];
+        var pending = dolphin.Play.ReadPending()?[(int)TwwInvCounter.MaxLife];
+        var scene = dolphin.ReadScene();
+        bool idle = pending == 0 && scene is { IsIdle: true, MiniGameType: 0 };
 
-        var name = dolphin.ReadMemory(GameMemoryAddresses.Stage.CurrentStageName.Address, 8);
-        string stage = name == null ? "" : System.Text.Encoding.ASCII.GetString(name, 0, Array.IndexOf(name, (byte)0) is int n and >= 0 ? n : name.Length);
-        int room = dolphin.ReadMemory(GameMemoryAddresses.Stage.CurrentRoomNumber.Address, 1) is [var r] ? (sbyte)r : -1;
-
-        return new HeartObservation(flags, maxLife, life, idle, stage, room);
+        return new HeartObservation(flags, maxLife, life, idle, scene?.Stage ?? "", scene?.Room ?? -1);
     }
 
     /// <summary>The heart flags in a gameInfo save block (<see cref="GameMemoryAddresses.Hearts.SaveBlockLength"/> bytes),
@@ -79,8 +74,8 @@ public static class HeartMemory
     public static bool ApplyDelta(IDolphinService dolphin, int delta)
     {
         if (delta == 0) return true;
-        if (dolphin.Read(GameMemoryAddresses.Hearts.PendingMaxLife) != 0) return false;
-        return dolphin.Write(GameMemoryAddresses.Hearts.PendingMaxLife, (short)delta);
+        if (dolphin.Play.ReadPending()?[(int)TwwInvCounter.MaxLife] != 0) return false;
+        return dolphin.Play.Add(TwwInvCounter.MaxLife, (short)delta);
     }
 
     private static int U16(byte[] b, int o) => b[o] << 8 | b[o + 1];

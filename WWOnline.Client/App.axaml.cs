@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Data.Core.Plugins;
@@ -5,6 +6,7 @@ using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 using WWOnline.Hubs;
+using WWOnline.Native;
 using WWOnline.Services;
 using WWOnline.ViewModels;
 using WWOnline.Views;
@@ -14,6 +16,7 @@ namespace WWOnline;
 public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
+    private PosixSignalRegistration? _sigterm;
 
     public override void Initialize()
     {
@@ -33,9 +36,14 @@ public partial class App : Application
         // Services
         services.AddSingleton(Program.StartupOptions);
         services.AddSingleton<WindowSettingsService>();
-        services.AddSingleton<SignalRClientService>();
+        var backend = new GameSettingsService().Load().Backend;
+        services.AddSingleton(_ => new SignalRClientService
+        {
+            Platform = NativePaths.PlatformName(backend),
+            Capabilities = backend == GameBackend.Native ? Shared.Models.ClientCapabilities.PvpHits : Shared.Models.ClientCapabilities.None,
+        });
         services.AddSingleton<IGameStateService, GameStateService>();
-        services.AddSingleton<IDolphinService, DolphinService>();
+        AddGameBackend(services, backend);
         services.AddSingleton<GameMemoryMonitorService>();
         services.AddSingleton<DespawnWorker>();
         services.AddSingleton<LiveWorldPoke>();
@@ -57,6 +65,7 @@ public partial class App : Application
         services.AddSingleton<SharedHeartService>();
         services.AddSingleton<IHeartsSource>(sp => sp.GetRequiredService<SharedHeartService>());
         services.AddSingleton<PlayerEventService>();
+        services.AddSingleton<PvpService>();
         services.AddSingleton<RoomSettingsService>();
         services.AddSingleton<WarpService>();
         services.AddSingleton<GameSyncService>();
@@ -85,6 +94,7 @@ public partial class App : Application
         services.AddSingleton<PatchOptionsViewModel>();
         services.AddSingleton<AppearanceViewModel>();
         services.AddSingleton<UpdateViewModel>();
+        services.AddSingleton(sp => new NativeSetupViewModel(sp.GetRequiredService<GameSettingsService>()));
         services.AddSingleton<SetupWizardViewModel>();
         services.AddSingleton(sp => new ItemIcons(sp.GetRequiredService<ItemIconService>()));
 
@@ -98,24 +108,33 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var windowSettings = _serviceProvider.GetRequiredService<WindowSettingsService>().Load();
-
-            desktop.MainWindow = new MainWindow
+            if (Program.StartupOptions.Hidden)
             {
-                DataContext = _serviceProvider.GetRequiredService<MainViewModel>(),
-                Width = windowSettings.Width,
-                Height = windowSettings.Height,
-            };
-
-            if (windowSettings.X != 0 || windowSettings.Y != 0)
-            {
-                desktop.MainWindow.Position = new Avalonia.PixelPoint(windowSettings.X, windowSettings.Y);
+                RunWithoutWindow(_serviceProvider);
             }
             else
             {
-                desktop.MainWindow.WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterScreen;
+                var windowSettings = _serviceProvider.GetRequiredService<WindowSettingsService>().Load();
+
+                desktop.MainWindow = new MainWindow
+                {
+                    DataContext = _serviceProvider.GetRequiredService<MainViewModel>(),
+                    Width = windowSettings.Width,
+                    Height = windowSettings.Height,
+                };
+
+                if (windowSettings.X != 0 || windowSettings.Y != 0)
+                {
+                    desktop.MainWindow.Position = new Avalonia.PixelPoint(windowSettings.X, windowSettings.Y);
+                }
+                else
+                {
+                    desktop.MainWindow.WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterScreen;
+                }
             }
 
+            // Closing the main window quits, even while the game is popped out into its own window.
+            desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnMainWindowClose;
             desktop.ShutdownRequested += OnShutdownRequested;
         }
 
@@ -125,6 +144,65 @@ public partial class App : Application
         // initialising first. --auto-connect / --auto-attach flags make the dev-test
         // script a one-click setup.
         _ = System.Threading.Tasks.Task.Run(() => RunStartupActions(_serviceProvider!));
+
+        if (Program.StartupOptions is { TestShots: not null } or { TestRupees: not null } or { TestWarp: not null }
+            && _serviceProvider.GetService<GameHost>() is { } host)
+            _ = System.Threading.Tasks.Task.Run(() => NativeTestRun.RunAsync(Program.StartupOptions, host,
+                _serviceProvider.GetRequiredService<IDolphinService>(), _serviceProvider.GetRequiredService<SharedWalletService>(),
+                _serviceProvider.GetRequiredService<DashboardViewModel>()));
+
+        // scripts/dev-test-native.sh --stop sends SIGTERM: shut down as closing the window does (a hosted server stops too).
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime lifetime)
+            _sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+            {
+                context.Cancel = true;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => lifetime.TryShutdown());
+            });
+    }
+
+    /// <summary>
+    /// --hidden: no window at all, so nothing can show on the desktop. The view models and services run as usual, and
+    /// the embedded game renders into its view outside any window, as tww_smoke runs it.
+    /// </summary>
+    private static void RunWithoutWindow(IServiceProvider services)
+    {
+        services.GetRequiredService<MainViewModel>();
+        if (services.GetService<GameHost>() is not { } host) return;
+        host.Started += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            try
+            {
+                host.CreateView();
+                TwwNative.tww_set_size(1240, 760, 2f);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Log.Error(ex, "[native] no game view");
+            }
+        });
+    }
+
+    /// <summary>
+    /// The game backend, chosen once per run (<see cref="GameSettings.Backend"/>): Dolphin's memory, or the embedded
+    /// native game behind the same <see cref="IDolphinService"/> (<see cref="NativeGameService"/>). Only the native
+    /// backend registers <see cref="GameHost"/> / <see cref="INativeGame"/>, which the services that take them
+    /// optionally use for their native path.
+    /// </summary>
+    public static void AddGameBackend(IServiceCollection services, GameBackend backend)
+    {
+        Log.Information("Game backend: {Backend}", backend);
+        if (backend == GameBackend.Native)
+        {
+            services.AddSingleton<GameHost>();
+            services.AddSingleton<INativeGame>(sp => sp.GetRequiredService<GameHost>());
+            services.AddSingleton<IDolphinService, NativeGameService>();
+            services.AddSingleton<IWorldGame, NativeWorldGame>();
+            services.AddSingleton(sp => new GameSettingsViewModel(new NativeGameSettings(sp.GetRequiredService<INativeGame>())));
+        }
+        else
+        {
+            services.AddSingleton<IDolphinService, DolphinService>();
+        }
     }
 
     private static async System.Threading.Tasks.Task RunStartupActions(IServiceProvider services)
@@ -215,6 +293,7 @@ public partial class App : Application
     private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
     {
         Log.Information("Application closing, cleaning up resources");
+        _sigterm?.Dispose();
 
         if (_serviceProvider == null) return;
 
@@ -247,7 +326,8 @@ public partial class App : Application
             gameLog.Dispose();
 
             var signalRClient = _serviceProvider.GetRequiredService<SignalRClientService>();
-            signalRClient.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            // Off the UI thread: its awaits resume on the UI context, which this wait blocks.
+            Task.Run(() => signalRClient.DisposeAsync().AsTask()).GetAwaiter().GetResult();
 
             _serviceProvider.GetRequiredService<MainViewModel>().Dispose();
             _serviceProvider.GetRequiredService<RoomItemsViewModel>().Dispose();
@@ -271,6 +351,13 @@ public partial class App : Application
         finally
         {
             Log.Information("Application shutdown complete");
+            // libtww's static destructors assume a game that never ends: once it has loaded, leave without them.
+            if (_serviceProvider.GetService<GameHost>() is { IsStarted: true } game)
+            {
+                game.Stop(TimeSpan.FromSeconds(2));
+                Log.CloseAndFlush();
+                TwwNative.ExitProcess(0);
+            }
         }
     }
 }

@@ -67,7 +67,7 @@ public class SalvageSyncTests
             (11, 3, 6, 0),    // 5: kind 6 (event bit): never
             (11, 3, 3, 1),    // 6: already done here: nothing to write
             (-1, 34, 0, 0));  // 7: not registered
-        Assert.Equal(new[] { 0, 2, 3 }, WorldFlagSyncService.SalvagedPoints(infos, bits).ToArray());
+        Assert.Equal(new[] { 0, 2, 3 }, WorldFlagSyncService.SalvagedPoints(DolphinWorldGame.ParseSalvagePoints(infos), bits).ToArray());
     }
 
     [Fact]

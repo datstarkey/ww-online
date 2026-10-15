@@ -8,10 +8,22 @@ namespace WWOnline.Services;
 /// <summary>A stage the game was entered with or is asked to load (dStage_startStage_c, d_stage.h:949-952).</summary>
 public readonly record struct StageEntry(string Name, short Point, sbyte Room, sbyte Layer);
 
+/// <summary>The warp as a typed call (the native game's tww_gate_warp_local / tww_gate_change_stage).</summary>
+public interface IGameWarp
+{
+    /// <summary>Move the local Link within his room (current, old and kept position, facing, speed zeroed).</summary>
+    bool MoveLink(Vector3 pos, short angleY);
+    /// <summary>dComIfGp_setNextStage(entry). False if no Link or a change is pending.</summary>
+    bool ChangeStage(StageEntry entry);
+    /// <summary>The local Link's current.pos, or null without him.</summary>
+    Vector3? LinkPosition();
+}
+
 /// <summary>
 /// The game memory behind "Warp to player" (docs/softlocks.md): reading where the local stage was
 /// entered, asking the game for a stage change the way dComIfGp_setNextStage does, and moving the
-/// local Link within his room. Addresses: <see cref="GameMemoryAddresses.Warp"/>.
+/// local Link within his room. Addresses: <see cref="GameMemoryAddresses.Warp"/>; a backend that is an
+/// <see cref="IGameWarp"/> / <see cref="IGameSceneSource"/> (the native game) gets typed calls instead.
 /// </summary>
 public static class WarpMemory
 {
@@ -23,6 +35,8 @@ public static class WarpMemory
     /// <summary>play.mCurStage: the stage, spawn point, room and layer the current stage was entered with.</summary>
     public static StageEntry? ReadStartStage(IDolphinService dolphin)
     {
+        if (dolphin is IGameSceneSource source)
+            return source.ReadScene()?.StartEntry;
         var b = dolphin.ReadMemory(GameMemoryAddresses.Warp.StartStage, GameMemoryAddresses.Warp.NextStageOffEnable);
         if (b == null || b.Length < GameMemoryAddresses.Warp.NextStageOffEnable)
             return null;
@@ -46,8 +60,9 @@ public static class WarpMemory
         name.All(c => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '_');
 
     /// <summary>True while a stage change is pending (play.mNextStage.mEnable).</summary>
-    public static bool IsStageChangePending(IDolphinService dolphin) =>
-        dolphin.ReadMemory(GameMemoryAddresses.Warp.NextStage + GameMemoryAddresses.Warp.NextStageOffEnable, 1) is not [0];
+    public static bool IsStageChangePending(IDolphinService dolphin) => dolphin is IGameSceneSource source
+        ? source.ReadScene() is not { NextStagePending: false }
+        : dolphin.ReadMemory(GameMemoryAddresses.Warp.NextStage + GameMemoryAddresses.Warp.NextStageOffEnable, 1) is not [0];
 
     /// <summary>
     /// Ask the game to load <paramref name="entry"/>, as dComIfGp_setNextStage(name, point, room, layer, 0, mode,
@@ -62,6 +77,8 @@ public static class WarpMemory
             throw new ArgumentException($"not a stage name: '{entry.Name}'", nameof(entry));
         if (IsStageChangePending(dolphin))
             return false;
+        if (dolphin is IGameWarp warp)
+            return warp.ChangeStage(entry);
 
         uint restart = GameMemoryAddresses.Warp.Restart;
         var u32 = new byte[4];
@@ -114,6 +131,8 @@ public static class WarpMemory
     /// </summary>
     public static bool MoveActor(IDolphinService dolphin, uint actor, Vector3 pos, short angleY)
     {
+        if (dolphin is IGameWarp warp)
+            return warp.MoveLink(pos, angleY);
         var p = new byte[12];
         BinaryPrimitives.WriteSingleBigEndian(p.AsSpan(0), pos.X);
         BinaryPrimitives.WriteSingleBigEndian(p.AsSpan(4), pos.Y);
@@ -140,6 +159,8 @@ public static class WarpMemory
     /// <summary>An actor's current.pos, or null if unreadable / not finite.</summary>
     public static Vector3? ReadActorPos(IDolphinService dolphin, uint actor)
     {
+        if (dolphin is IGameWarp warp)
+            return warp.LinkPosition();
         var b = dolphin.ReadMemory(actor + GameMemoryAddresses.Warp.ActorOffPos, 12);
         if (b is not { Length: 12 })
             return null;
@@ -159,16 +180,19 @@ public static class WarpMemory
     /// Why the local player can't be warped to right now (or be warped anywhere), from game memory; see
     /// <see cref="WarpBusy"/>. <paramref name="minigame"/> comes from a <see cref="MinigameGate"/>.
     /// </summary>
-    public static WarpBusy ReadBusy(IDolphinService dolphin, bool minigame)
+    public static WarpBusy ReadBusy(IDolphinService dolphin, bool minigame) =>
+        ReadBusy(dolphin.ReadScene(), dolphin.Read(GameMemoryAddresses.Player.CurrentHealth), minigame);
+
+    /// <summary><see cref="ReadBusy(IDolphinService, bool)"/> from a scene already read (null = unreadable: loading).</summary>
+    public static WarpBusy ReadBusy(GameScene? scene, ushort? health, bool minigame)
     {
-        uint link = ReadU32(dolphin, GameMemoryAddresses.Warp.LinkActorPtr);
-        if (link == 0 || IsStageChangePending(dolphin))
+        if (scene is not { LinkActor: not 0, NextStagePending: false })
             return WarpBusy.Loading;
-        if (dolphin.ReadMemory(GameMemoryAddresses.Events.EventMode, 1) is not [0])
+        if (scene.EventMode != 0)
             return WarpBusy.Event;
-        if (dolphin.Read(GameMemoryAddresses.Player.CurrentHealth) is 0)
+        if (health is 0)
             return WarpBusy.Dead;
-        if (ReadU32(dolphin, GameMemoryAddresses.Warp.ControlledActorPtr) is var controlled && controlled != 0 && controlled != link)
+        if (scene.OtherCharacter)
             return WarpBusy.OtherCharacter;
         if (minigame)
             return WarpBusy.Minigame;
@@ -222,13 +246,12 @@ public sealed class LocalWarpReader
 
     public WarpInfo? Read(IDolphinService dolphin, string stage)
     {
-        var mg = dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.MiniGameType, 1);
-        bool minigame = _minigame.Update(mg is { Length: 1 } ? mg[0] : (byte)0, stage);
-        if (WarpMemory.ReadStartStage(dolphin) is not { } start)
+        if (dolphin.ReadScene() is not { } scene)
             return null;
-
+        bool minigame = _minigame.Update(scene.MiniGameType, stage);
+        var start = scene.StartEntry;
         var entry = _tracker.Update(start);
-        var busy = WarpMemory.ReadBusy(dolphin, minigame);
+        var busy = WarpMemory.ReadBusy(scene, dolphin.Read(GameMemoryAddresses.Player.CurrentHealth), minigame);
         if (entry != _loggedEntry)
         {
             _loggedEntry = entry;

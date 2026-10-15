@@ -38,7 +38,7 @@ public class WorldFlagSyncService : IDisposable
     private readonly IDolphinService _dolphin;
     private readonly SignalRClientService _signalR;
     private readonly RoomSettingsService _room;
-    private readonly DespawnWorker _despawnWorker;
+    private readonly IWorldGame _world;
     private readonly LiveWorldPoke _liveWorld;
     private readonly SwitchTableProvider _tables;
 
@@ -56,13 +56,14 @@ public class WorldFlagSyncService : IDisposable
     private int? _lastSlot;
     private uint _remoteItemMask;
 
+    /// <param name="world">The game outside the save window; null: Dolphin's memory (<see cref="DolphinWorldGame"/>).</param>
     public WorldFlagSyncService(IDolphinService dolphin, SignalRClientService signalR, RoomSettingsService room,
-        DespawnWorker despawnWorker, LiveWorldPoke liveWorld, SwitchTableProvider tables)
+        DespawnWorker despawnWorker, LiveWorldPoke liveWorld, SwitchTableProvider tables, IWorldGame? world = null)
     {
         _dolphin = dolphin;
         _signalR = signalR;
         _room = room;
-        _despawnWorker = despawnWorker;
+        _world = world ?? new DolphinWorldGame(dolphin, despawnWorker);
         _liveWorld = liveWorld;
         _tables = tables;
     }
@@ -154,12 +155,12 @@ public class WorldFlagSyncService : IDisposable
 
         LogRelDespawns();
         bool online = _signalR.IsConnected;
-        int? slot = ReadCurrentSlot();
+        int? slot = _world.CurrentSlot();
         if (slot != _lastSlot)
         {
             // New stage: the REL's despawn mask is per-stage.
             _remoteItemMask = 0;
-            WriteRemoteItemMask(0, slot ?? 0);
+            _world.SetRemoteItems(slot ?? 0, 0);
             Logger.Information("[world] current stage slot {Old} -> {New}", _lastSlot, slot);
             _lastSlot = slot;
         }
@@ -214,7 +215,7 @@ public class WorldFlagSyncService : IDisposable
                 if (missing.Item != 0)
                 {
                     _remoteItemMask |= missing.Item;
-                    WriteRemoteItemMask(_remoteItemMask, slot.Value);
+                    _world.SetRemoteItems(slot.Value, _remoteItemMask);
                 }
                 // Chests / switches that read their flag only at create: the REL catches them up
                 // once the next tick reads these bits back from the live copy.
@@ -239,7 +240,7 @@ public class WorldFlagSyncService : IDisposable
     private void TickLiveWorld(StageFlags live)
     {
         _liveWorld.SetLive(0, LiveWorldPoke.FromMemBit(live.Tbox, live.Switch)[..5]);
-        if (_liveWorld.Tick(_dolphin) is not { } r) return;
+        if (_liveWorld.Tick(_world) is not { } r) return;
         if (r.Acknowledged is { IsEmpty: false } done)
             Logger.Information("[world] live world: REL handled {Batch} ({Pokes} actor(s) updated so far)", done, r.PokeCount);
         if (r.Published is { IsEmpty: false } batch)
@@ -270,52 +271,16 @@ public class WorldFlagSyncService : IDisposable
         });
     }
 
-    /// <summary>
-    /// The current stage's save slot (dStage_stagInfo_GetSaveTbl), or null if unknown.
-    /// Without it the live copy isn't synced (saved slots still are).
-    /// </summary>
-    private int? ReadCurrentSlot()
-    {
-        var ptrBytes = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.StagInfoPtr, 4);
-        if (ptrBytes == null) return null;
-        uint p = ReadU32(ptrBytes, 0);
-        if (p < 0x80000000 || p >= 0x84000000) return null;
-        var b = _dolphin.ReadMemory(p + GameMemoryAddresses.WorldFlags.StagSaveTblOffset, 1);
-        if (b == null) return null;
-        int slot = (b[0] >> 1) & 0x7F;
-        return slot < StageFlags.SlotCount ? slot : null;
-    }
-
-    /// <summary>
-    /// Publish the item bits other players collected in the current stage for the REL's live
-    /// despawn (puppet_worldsync.c). Tag is cleared first and set last so the REL never pairs a
-    /// new mask with an old stage (it re-checks the tag after reading the mask).
-    /// </summary>
-    private void WriteRemoteItemMask(uint mask, int slot)
-    {
-        _despawnWorker.MarkChanged(_dolphin); // the REL must rescan before its result counts again
-        WriteU32(PuppetLayout.WORLDSYNC_STAGE_TAG_ADDR, 0);
-        WriteU32(PuppetLayout.WORLDSYNC_ITEM_MASK_ADDR, mask);
-        if (mask != 0)
-            WriteU32(PuppetLayout.WORLDSYNC_STAGE_TAG_ADDR, (uint)PuppetLayout.WORLDSYNC_TAG_MAGIC | (uint)slot);
-    }
-
     private uint _lastDespawnCount;
 
     /// <summary>Surface the REL's live despawns (layer 2) in the client log.</summary>
     private void LogRelDespawns()
     {
-        var c = _dolphin.ReadMemory(PuppetLayout.WORLDSYNC_DESPAWN_COUNT_ADDR, 8);
-        if (c == null) return;
-        uint count = ReadU32(c, 0), last = ReadU32(c, 4);
-        if (count == _lastDespawnCount) return;
+        if (_world.ReadDespawns() is not var (count, last) || count == _lastDespawnCount) return;
         Logger.Information("[world] REL despawned {N} placed item(s); last: slot {Slot} item 0x{Item:X2} bit {Bit}",
             count - _lastDespawnCount, last >> 16, (last >> 8) & 0xFF, last & 0xFF);
         _lastDespawnCount = count;
     }
-
-    private void WriteU32(uint addr, uint v) =>
-        _dolphin.WriteMemory(addr, new[] { (byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v });
 
     /// <summary>OR <paramref name="bits"/> into a dSv_memory_c at <paramref name="baseAddr"/>, one word at a
     /// time (read-modify-write per word keeps the window where the game could race us tiny).</summary>
@@ -349,40 +314,29 @@ public class WorldFlagSyncService : IDisposable
         for (int w = 0; w < StageFlags.ChartWords; w++)
             OrU32(GameMemoryAddresses.WorldFlags.SalvagedCharts + (uint)(w * 4), bits.SalvagedCharts[w]);
 
-        var ptr = _dolphin.ReadMemory(GameMemoryAddresses.Salvage.TagDataPtr, 4);
-        if (ptr == null) return;
-        uint ctl = ReadU32(ptr, 0);
-        if (ctl < 0x80000000 || ctl >= 0x81800000) return; // not built yet (no sea loaded since boot)
-        uint infos = ctl + GameMemoryAddresses.Salvage.InfoBase;
-        var buf = _dolphin.ReadMemory(infos, GameMemoryAddresses.Salvage.InfoCount * GameMemoryAddresses.Salvage.InfoSize);
-        if (buf == null) return;
+        if (_world.ReadSalvagePoints() is not { } points) return; // not built yet (no sea loaded since boot)
         int marked = 0;
-        foreach (int i in SalvagedPoints(buf, bits))
+        foreach (int i in SalvagedPoints(points, bits))
         {
-            int flagOff = i * GameMemoryAddresses.Salvage.InfoSize + GameMemoryAddresses.Salvage.OffFlag;
-            _dolphin.WriteMemory(infos + (uint)flagOff, new[] { (byte)(buf[flagOff] | GameMemoryAddresses.Salvage.FlagDone) });
-            marked++;
+            if (_world.OrSalvageFlag(i, GameMemoryAddresses.Salvage.FlagDone))
+                marked++;
         }
         if (marked != 0)
             Logger.Information("[world] live world: {N} salvage point(s) here marked emptied", marked);
     }
 
     /// <summary>
-    /// The registered salvage points (dSalvage_control_c::mInfo, <paramref name="infos"/>) that <paramref name="bits"/>
+    /// The registered salvage points (dSalvage_control_c::mInfo, <paramref name="points"/>) that <paramref name="bits"/>
     /// empties and that are still salvageable: kind 0 by chart (mSaveNo, 1-based), kinds 2-4 by sea square (mRoomNo)
     /// and point (mSaveNo), the keys end_salvage writes (d_a_salvage.cpp:504-519). Point 31 (no save) and kind 6
     /// (an event bit) are left alone.
     /// </summary>
-    public static IEnumerable<int> SalvagedPoints(byte[] infos, StageFlags bits)
+    public static IEnumerable<int> SalvagedPoints(IReadOnlyList<SalvagePoint> points, StageFlags bits)
     {
-        for (int i = 0; i < GameMemoryAddresses.Salvage.InfoCount; i++)
+        for (int i = 0; i < points.Count; i++)
         {
-            int o = i * GameMemoryAddresses.Salvage.InfoSize;
-            if (o + GameMemoryAddresses.Salvage.InfoSize > infos.Length) yield break;
-            int room = (sbyte)infos[o + GameMemoryAddresses.Salvage.OffRoomNo];
-            int save = infos[o + GameMemoryAddresses.Salvage.OffSaveNo];
-            int kind = infos[o + GameMemoryAddresses.Salvage.OffKind];
-            if (room < 0 || (infos[o + GameMemoryAddresses.Salvage.OffFlag] & GameMemoryAddresses.Salvage.FlagDone) != 0)
+            int room = points[i].Room, save = points[i].SaveNo, kind = points[i].Kind;
+            if (room < 0 || (points[i].Flag & GameMemoryAddresses.Salvage.FlagDone) != 0)
                 continue;
             bool done = kind switch
             {

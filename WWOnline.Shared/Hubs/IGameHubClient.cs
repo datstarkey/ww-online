@@ -42,4 +42,6 @@ public interface IGameHubClient
     Task ReceiveRoomSwitches(RoomSwitches switches);
     /// <summary>A player who can see us threw / exploded a bomb or fired their boat cannon (PlayerEvent.PlayerId = who).</summary>
     Task ReceivePlayerEvent(PlayerEvent evt);
+    /// <summary>Another player's Link hit our puppet over there (PvpHit.AttackerId = who): apply it to our Link.</summary>
+    Task ReceivePvpHit(PvpHit hit);
 }

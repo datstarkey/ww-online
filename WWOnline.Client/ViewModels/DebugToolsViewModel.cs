@@ -69,6 +69,10 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
     [RelayCommand] private void PickMemory() => SelectedTool = ToolPage.Memory;
 
     // ═══ Memory Read/Write ═══
+
+    /// <summary>Raw GameCube addresses: Dolphin only. The native game has no emulated memory (only typed calls).</summary>
+    public bool IsMemoryAvailable { get; }
+
     [ObservableProperty]
     private string _memoryAddress = "803C525C";
 
@@ -200,6 +204,7 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
     {
         _dolphinService = dolphinService;
         _settingsService = settingsService;
+        IsMemoryAvailable = dolphinService is not NativeGameService;
         foreach (var d in WarpDestinations) _warpItems.Add(new WarpStageItem(d));
         RebuildWarpGroups();
         SelectedWarp = WarpDestinations[0];
@@ -207,7 +212,7 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
 
     // ═══ Memory Read/Write Commands ═══
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsMemoryAvailable))]
     private void ReadMemory()
     {
         try
@@ -236,7 +241,7 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsMemoryAvailable))]
     private void WriteMemory()
     {
         try

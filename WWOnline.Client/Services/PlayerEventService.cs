@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Serilog;
 using WWOnline.Data;
 using WWOnline.Hubs;
+using WWOnline.Native;
 using WWOnline.Shared.Models;
 
 namespace WWOnline.Services;
@@ -20,6 +21,7 @@ namespace WWOnline.Services;
 /// their slot; the REL spawns / explodes the copy.
 /// Both only while the room's <see cref="RoomSettings.SharedProjectiles"/> rule is on: the REL's SEND
 /// flag follows the rule, and received events are dropped while it is off (the server drops them too).
+/// On the native backend the game's own event queues take the block's place (<see cref="NativeOverlay"/>).
 /// </summary>
 public sealed class PlayerEventService : IDisposable
 {
@@ -35,6 +37,7 @@ public sealed class PlayerEventService : IDisposable
     private readonly SignalRClientService _signalR;
     private readonly PuppetSyncService _puppets;
     private readonly RoomSettingsService _room;
+    private readonly INativeGame? _native;
     private readonly PlayerEventDedup _dedup = new();
     private readonly MinigameGate _minigame = new();
     private bool _minigameActive; // the gate's verdict this tick (it sees every tick's type and stage)
@@ -58,12 +61,13 @@ public sealed class PlayerEventService : IDisposable
     private bool _disposed;
 
     public PlayerEventService(IDolphinService dolphin, SignalRClientService signalR, PuppetSyncService puppets,
-                              RoomSettingsService room)
+                              RoomSettingsService room, INativeGame? native = null)
     {
         _dolphin = dolphin;
         _signalR = signalR;
         _puppets = puppets;
         _room = room;
+        _native = native;
     }
 
     public void Start()
@@ -128,6 +132,11 @@ public sealed class PlayerEventService : IDisposable
             DropStale(DateTime.UtcNow);
             return;
         }
+        if (_native != null)
+        {
+            await TickNativeAsync(_native);
+            return;
+        }
         // Every tick, events or not, so the gate knows which stage a minigame started in.
         var mg = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.MiniGameType, 1);
         _minigameActive = _minigame.Update(mg is { Length: 1 } ? mg[0] : (byte)0, _puppets.LocalLocation.Stage);
@@ -159,15 +168,31 @@ public sealed class PlayerEventService : IDisposable
             Logger.Information("[fx] report our projectiles: {On}", rule);
         }
 
-        CollectOutbox(b, rule);
+        CollectOutbox(PlayerEventBlock.ReadOutbox(_dolphin, b, ref _outCursor), rule);
         await SendOutgoingAsync();
-        DeliverIncoming(b, rule);
+        DeliverIncoming(batch => PlayerEventBlock.WriteInbox(_dolphin, b, batch), rule);
         LogCounters(b);
     }
 
-    private void CollectOutbox(uint block, bool rule)
+    /// <summary>The native tick: the same flow, with the game's event queues (tww_overlay_*) for the block.</summary>
+    private async Task TickNativeAsync(INativeGame native)
     {
-        var raw = PlayerEventBlock.ReadOutbox(_dolphin, block, ref _outCursor);
+        bool rule = _room.Current.SharedProjectiles && _signalR.IsConnected;
+        _minigameActive = _minigame.Update(_dolphin.ReadScene()?.MiniGameType ?? 0, _puppets.LocalLocation.Stage);
+        var raw = native.Invoke(api => NativeOverlay.ReadEvents(api, rule));
+        if (_sendFlag != rule)
+        {
+            _sendFlag = rule;
+            Logger.Information("[fx] report our projectiles: {On}", rule);
+        }
+
+        CollectOutbox(raw, rule);
+        await SendOutgoingAsync();
+        DeliverIncoming(batch => batch.Count == 0 ? 0 : native.Invoke(api => NativeOverlay.WriteEvents(api, batch)), rule);
+    }
+
+    private void CollectOutbox(List<PlayerEventBlock.Raw> raw, bool rule)
+    {
         if (raw.Count == 0 || !rule)
             return;
         var (stage, room, _, _) = _puppets.LocalLocation;
@@ -219,13 +244,14 @@ public sealed class PlayerEventService : IDisposable
         }
     }
 
-    private void DeliverIncoming(uint block, bool rule)
+    /// <param name="write">Writes a batch into the game's inbox in order; returns how many it took.</param>
+    private void DeliverIncoming(Func<IReadOnlyList<PlayerEventBlock.Raw>, int> write, bool rule)
     {
         lock (_outLock)
-            DeliverIncomingLocked(block, rule);
+            DeliverIncomingLocked(write, rule);
     }
 
-    private void DeliverIncomingLocked(uint block, bool rule)
+    private void DeliverIncomingLocked(Func<IReadOnlyList<PlayerEventBlock.Raw>, int> write, bool rule)
     {
         var now = DateTime.UtcNow;
         while (_incoming.TryDequeue(out var item))
@@ -258,7 +284,7 @@ public sealed class PlayerEventService : IDisposable
         }
         _pendingIn.Clear();
 
-        int written = PlayerEventBlock.WriteInbox(_dolphin, block, batch);
+        int written = write(batch);
         for (int i = 0; i < batchEvents.Count; i++)
         {
             var (evt, at) = batchEvents[i];

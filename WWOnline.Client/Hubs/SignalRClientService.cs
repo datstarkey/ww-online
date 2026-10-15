@@ -25,6 +25,11 @@ public class SignalRClientService : IAsyncDisposable
     /// join events already fired) read names from here instead of relying on PlayerJoined.</summary>
     public IReadOnlyDictionary<string, string> Players => _players;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _players = new();
+
+    /// <summary>What each other player's game supports (<see cref="PlayerInfo.Capabilities"/>), from GetPlayers on
+    /// connect and again whenever someone joins.</summary>
+    public IReadOnlyDictionary<string, ClientCapabilities> PlayerCapabilities => _capabilities;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ClientCapabilities> _capabilities = new();
     public event Action<string>? PlayerLeft;
     public event Action<int>? PlayerCountUpdated;
     public event Action<StageFlags>? StageFlagsReceived;
@@ -37,6 +42,7 @@ public class SignalRClientService : IAsyncDisposable
     public event Action<StoryFlags>? StoryFlagsReceived;
     public event Action<RoomSwitches>? RoomSwitchesReceived;
     public event Action<PlayerEvent>? PlayerEventReceived;
+    public event Action<PvpHit>? PvpHitReceived;
 
     // Connection lifecycle. ConnectionLost fires from SignalR's Reconnecting / Closed callbacks
     // (wipe per-connection state). Connected fires after EVERY successful connect — the initial
@@ -62,6 +68,12 @@ public class SignalRClientService : IAsyncDisposable
 
     // Remembered so an automatic reconnect (new connection id) can re-identify us to the server.
     private string _playerName = "";
+
+    /// <summary>Sent in <see cref="JoinRequest.Platform"/> (set once at startup).</summary>
+    public string Platform { get; init; } = "";
+
+    /// <summary>Sent in <see cref="JoinRequest.Capabilities"/> (set once at startup: PVP hits on the native backend).</summary>
+    public ClientCapabilities Capabilities { get; init; }
     private string? _hostToken;
 
     /// <summary>True when the host field holds a URL ("https://...") rather than a host name or IP.</summary>
@@ -195,6 +207,7 @@ public class SignalRClientService : IAsyncDisposable
                 if (p.ConnectionId == selfId) continue;
                 Logger.Information("Existing player: {ConnectionId} ({PlayerName})", p.ConnectionId, p.PlayerName);
                 _players[p.ConnectionId] = p.PlayerName;
+                _capabilities[p.ConnectionId] = p.Capabilities;
                 PlayerJoined?.Invoke(p.ConnectionId, p.PlayerName);
             }
         }
@@ -217,6 +230,8 @@ public class SignalRClientService : IAsyncDisposable
             PlayerName = _playerName,
             ProtocolVersion = HubConstants.ProtocolVersion,
             AppVersion = AppInfo.Version,
+            Platform = Platform,
+            Capabilities = Capabilities,
         };
         try
         {
@@ -250,6 +265,7 @@ public class SignalRClientService : IAsyncDisposable
         {
             await DisconnectInternalAsync();
             _players.Clear();
+            _capabilities.Clear();
         }
         finally
         {
@@ -293,6 +309,7 @@ public class SignalRClientService : IAsyncDisposable
         {
             Logger.Warning(error, "SignalR connection lost, attempting to reconnect");
             _players.Clear();
+            _capabilities.Clear();
             ConnectionLost?.Invoke();
             return Task.CompletedTask;
         };
@@ -323,6 +340,7 @@ public class SignalRClientService : IAsyncDisposable
             else
                 Logger.Information("SignalR connection closed");
             _players.Clear();
+            _capabilities.Clear();
             ConnectionLost?.Invoke();
             return Task.CompletedTask;
         };
@@ -342,7 +360,12 @@ public class SignalRClientService : IAsyncDisposable
         {
             Logger.Information("Player joined: {ConnectionId} ({PlayerName})", connectionId, playerName);
             if (connectionId != connection.ConnectionId)
+            {
                 _players[connectionId] = playerName;
+                // PlayerJoined carries no capabilities; GetPlayers does. Not awaited here: a hub call awaited
+                // inside a handler would block the handler loop that delivers its result.
+                _ = RefreshCapabilitiesAsync(connection);
+            }
             PlayerJoined?.Invoke(connectionId, playerName);
         });
 
@@ -350,6 +373,7 @@ public class SignalRClientService : IAsyncDisposable
         {
             Logger.Information("Player left: {ConnectionId}", connectionId);
             _players.TryRemove(connectionId, out _);
+            _capabilities.TryRemove(connectionId, out _);
             PlayerLeft?.Invoke(connectionId);
         });
 
@@ -408,6 +432,24 @@ public class SignalRClientService : IAsyncDisposable
         {
             PlayerEventReceived?.Invoke(evt);
         });
+
+        connection.On<PvpHit>(HubConstants.ReceivePvpHit, hit =>
+        {
+            PvpHitReceived?.Invoke(hit);
+        });
+    }
+
+    private async Task RefreshCapabilitiesAsync(HubConnection connection)
+    {
+        try
+        {
+            foreach (var p in await connection.InvokeAsync<List<PlayerInfo>>(HubConstants.GetPlayers))
+            {
+                if (p.ConnectionId != connection.ConnectionId && _players.ContainsKey(p.ConnectionId))
+                    _capabilities[p.ConnectionId] = p.Capabilities;
+            }
+        }
+        catch (Exception ex) { Logger.Warning(ex, "Failed to refresh the players' capabilities"); }
     }
 
     public async Task<RoomSettings?> GetRoomSettingsAsync()
@@ -571,6 +613,7 @@ public class SignalRClientService : IAsyncDisposable
     }
     /// <summary>Report one of our projectiles (bomb thrown / exploded, cannon fired); false if not connected.</summary>
     public Task<bool> SendPlayerEventAsync(PlayerEvent evt) => SendAsync(HubConstants.SendPlayerEvent, evt);
+    public Task<bool> SendPvpHitAsync(PvpHit hit) => SendAsync(HubConstants.SendPvpHit, hit);
 
     public async ValueTask DisposeAsync()
     {

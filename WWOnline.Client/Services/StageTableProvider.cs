@@ -1,4 +1,5 @@
 using Serilog;
+using WWOnline.Native;
 using WWOnline.Patcher.Config;
 
 namespace WWOnline.Services;
@@ -8,8 +9,8 @@ namespace WWOnline.Services;
 /// never written anywhere: the small-key table (<see cref="SmallKeyTableProvider"/>) and the heart table
 /// (<see cref="HeartTableProvider"/>). Looked up in the Settings page's patched game, then its vanilla game,
 /// then (dev) GameMod/config.json's game_path and vanilla_game_path: the stage files are the same in all of
-/// them (no patch edits a stage's actors). Null until built, or when no game folder has stage data; retried
-/// every 30 s.
+/// them (no patch edits a stage's actors). On the native backend the disc image comes first (there is no patched
+/// game). Null until built, or when no game folder has stage data; retried every 30 s.
 /// </summary>
 public abstract class StageTableProvider<T> where T : class
 {
@@ -44,10 +45,11 @@ public abstract class StageTableProvider<T> where T : class
     /// <summary>Logged once when no game folder has stage data.</summary>
     protected abstract string MissingMessage { get; }
 
-    /// <summary>The Settings page's game folders, then (dev) GameMod/config.json's.</summary>
+    /// <summary>The native backend's disc image, the Settings page's game folders, then (dev) GameMod/config.json's.</summary>
     public static IEnumerable<string> DefaultGamePaths(GameSettingsService settings)
     {
         var s = settings.Load();
+        if (s.Backend == GameBackend.Native && NativePaths.Disc(s) is { } disc) yield return disc;
         if (!string.IsNullOrWhiteSpace(s.GamePath)) yield return s.GamePath;
         if (!string.IsNullOrWhiteSpace(s.VanillaGamePath)) yield return s.VanillaGamePath;
         var gameMod = GamePatcherService.FindGameModFolder();

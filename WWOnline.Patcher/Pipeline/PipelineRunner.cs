@@ -51,6 +51,16 @@ public class PipelineRunner
         if (mode != BuildMode.PatchData)
             BuildStamp.Delete(_config);
 
+        await RunStepsAsync(steps, progress, ct);
+
+        if (mode == BuildMode.Full)
+            BuildStamp.Write(_config, WorldData.SwitchTableBuilder.RulesVersion); // step 7 wrote the table
+    }
+
+    /// <summary>Run <paramref name="steps"/> in order, reporting each one's start, end or failure (which is rethrown).</summary>
+    public static async Task RunStepsAsync(IEnumerable<IPipelineStep> steps, PipelineProgress progress,
+        CancellationToken ct = default)
+    {
         foreach (var step in steps)
         {
             progress.Report(step.StepNumber, step.Name, $"Starting {step.Name}...");
@@ -68,9 +78,6 @@ public class PipelineRunner
                 throw;
             }
         }
-
-        if (mode == BuildMode.Full)
-            BuildStamp.Write(_config, WorldData.SwitchTableBuilder.RulesVersion); // step 7 wrote the table
     }
 
     private List<IPipelineStep> GetSteps(BuildMode mode)

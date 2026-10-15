@@ -3,7 +3,8 @@
     Fails if the repo or a release artifact contains Nintendo game files.
 
 .DESCRIPTION
-    WW-Online must never ship or commit Nintendo files (main.dol, RELS.arc, models, disc images...).
+    WW-Online must never ship or commit Nintendo files (main.dol, RELS.arc, models, disc images...),
+    nor a built native game (libtww: seaborne/ ships as source only).
     This guard checks file NAMES, EXTENSIONS and a few file-format MAGIC numbers (RARC archives,
     Yaz0-compressed data, J3D models, GameCube disc headers), so a renamed file is caught too.
 
@@ -49,7 +50,9 @@ $ForbiddenExtensions = @(
 # Exact file names from the game disc (system area + the files we patch).
 $ForbiddenNames = @(
     'main.dol', 'rels.arc', 'bi2.bin', 'boot.bin', 'apploader.img', 'fst.bin', 'opening.bnr',
-    'wwo-switch-table.json'   # built at patch time from the player's own stage data
+    'wwo-switch-table.json',  # built at patch time from the player's own stage data
+    # the native game, built on the player's machine from seaborne/: compiled game code, and GPL as a whole
+    'libtww.dylib', 'libtww.dll', 'libtww.so'
 )
 
 # Folder names that only ever hold game-derived files: the icon cache (AppPaths.IconCacheFolderName)

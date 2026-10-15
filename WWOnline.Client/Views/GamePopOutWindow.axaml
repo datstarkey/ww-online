@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:WWOnline.ViewModels"
+        x:Class="WWOnline.Views.GamePopOutWindow"
+        x:DataType="vm:GameWindowViewModel"
+        Icon="avares://WWOnline.Client/Assets/Branding/app.ico"
+        MinWidth="480" MinHeight="408"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="{StaticResource FontBody}" FontSize="14"
+        Foreground="{StaticResource TextBrush}"
+        Background="{StaticResource GroundBrush}">
+    <Window.KeyBindings>
+        <KeyBinding Gesture="F11" Command="{Binding ToggleFullScreenCommand}" />
+    </Window.KeyBindings>
+
+    <DockPanel>
+        <!-- Above the game, never over it; full screen is the game alone (F11 or the green button leave it) -->
+        <Border x:Name="Bar" DockPanel.Dock="Top" Classes="ww-game-bar" IsVisible="{Binding !IsFullScreen}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
+                <Button Classes="ww-ghost ww-game-bar" Command="{Binding ToggleFullScreenCommand}"
+                        ToolTip.Tip="Full screen (F11)" AutomationProperties.Name="Full screen">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Viewbox Width="16" Height="16"><Path Classes="icon" Data="{StaticResource IconFullScreen}" /></Viewbox>
+                        <TextBlock Text="Full screen" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="ww-ghost ww-game-bar" Command="{Binding DockCommand}"
+                        ToolTip.Tip="Back into the main window (closing this window does it too)"
+                        AutomationProperties.Name="Back to the main window">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Viewbox Width="16" Height="16"><Path Classes="icon" Data="{StaticResource IconPopIn}" /></Viewbox>
+                        <TextBlock Text="Back to the main window" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- The game's view while popped out (MainWindow moves it) -->
+        <Panel x:Name="Slot" />
+    </DockPanel>
+</Window>

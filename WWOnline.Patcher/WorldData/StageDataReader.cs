@@ -1,5 +1,6 @@
 using System.Text;
 using WWOnline.Patcher.BinaryFormats;
+using WWOnline.Patcher.BinaryFormats.Dol;
 using WWOnline.Patcher.BinaryFormats.Yaz0;
 
 namespace WWOnline.Patcher.WorldData;
@@ -28,6 +29,22 @@ public static class StageDataReader
         return Directory.Exists(path) ? path : null;
     }
 
+    /// <summary>
+    /// Every stage and main.dol of <paramref name="gamePath"/>: an extracted game folder (files/res/Stage + sys/main.dol)
+    /// or a GameCube disc image (the native backend's). Null when it has neither.
+    /// </summary>
+    public static (List<StageData> Stages, DolPatcher Dol)? ReadGame(string gamePath, Action<string> skipped)
+    {
+        if (File.Exists(gamePath))
+        {
+            using var disc = DiscImage.Open(gamePath);
+            return disc == null ? null : (ReadAll(disc, skipped).ToList(), new DolPatcher(disc.ReadDol()));
+        }
+        var dolPath = Path.Combine(gamePath, "sys", "main.dol");
+        var stages = StagesPath(gamePath);
+        return stages == null || !File.Exists(dolPath) ? null : (ReadAll(stages, skipped).ToList(), new DolPatcher(dolPath));
+    }
+
     /// <summary>Largest archive prefix we inflate: stage data archives are a few MB at most.</summary>
     public const int MaxInflate = 64 << 20;
 
@@ -36,16 +53,33 @@ public static class StageDataReader
     /// archives can't be read (damaged or modded files) is skipped and reported to <paramref name="skipped"/>
     /// rather than failing the whole patch.
     /// </summary>
-    public static IEnumerable<StageData> ReadAll(string stagesPath, Action<string> skipped)
+    public static IEnumerable<StageData> ReadAll(string stagesPath, Action<string> skipped) =>
+        ReadAll(Directory.GetDirectories(stagesPath).Select(dir => (Path.GetFileName(dir), (Func<StageData?>)(() => ReadStage(dir)))),
+            skipped);
+
+    /// <summary><see cref="ReadAll(string, Action{string})"/> from a disc image's res/Stage.</summary>
+    public static IEnumerable<StageData> ReadAll(DiscImage disc, Action<string> skipped) =>
+        ReadAll(disc.Directories(DiscStagesPath).Select(dir => (Name(dir), (Func<StageData?>)(() => ReadStage(disc, dir)))), skipped);
+
+    public const string DiscStagesPath = "res/Stage";
+
+    private static StageData? ReadStage(DiscImage disc, string dir) =>
+        disc.ReadFile(dir + "/Stage.arc") is { } stageArc
+            ? ReadStage(Name(dir), stageArc, disc.Files(dir).Select(f => (Name(f), (Func<byte[]>)(() => disc.ReadFile(f)!))))
+            : null;
+
+    private static string Name(string discPath) => discPath[(discPath.LastIndexOf('/') + 1)..];
+
+    private static IEnumerable<StageData> ReadAll(IEnumerable<(string Name, Func<StageData?> Read)> stages, Action<string> skipped)
     {
-        foreach (var dir in Directory.GetDirectories(stagesPath).OrderBy(d => d, StringComparer.Ordinal))
+        foreach (var (name, read) in stages.OrderBy(s => s.Name, StringComparer.Ordinal))
         {
             StageData? stage;
-            try { stage = ReadStage(dir); }
+            try { stage = read(); }
             catch (Exception ex) when (ex is IOException or InvalidDataException or IndexOutOfRangeException
                                            or ArgumentException or OverflowException or UnauthorizedAccessException)
             {
-                skipped($"{Path.GetFileName(dir)} ({ex.GetType().Name}: {ex.Message})");
+                skipped($"{name} ({ex.GetType().Name}: {ex.Message})");
                 continue;
             }
             if (stage != null)
@@ -56,14 +90,19 @@ public static class StageDataReader
     /// <summary>One stage folder, or null without a readable Stage.arc / STAG chunk.</summary>
     public static StageData? ReadStage(string stageDir)
     {
-        string name = Path.GetFileName(stageDir);
         var stageArc = Path.Combine(stageDir, "Stage.arc");
         if (!File.Exists(stageArc))
             return null;
+        return ReadStage(Path.GetFileName(stageDir), File.ReadAllBytes(stageArc),
+            Directory.GetFiles(stageDir, "Room*.arc").Select(f => (Path.GetFileName(f), (Func<byte[]>)(() => File.ReadAllBytes(f)))));
+    }
 
+    /// <summary>One stage from its Stage.arc and the files beside it (only Room&lt;N&gt;.arc are read), or null without a STAG chunk.</summary>
+    public static StageData? ReadStage(string name, byte[] stageArc, IEnumerable<(string File, Func<byte[]> Read)> files)
+    {
         int? saveTbl = null;
         var actors = new List<PlacedActor>();
-        foreach (var (_, dz) in ReadDzFiles(File.ReadAllBytes(stageArc)))
+        foreach (var (_, dz) in ReadDzFiles(stageArc))
         {
             saveTbl ??= ParseSaveTbl(dz);
             actors.AddRange(ParseActors(dz, name, -1));
@@ -71,12 +110,12 @@ public static class StageDataReader
         if (saveTbl == null)
             return null;
 
-        foreach (var file in Directory.GetFiles(stageDir, "Room*.arc"))
+        foreach (var (file, read) in files)
         {
-            var stem = Path.GetFileNameWithoutExtension(file);
-            if (!int.TryParse(stem.AsSpan(4), out int room) || room is < 0 or > 63)
+            if (!file.StartsWith("Room", StringComparison.OrdinalIgnoreCase) || !file.EndsWith(".arc", StringComparison.OrdinalIgnoreCase) ||
+                !int.TryParse(file.AsSpan(4, file.Length - 8), out int room) || room is < 0 or > 63)
                 continue;
-            foreach (var (_, dz) in ReadDzFiles(File.ReadAllBytes(file)))
+            foreach (var (_, dz) in ReadDzFiles(read()))
                 actors.AddRange(ParseActors(dz, name, room));
         }
         return new StageData(name, saveTbl.Value, actors);

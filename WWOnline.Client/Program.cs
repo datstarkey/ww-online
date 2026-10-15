@@ -77,9 +77,16 @@ internal class Program
         Log.Logger = config.CreateLogger();
     }
 
+    // --hidden: no Dock icon and no activation (and no window, see App.RunWithoutWindow). Avalonia's app
+    // delegate activates the Dock and then the app at launch, even without a Dock icon: leave it out.
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .With(new MacOSPlatformOptions
+            {
+                ShowInDock = !StartupOptions.Hidden,
+                DisableAvaloniaAppDelegate = StartupOptions.Hidden,
+            })
             .WithInterFont()
             .LogToTrace();
 }

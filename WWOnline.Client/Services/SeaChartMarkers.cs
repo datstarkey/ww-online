@@ -10,31 +10,47 @@ namespace WWOnline.Services;
 /// </summary>
 public static class SeaChartMarkers
 {
-    /// <summary>The entry region (SEACHART_OFF_ENTRY0..SEACHART_BLOCK_SIZE) for these players: the first
-    /// SEACHART_MAX_ENTRIES of them on the sea, the rest zero (not shown).</summary>
-    public static byte[] BuildEntries(IEnumerable<PuppetData> players)
+    /// <summary>One player's marker: where they are on the sea (their boat while they sail), their heading and colour.</summary>
+    public readonly record struct Marker(float X, float Z, short Angle, byte R, byte G, byte B);
+
+    /// <summary>The first SEACHART_MAX_ENTRIES of these players who are on the sea.</summary>
+    public static List<Marker> Markers(IEnumerable<PuppetData> players)
     {
-        var entries = new byte[PuppetLayout.SEACHART_MAX_ENTRIES * PuppetLayout.SEACHART_ENTRY_SIZE];
-        int n = 0;
+        var markers = new List<Marker>(PuppetLayout.SEACHART_MAX_ENTRIES);
         foreach (var p in players)
         {
-            if (n >= PuppetLayout.SEACHART_MAX_ENTRIES) break;
+            if (markers.Count >= PuppetLayout.SEACHART_MAX_ENTRIES) break;
             if (p.StageName != GameMemoryAddresses.Sea.SeaStageName) continue;
             var sailing = p.Boat is { Parked: false } ? p.Boat : null; // a parked boat isn't where they are
             var pos = sailing?.Position ?? p.Position;
             if (pos == null || !pos.IsFinite()) continue;
             short angle = sailing?.Rotation ?? (short)p.Rotation;
-            int o = n * PuppetLayout.SEACHART_ENTRY_SIZE;
-            BigEndian.WriteF32(entries, o + PuppetLayout.SEACHART_E_OFF_X, pos.X);
-            BigEndian.WriteF32(entries, o + PuppetLayout.SEACHART_E_OFF_Z, pos.Z);
-            BigEndian.WriteS16(entries, o + PuppetLayout.SEACHART_E_OFF_ANGLE, angle);
-            entries[o + PuppetLayout.SEACHART_E_OFF_FLAGS] = PuppetLayout.SEACHART_FLAG_SHOW;
             var a = p.Appearance ?? new AppearanceState();
             bool vanilla = a.ColorR == 0 && a.ColorG == 0 && a.ColorB == 0;
-            entries[o + PuppetLayout.SEACHART_E_OFF_R] = vanilla ? (byte)PuppetLayout.TUNIC_COLOR_DEFAULT_R : a.ColorR;
-            entries[o + PuppetLayout.SEACHART_E_OFF_G] = vanilla ? (byte)PuppetLayout.TUNIC_COLOR_DEFAULT_G : a.ColorG;
-            entries[o + PuppetLayout.SEACHART_E_OFF_B] = vanilla ? (byte)PuppetLayout.TUNIC_COLOR_DEFAULT_B : a.ColorB;
-            n++;
+            markers.Add(vanilla
+                ? new Marker(pos.X, pos.Z, angle, PuppetLayout.TUNIC_COLOR_DEFAULT_R, PuppetLayout.TUNIC_COLOR_DEFAULT_G,
+                             PuppetLayout.TUNIC_COLOR_DEFAULT_B)
+                : new Marker(pos.X, pos.Z, angle, a.ColorR, a.ColorG, a.ColorB));
+        }
+        return markers;
+    }
+
+    /// <summary>The entry region (SEACHART_OFF_ENTRY0..SEACHART_BLOCK_SIZE) for these players: the first
+    /// SEACHART_MAX_ENTRIES of them on the sea, the rest zero (not shown).</summary>
+    public static byte[] BuildEntries(IEnumerable<PuppetData> players)
+    {
+        var entries = new byte[PuppetLayout.SEACHART_MAX_ENTRIES * PuppetLayout.SEACHART_ENTRY_SIZE];
+        int o = 0;
+        foreach (var m in Markers(players))
+        {
+            BigEndian.WriteF32(entries, o + PuppetLayout.SEACHART_E_OFF_X, m.X);
+            BigEndian.WriteF32(entries, o + PuppetLayout.SEACHART_E_OFF_Z, m.Z);
+            BigEndian.WriteS16(entries, o + PuppetLayout.SEACHART_E_OFF_ANGLE, m.Angle);
+            entries[o + PuppetLayout.SEACHART_E_OFF_FLAGS] = PuppetLayout.SEACHART_FLAG_SHOW;
+            entries[o + PuppetLayout.SEACHART_E_OFF_R] = m.R;
+            entries[o + PuppetLayout.SEACHART_E_OFF_G] = m.G;
+            entries[o + PuppetLayout.SEACHART_E_OFF_B] = m.B;
+            o += PuppetLayout.SEACHART_ENTRY_SIZE;
         }
         return entries;
     }

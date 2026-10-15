@@ -92,6 +92,24 @@ public class AnimMirrorTests
     }
 
     [Fact]
+    public void ReadLocal_ReportsTheItemTrack_WithItsFrame_OrNoneWithoutAnAnm()
+    {
+        var game = LinkInASideHop();
+        SetTrack(game, true, 2, 0x81000200, 1.0f, 0x0036, 0, 40, 0, 2, 9.5f, 1.0f);
+        var anim = new AnimationState();
+
+        AnimMirror.ReadLocal(game, Link, anim);
+
+        Assert.Equal((ushort)0x0036, anim.ItemTrack!.Bck);
+        Assert.Equal((9.5f, 1.0f, 1.0f), (anim.ItemTrack.Frame, anim.ItemTrack.Rate, anim.ItemTrack.Ratio));
+        Assert.Equal((short)40, anim.ItemTrack.End);
+
+        var none = new AnimationState();
+        AnimMirror.ReadLocal(LinkInASideHop(), Link, none);
+        Assert.Equal(AnimTrack.None, none.ItemTrack!.Bck);
+    }
+
+    [Fact]
     public void ReadLocal_ReportsFaceAndHands_PriorityTextureFirst()
     {
         var anim = new AnimationState();

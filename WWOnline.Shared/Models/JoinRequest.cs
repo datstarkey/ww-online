@@ -11,6 +11,25 @@ public class JoinRequest
 
     /// <summary>The client's app version (<see cref="AppInfo.Version"/>), for messages and logs only.</summary>
     public string AppVersion { get; set; } = "";
+
+    /// <summary>
+    /// What runs the client's game: "dolphin-win", "native-osx-arm64", ... For logs only. Empty from clients
+    /// before it existed (an additive field: no protocol change).
+    /// </summary>
+    public string Platform { get; set; } = "";
+
+    /// <summary>What this client's game can do beyond the basics (the native game takes PVP hits; Dolphin doesn't).</summary>
+    public ClientCapabilities Capabilities { get; set; }
+}
+
+/// <summary>Optional features a client's game supports (<see cref="JoinRequest.Capabilities"/>, <see cref="PlayerInfo.Capabilities"/>).</summary>
+[Flags]
+public enum ClientCapabilities
+{
+    None = 0,
+
+    /// <summary>Its game reports the hits its Link lands on puppets and applies peers' hits to its Link (<see cref="PvpHit"/>).</summary>
+    PvpHits = 1,
 }
 
 /// <summary>The server's answer to a <see cref="JoinRequest"/>.</summary>

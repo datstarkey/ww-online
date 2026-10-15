@@ -23,6 +23,7 @@
   <a href="#what-it-does"><b>Features</b></a> ·
   <a href="#troubleshooting"><b>Troubleshooting</b></a> ·
   <a href="https://github.com/datstarkey/ww-online/wiki"><b>Wiki</b></a> ·
+  <a href="#playing-natively-on-macos-preview"><b>Native on macOS</b></a> ·
   <a href="#building-from-source"><b>Build from source</b></a> ·
   <a href="#credits"><b>Credits</b></a>
 </p>
@@ -31,7 +32,7 @@
   <img src="docs/screenshots/room-owner-edit.png" alt="The Room page: the room owner editing the room rules" width="820">
 </p>
 
-> **You need your own copy of the game.** WW-Online contains no Nintendo code, files or assets, and never will. It patches the game on your PC from a disc image you provide: a US copy of The Wind Waker (game ID `GZLE01`) that you dumped from a disc you own. Please don't ask for, or share, game files.
+> **You need your own copy of the game.** WW-Online contains no Nintendo files, assets or game data, and never will. It patches the game on your PC (or, natively on a Mac, reads it at run time) from a disc image you provide: a US copy of The Wind Waker (game ID `GZLE01`) that you dumped from a disc you own. Please don't ask for, or share, game files.
 
 > **Status: early development.** Things work, and things break. Expect bugs, and expect everyone in a room to need the same WW-Online version.
 
@@ -139,6 +140,18 @@ Patch again only when WW-Online asks (after an update with new game code, or whe
 
 More on the wiki: **[Troubleshooting](https://github.com/datstarkey/ww-online/wiki/Troubleshooting)** and **[Known limitations](https://github.com/datstarkey/ww-online/wiki/Known-Limitations)**.
 
+## Playing natively on macOS (preview)
+
+On a Mac, WW-Online runs the game itself instead of Dolphin. Its game engine, **Seaborne** (in [`seaborne/`](seaborne/VENDORED.md)), is a native port built from the [zeldaret/tww](https://github.com/zeldaret/tww) decompilation and based on [SwitchWaker](https://github.com/centollOS/SwitchWaker) by Pulpparty and depende3000. It runs inside the app, is compiled on your Mac from the source in this repository, and reads everything of the game from your disc image every time it starts. No game binary is downloaded.
+
+- **Status:** macOS on Apple silicon only, and early. There is no macOS installer yet: run the client from source (see [Building from source](#building-from-source)). On Windows, WW-Online keeps using Dolphin; a native Windows build comes later.
+- **You need:** Xcode's command line tools (`xcode-select --install`), Homebrew's `cmake` and `ninja` (`brew install cmake ninja`), git, the network for the first build, about 1 GB of free disk, and your own disc image: the US version (`GZLE01`, revision 0) as an uncompressed `.iso`.
+- **How to play:**
+  1. Start the client (`dotnet run --project WWOnline.Client/WWOnline.Client.csproj`). On a Mac the setup picks the native game.
+  2. **Your disc:** choose your `.iso`. WW-Online checks it against the known good dump (SHA-1) and saves only its path: the image is never copied or changed.
+  3. **Build the game:** press **Build the game**. The setup builds the game library (`libtww`) from `seaborne/` in four steps: it checks the build tools, fetches the audio sources (Dolphin's DSP HLE, from [RecompCore](https://github.com/elliotttate/RecompCore)), configures (CMake also fetches [Aurora](https://github.com/encounter/aurora), the graphics and input layer) and compiles. The build reads no disc. Everything it makes goes in `~/Library/Application Support/WWOnline/game/`, never into the repository. The first build takes about a minute on a 14-core Mac and a few minutes on smaller ones; after an update only what changed is rebuilt. You can rebuild from **Settings → Game files**.
+  4. **Play:** host or join a room as usual. The game starts inside the WW-Online window.
+
 ## Building from source
 
 For developers. You need the [.NET 9 SDK](https://dotnet.microsoft.com/download) and, to rebuild the in-game code, [devkitPro's devkitPPC](https://devkitpro.org/wiki/Getting_Started) (`C:\devkitPro\devkitPPC`).
@@ -151,6 +164,7 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj
 ```
 
 - Copy `GameMod/config.example.json` to `GameMod/config.json` and set `vanilla_game_path` (your extracted game) and `game_path` (the patched output).
+- `seaborne/` is the native game engine, vendored from its own repository by `scripts/vendor-seaborne.sh` (never edited here; see `CLAUDE.md`). `scripts/dev-test-native.sh` runs two native clients on a Mac (`--hidden` for checks: no window, no focus).
 - `.\scripts\dev-test.ps1` runs a local two-player test: two Dolphins and two clients, with Player 1 hosting. `-Patch` also rebuilds the in-game code. Logs go to `logs/latest/`.
 - `python scripts/dolphin-crash-context.py <dolphin pid> tww-decomp/config/GZLE01/symbols.txt` prints the registers and stack of a game crash from the running Dolphin (read-only).
 - `CLAUDE.md` and `GameMod/CLAUDE.md` describe the architecture, memory map and coding rules. `docs/` has the design notes (held items and projectiles, live world, small keys, hearts, event flags, delivery bag, figurines, side quests, optional patches), [softlocks and warping](docs/softlocks.md), [self-hosting](docs/self-hosting.md) and [releasing](docs/releasing.md).
@@ -160,22 +174,30 @@ dotnet run --project WWOnline.Client/WWOnline.Client.csproj
 
 ## Legal
 
-WW-Online is a fan project. It is not affiliated with, endorsed by or sponsored by Nintendo. The Legend of Zelda and The Wind Waker are trademarks of Nintendo. This repository contains no Nintendo code, assets or game files. You must own the game and use a disc image you dumped yourself.
+WW-Online is a fan project. It is not affiliated with, endorsed by or sponsored by Nintendo. The Legend of Zelda and The Wind Waker are trademarks of Nintendo. This repository contains no Nintendo game files, assets or data: no disc image, executable, texture, model or sound. `seaborne/game/` is the community's decompilation ([zeldaret/tww](https://github.com/zeldaret/tww)), source code written by its contributors, as that project publishes it; the game's data is read from your own disc when the game runs. You must own the game and use a disc image you dumped yourself.
 
 ## Credits
 
 **WW-Online would not be possible without these projects.** Huge thanks to everyone behind them:
 
-- **[zeldaret/tww](https://github.com/zeldaret/tww)**, the Wind Waker decompilation. Every game structure, offset and function this project touches was understood through it.
+- **[SwitchWaker](https://github.com/centollOS/SwitchWaker)** by **Pulpparty and depende3000** and the SwitchWaker contributors (MIT). The native game engine, Seaborne (`seaborne/`), is based on it: the native port of the game that WW-Online runs on macOS. Everyone else Seaborne builds on is credited in [`seaborne/README.md`](seaborne/README.md) and [`seaborne/THIRD_PARTY.md`](seaborne/THIRD_PARTY.md).
+- **[zeldaret/tww](https://github.com/zeldaret/tww)**, the Wind Waker decompilation (CC0). Every game structure, offset and function this project touches was understood through it, and Seaborne's `game/` is compiled from it.
 - **[WW_Hacking_API](https://github.com/LagoLunatic/WW_Hacking_API)** by LagoLunatic. The approach to building custom code into the game (C to REL, ASM patches) and the vanilla game headers in `GameMod/include/` come from it.
 - **[Wind Waker Randomizer (wwrando)](https://github.com/LagoLunatic/wwrando)** by LagoLunatic and contributors. Our archive, REL and Yaz0 handling is ported from it, and so are several game patches, including skip intro.
 - **[Better Wind Waker (betterww)](https://github.com/WideBoner/betterww)** by WideBoner, brainfubar and contributors, building on wwrando. The optional quality-of-life patches come from it.
-- **[Dolphin](https://dolphin-emu.org/)**, the GameCube and Wii emulator, without which none of this would run.
+- **[Dolphin](https://dolphin-emu.org/)**, the GameCube and Wii emulator, without which none of this would run. On the native game, its DSP HLE plays the audio.
+- **[Aurora](https://github.com/encounter/aurora)** by encounter: the GameCube SDK over WebGPU that draws the native game and reads its controllers.
 
 WW_Hacking_API, wwrando and betterww are MIT-licensed; their licence notices are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 Fonts: Fredoka, Hanken Grotesk and JetBrains Mono, under the SIL Open Font License (see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)).
 
-## License
+## Licensing
 
-WW-Online's own code is released under the [MIT License](LICENSE). It covers this project's code only: The Wind Waker itself belongs to Nintendo and is not part of this project.
+- **WW-Online's own code** (everything outside `seaborne/` and `tww-decomp/`) is released under the [MIT License](LICENSE). The code it adapts from other projects is listed, with their licences, in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+- **`seaborne/`**, the native game engine, has its own licence files: [`seaborne/LICENSE`](seaborne/LICENSE) (MIT, Copyright Pulpparty and depende3000 and the SwitchWaker contributors, and datstarkey for Seaborne) and [`seaborne/THIRD_PARTY.md`](seaborne/THIRD_PARTY.md), which lists every component. Its `game/` folder is the zeldaret/tww decompilation, CC0-1.0.
+- **`seaborne/native/dsp_hle/`** (the audio) is **GPL-3.0-or-later**, and the Dolphin DSP HLE sources the build fetches are GPL-2.0-or-later. So a `libtww` you build is **GPL-3.0-or-later as a whole**.
+- **Nothing GPL ships as a binary.** WW-Online distributes Seaborne as source only. `libtww` is built on your own machine and stays there; no installer, release or CI artifact contains one.
+- `tww-decomp/` is a git submodule of zeldaret/tww (CC0), used as reference material.
+
+These licences cover the projects' code only: The Wind Waker itself belongs to Nintendo and is not part of this project.

@@ -1,0 +1,6 @@
+# Controller script of the peer-smoothing proof (native/src/mods/ww_online/README.md, "Smooth peers"): the stick held
+# forward from frame 700 runs Link in a straight line for 120 frames, then he stands. Run with COS_MP_TEST_STEPS=1 and
+# either COS_MP_TEST_PEER=1 + a COS_MP_TEST_RATE (one process), or as one player of scripts/dev-test-native.sh --hidden.
+0   - 0 0
+700 - 0 127
+820 - 0 0

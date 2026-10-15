@@ -1,4 +1,5 @@
 using WWOnline.Data;
+using WWOnline.Native;
 
 namespace WWOnline.Services;
 
@@ -15,8 +16,7 @@ public static class GameActions
     public static bool AddRupees(IDolphinService dolphin, int delta)
     {
         if (!dolphin.IsConnected || delta == 0) return false;
-        int pending = dolphin.Read(GameMemoryAddresses.Player.PendingRupeeDelta) ?? 0;
-        return dolphin.Write(GameMemoryAddresses.Player.PendingRupeeDelta, pending + delta);
+        return dolphin.Play.Add(TwwInvCounter.Rupee, delta);
     }
 
     /// <summary>Set rupees to <paramref name="target"/> via the HUD path (see <see cref="AddRupees"/>).</summary>
@@ -24,7 +24,7 @@ public static class GameActions
     {
         if (!dolphin.IsConnected) return false;
         int current = dolphin.Read(GameMemoryAddresses.Player.RupeeCount) ?? 0;
-        int pending = dolphin.Read(GameMemoryAddresses.Player.PendingRupeeDelta) ?? 0;
+        int pending = dolphin.Play.ReadPending()?[(int)TwwInvCounter.Rupee] ?? 0;
         return AddRupees(dolphin, target - (current + pending));
     }
 
@@ -33,18 +33,18 @@ public static class GameActions
     /// so d_meter updates the HUD counter (and clamps to the quiver's max) like a pickup does.
     /// </summary>
     public static bool SetArrows(IDolphinService dolphin, int target) =>
-        SetAmmo(dolphin, GameMemoryAddresses.Player.CurrentArrowCount, GameMemoryAddresses.Player.PendingArrowDelta, target);
+        SetAmmo(dolphin, GameMemoryAddresses.Player.CurrentArrowCount, TwwInvCounter.Arrow, target);
 
     /// <summary>Set bombs to <paramref name="target"/> via the HUD path (see <see cref="SetArrows"/>).</summary>
     public static bool SetBombs(IDolphinService dolphin, int target) =>
-        SetAmmo(dolphin, GameMemoryAddresses.Player.CurrentBombCount, GameMemoryAddresses.Player.PendingBombDelta, target);
+        SetAmmo(dolphin, GameMemoryAddresses.Player.CurrentBombCount, TwwInvCounter.Bomb, target);
 
-    private static bool SetAmmo(IDolphinService dolphin, MemoryAddress<byte> count, MemoryAddress<short> pendingDelta, int target)
+    private static bool SetAmmo(IDolphinService dolphin, MemoryAddress<byte> count, TwwInvCounter counter, int target)
     {
         if (!dolphin.IsConnected) return false;
         int current = dolphin.Read(count) ?? 0;
-        int pending = dolphin.Read(pendingDelta) ?? 0;
+        int pending = dolphin.Play.ReadPending()?[(int)counter] ?? 0;
         int delta = Math.Clamp(target, 0, 99) - (current + pending);
-        return delta == 0 || dolphin.Write(pendingDelta, (short)(pending + delta));
+        return delta == 0 || dolphin.Play.Add(counter, delta);
     }
 }

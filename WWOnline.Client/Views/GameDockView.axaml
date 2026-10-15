@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             x:Class="WWOnline.Views.GameDockView"
+             x:DataType="vm:GameWindowViewModel">
+    <DockPanel>
+        <!-- Above the game, never over it: nothing Avalonia draws can sit on the game's native view -->
+        <Border DockPanel.Dock="Top" Classes="ww-game-bar" IsVisible="{Binding !IsPoppedOut}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
+                <Button Classes="ww-ghost ww-game-bar" Command="{Binding PopOutCommand}"
+                        ToolTip.Tip="Play in a window of its own" AutomationProperties.Name="Pop out">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Viewbox Width="16" Height="16"><Path Classes="icon" Data="{StaticResource IconPopOut}" /></Viewbox>
+                        <TextBlock Text="Pop out" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button Classes="ww-ghost ww-game-bar" Command="{Binding ToggleFullScreenCommand}"
+                        ToolTip.Tip="Full screen in a window of its own (F11)" AutomationProperties.Name="Full screen">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Viewbox Width="16" Height="16"><Path Classes="icon" Data="{StaticResource IconFullScreen}" /></Viewbox>
+                        <TextBlock Text="Full screen" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <Panel>
+            <!-- The game's view, while docked (MainWindow moves it) -->
+            <Panel x:Name="Slot" IsVisible="{Binding !IsPoppedOut}" />
+
+            <StackPanel IsVisible="{Binding IsPoppedOut}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Spacing="10" MaxWidth="420">
+                <Viewbox Width="40" Height="40" HorizontalAlignment="Center" Margin="0,0,0,6">
+                    <Path Classes="icon" Data="{StaticResource IconPopOut}" Stroke="{StaticResource AccentBrush}" />
+                </Viewbox>
+                <TextBlock Text="The game is in its own window" FontFamily="{StaticResource FontHeading}"
+                           FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="It keeps running there. Bring it back, or close its window, to play here again."
+                           FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
+                           TextAlignment="Center" />
+                <Button Classes="ww-accent" Command="{Binding DockCommand}" HorizontalAlignment="Center"
+                        Margin="0,10,0,0" AutomationProperties.Name="Bring back">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Viewbox Width="16" Height="16">
+                            <Path Classes="icon bold" Data="{StaticResource IconPopIn}" Stroke="{StaticResource OnAccentBrush}" />
+                        </Viewbox>
+                        <TextBlock Text="Bring back" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Panel>
+    </DockPanel>
+</UserControl>

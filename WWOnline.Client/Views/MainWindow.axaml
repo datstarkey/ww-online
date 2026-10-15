@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:WWOnline.ViewModels"
+        xmlns:views="using:WWOnline.Views"
         x:Class="WWOnline.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="{Binding Title}"
@@ -122,10 +123,10 @@
                             <TextBlock Text="Appearance" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <Button Classes="ww-nav" AutomationProperties.Name="Dolphin" Classes.active="{Binding IsLiveStateActive}" Command="{Binding ShowLiveStateCommand}">
+                    <Button Classes="ww-nav" AutomationProperties.Name="{Binding LiveStateLabel}" Classes.active="{Binding IsLiveStateActive}" Command="{Binding ShowLiveStateCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="12">
                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconMonitor}" /></Viewbox>
-                            <TextBlock Text="Dolphin" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding LiveStateLabel}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
                     <Button Classes="ww-nav" AutomationProperties.Name="Activity" Classes.active="{Binding IsActivityActive}" Command="{Binding ShowActivityCommand}">
@@ -182,8 +183,14 @@
             </Grid>
         </Border>
 
-        <!-- ═══ Content ═══ -->
-        <ContentControl Content="{Binding CurrentView}" />
+        <!-- ═══ Content: the page, or the native game (its view is added to GameDock once it starts and
+             stays for the process, here or in its pop-out window; nothing may be drawn over it) ═══ -->
+        <Panel>
+            <ContentControl Content="{Binding CurrentView}" IsVisible="{Binding !IsGameViewActive}" />
+            <Panel IsVisible="{Binding IsGameViewActive}">
+                <views:GameDockView x:Name="GameDock" DataContext="{Binding GameWindow}" />
+            </Panel>
+        </Panel>
     </DockPanel>
 
     <!-- ═══ First-run setup, over everything ═══ -->

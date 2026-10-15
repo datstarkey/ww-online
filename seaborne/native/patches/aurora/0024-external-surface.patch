@@ -1,0 +1,490 @@
+External surface (AuroraConfig::externalMetalLayer, off by default)
+
+For embedding the game in a host application (libtww, docs: WW_ONLINE_EMBED.md section 4.2b): Aurora
+renders into a CAMetalLayer the host owns instead of an SDL window. SDL starts with its events subsystem
+only (no video, which must live on the macOS main thread; no signal handlers, which belong to the host),
+the WebGPU surface is made from the layer (SurfaceSourceMetalLayer), the window size comes from
+aurora_set_external_size (pushed as AURORA_WINDOW_RESIZED at the next event pump), the window is never
+paused, and ImGui runs without its SDL platform backend. aurora_get_external_present_count and
+aurora_request_surface_readback (the surface gets CopySrc usage) let the host verify what its layer shows.
+
+diff --git a/include/aurora/aurora.h b/include/aurora/aurora.h
+index d853fdd..93eee80 100644
+--- a/include/aurora/aurora.h
++++ b/include/aurora/aurora.h
+@@ -131,6 +131,18 @@ typedef struct {
+    * present to the hidden window's surface, so EFB readbacks (screenshots) work as usual.
+    */
+   bool headless;
++
++  /*
++   * External surface (Seaborne patch 0024): render into a CAMetalLayer the host application owns
++   * (an NSView it embeds) instead of an SDL window. SDL then starts without its video subsystem and
++   * installs no signal handlers; the host reports the drawable's size with aurora_set_external_size
++   * (points and backing scale), and Aurora reconfigures the swapchain at the next event pump.
++   * AuroraInfo::window is NULL in this mode.
++   */
++  void* externalMetalLayer;
++  uint32_t externalWidth;
++  uint32_t externalHeight;
++  float externalScale;
+ } AuroraConfig;
+ 
+ typedef struct {
+@@ -212,6 +224,18 @@ void aurora_fifo_profile_get(uint64_t* out, size_t count);
+ void aurora_set_fifo_fast_paths(bool enabled);
+ 
+ void aurora_set_log_level(AuroraLogLevel level);
++/* External surface (patch 0024): the host view's size in points and its backing scale; any thread. */
++void aurora_set_external_size(uint32_t width, uint32_t height, float scale);
++/* External surface (patch 0024): successful presents to the external surface so far. */
++uint64_t aurora_get_external_present_count();
++/*
++ * External surface (patch 0024): reads back the next presented surface texture (what the host's
++ * layer shows) and calls fn on the render worker with its texels (rows of bytesPerRow bytes, the
++ * surface's WGPUTextureFormat). The surface is configured with CopySrc usage for this.
++ */
++typedef void (*AuroraSurfaceReadback)(void* user, const uint8_t* texels, uint32_t width, uint32_t height,
++                                      uint32_t bytesPerRow, uint32_t format);
++void aurora_request_surface_readback(AuroraSurfaceReadback fn, void* user);
+ void aurora_set_pause_on_focus_lost(bool value);
+ void aurora_set_background_input(bool value);
+ void aurora_set_resampler(AuroraSampler sampler);
+diff --git a/lib/aurora.cpp b/lib/aurora.cpp
+index cdbd43f..0bb2ab6 100644
+--- a/lib/aurora.cpp
++++ b/lib/aurora.cpp
+@@ -29,8 +29,11 @@
+ #include <SDL3/SDL_filesystem.h>
+ #include <magic_enum.hpp>
+ 
++#include <atomic>
+ #include <chrono>
++#include <mutex>
+ #include <thread>
++#include <utility>
+ 
+ #include "system_info.hpp"
+ #include "tracy/Tracy.hpp"
+@@ -102,6 +105,12 @@ constexpr std::array<AuroraBackend, 0> PreferredBackendOrder{};
+ 
+ bool g_initialFrame = false;
+ 
++// External surface (patch 0024): presents done, and a pending surface readback.
++std::atomic<uint64_t> g_externalPresents = 0;
++std::mutex g_readbackMutex;
++AuroraSurfaceReadback g_readbackFn = nullptr;
++void* g_readbackUser = nullptr;
++
+ AuroraInfo initialize(int argc, char* argv[], const AuroraConfig& config) noexcept {
+   g_config = config;
+   Log.info("Aurora initializing");
+@@ -366,6 +375,17 @@ void present_frame(imgui::DrawData imguiDrawData) noexcept {
+     }
+ 
+     const bool canPresent = currentTexture && currentView;
++    // External surface (patch 0024): aurora_request_surface_readback copies this frame's surface texture.
++    wgpu::Buffer readbackBuffer;
++    AuroraSurfaceReadback readbackFn = nullptr;
++    void* readbackUser = nullptr;
++    uint32_t readbackRow = 0;
++    if (canPresent &&
++        (webgpu::g_graphicsConfig.surfaceConfiguration.usage & wgpu::TextureUsage::CopySrc) != wgpu::TextureUsage::None) {
++      std::lock_guard lock{g_readbackMutex};
++      readbackFn = std::exchange(g_readbackFn, nullptr);
++      readbackUser = g_readbackUser;
++    }
+     if (canPresent) {
+       wgpu::BindGroup presentBindGroup;
+       if (rmlBindGroup && !rmlOverlay) {
+@@ -423,6 +443,24 @@ void present_frame(imgui::DrawData imguiDrawData) noexcept {
+         imgui::render(pass, imguiDrawData);
+         pass.End();
+       }
++      if (readbackFn != nullptr) {
++        const uint32_t width = currentTexture.GetWidth();
++        const uint32_t height = currentTexture.GetHeight();
++        readbackRow = (width * 4 + 255) & ~255u;
++        const wgpu::BufferDescriptor bufferDescriptor{
++            .label = "External surface readback",
++            .usage = wgpu::BufferUsage::MapRead | wgpu::BufferUsage::CopyDst,
++            .size = static_cast<uint64_t>(readbackRow) * height,
++        };
++        readbackBuffer = webgpu::g_device.CreateBuffer(&bufferDescriptor);
++        const wgpu::TexelCopyTextureInfo src{.texture = currentTexture};
++        const wgpu::TexelCopyBufferInfo dst{
++            .layout = {.offset = 0, .bytesPerRow = readbackRow, .rowsPerImage = height},
++            .buffer = readbackBuffer,
++        };
++        const wgpu::Extent3D extent{width, height, 1};
++        encoder.CopyTextureToBuffer(&src, &dst, &extent);
++      }
+     } else {
+       Log.info("Skipping present; window not presentable");
+     }
+@@ -434,6 +472,22 @@ void present_frame(imgui::DrawData imguiDrawData) noexcept {
+       g_queue.Submit(1, &buffer);
+     }
+     webgpu::gpu_prof::after_submit();
++    if (readbackBuffer) {
++      const uint64_t size = readbackBuffer.GetSize();
++      bool mapped = false;
++      const auto future = readbackBuffer.MapAsync(
++          wgpu::MapMode::Read, 0, size, wgpu::CallbackMode::WaitAnyOnly,
++          [&mapped](wgpu::MapAsyncStatus status, wgpu::StringView) { mapped = status == wgpu::MapAsyncStatus::Success; });
++      if (webgpu::g_instance.WaitAny(future, 5'000'000'000ull) == wgpu::WaitStatus::Success && mapped) {
++        readbackFn(readbackUser, static_cast<const uint8_t*>(readbackBuffer.GetConstMappedRange(0, size)),
++                   currentTexture.GetWidth(), currentTexture.GetHeight(), readbackRow,
++                   static_cast<uint32_t>(currentTexture.GetFormat()));
++        readbackBuffer.Unmap();
++      } else {
++        Log.warn("External surface readback failed");
++        readbackFn(readbackUser, nullptr, 0, 0, 0, 0);
++      }
++    }
+     if (canPresent && g_surface) {
+       ZoneScopedN("Present");
+       wgpu::ConvertibleStatus status = wgpu::Status::Error;
+@@ -444,6 +498,9 @@ void present_frame(imgui::DrawData imguiDrawData) noexcept {
+         }
+       }
+       if (status) {
++        if (window::is_external()) {
++          g_externalPresents.fetch_add(1, std::memory_order_relaxed);
++        }
+         gfx::after_present();
+       } else {
+         Log.warn("Surface present failed");
+@@ -552,6 +609,16 @@ void aurora_fifo_profile_get(uint64_t* out, size_t count) {
+   }
+ }
+ AuroraBackend aurora_get_backend() { return aurora::g_config.desiredBackend; }
++
++uint64_t aurora_get_external_present_count() {
++  return aurora::g_externalPresents.load(std::memory_order_relaxed);
++}
++
++void aurora_request_surface_readback(AuroraSurfaceReadback fn, void* user) {
++  std::lock_guard lock{aurora::g_readbackMutex};
++  aurora::g_readbackFn = fn;
++  aurora::g_readbackUser = user;
++}
+ const AuroraBackend* aurora_get_available_backends(size_t* count) {
+   if (count != nullptr) {
+     *count = aurora::PreferredBackendOrder.size();
+diff --git a/lib/imgui.cpp b/lib/imgui.cpp
+index 07a0ec1..b829abe 100644
+--- a/lib/imgui.cpp
++++ b/lib/imgui.cpp
+@@ -11,6 +11,7 @@
+ #include <webgpu/webgpu_cpp.h>
+ #include <SDL3/SDL_events.h>
+ #include <SDL3/SDL_render.h>
++#include <SDL3/SDL_timer.h>
+ 
+ #include "internal.hpp"
+ #include "gfx/render_worker.hpp"
+@@ -93,7 +94,10 @@ void create_context() noexcept {
+ void initialize() noexcept {
+   ZoneScoped;
+   SDL_Renderer* renderer = window::get_sdl_renderer();
+-  ImGui_ImplSDL3_InitForSDLRenderer(window::get_sdl_window(), renderer);
++  // External surface (patch 0024): no SDL window, so no SDL platform backend (no ImGui input).
++  if (!window::is_external()) {
++    ImGui_ImplSDL3_InitForSDLRenderer(window::get_sdl_window(), renderer);
++  }
+   g_useSdlRenderer = renderer != nullptr;
+   if (g_useSdlRenderer) {
+     ImGui_ImplSDLRenderer3_Init(renderer);
+@@ -112,7 +116,9 @@ void shutdown() noexcept {
+   } else {
+     ImGui_ImplWGPU_Shutdown();
+   }
+-  ImGui_ImplSDL3_Shutdown();
++  if (!window::is_external()) {
++    ImGui_ImplSDL3_Shutdown();
++  }
+   ImGui::DestroyContext();
+   for (const auto& texture : g_sdlTextures) {
+     SDL_DestroyTexture(texture);
+@@ -128,7 +134,9 @@ void process_event(const SDL_Event& event) noexcept {
+       SDL_ConvertEventToRenderCoordinates(renderer, &renderEvent);
+     }
+   }
+-  ImGui_ImplSDL3_ProcessEvent(&renderEvent);
++  if (!window::is_external()) {
++    ImGui_ImplSDL3_ProcessEvent(&renderEvent);
++  }
+ }
+ 
+ bool wants_capture_event(const SDL_Event& event) noexcept {
+@@ -195,9 +203,16 @@ void new_frame(const AuroraWindowSize& size) noexcept {
+     }
+     ImGui_ImplWGPU_NewFrame();
+   }
+-  ImGui_ImplSDL3_NewFrame();
+-
+   ImGuiIO& io = ImGui::GetIO();
++  if (window::is_external()) {
++    // What ImGui_ImplSDL3_NewFrame would set: the time step.
++    static uint64_t lastNs = 0;
++    const uint64_t nowNs = SDL_GetTicksNS();
++    io.DeltaTime = lastNs != 0 && nowNs > lastNs ? static_cast<float>(nowNs - lastNs) / 1e9f : 1.f / 60.f;
++    lastNs = nowNs;
++  } else {
++    ImGui_ImplSDL3_NewFrame();
++  }
+   io.DisplayFramebufferScale = framebufferScale;
+   ImGui::GetIO().DisplaySize = displaySize;
+   ImGui::NewFrame();
+diff --git a/lib/webgpu/gpu.cpp b/lib/webgpu/gpu.cpp
+index b3ae6cd..0561762 100644
+--- a/lib/webgpu/gpu.cpp
++++ b/lib/webgpu/gpu.cpp
+@@ -756,6 +756,23 @@ static wgpu::BackendType to_wgpu_backend(AuroraBackend backend) {
+ static void release_surface_locked() noexcept { g_surface = {}; }
+ 
+ static bool create_surface() {
++  if (window::is_external()) {
++    // External surface (patch 0024): the host's CAMetalLayer.
++    window::SurfaceLock surfaceLock;
++    release_surface_locked();
++    wgpu::SurfaceSourceMetalLayer source;
++    source.layer = g_config.externalMetalLayer;
++    const wgpu::SurfaceDescriptor descriptor{
++        .nextInChain = &source,
++        .label = "External surface",
++    };
++    g_surface = g_instance.CreateSurface(&descriptor);
++    if (!g_surface) {
++      Log.error("Failed to create the external surface");
++      return false;
++    }
++    return true;
++  }
+   SDL_Window* window = window::get_sdl_window();
+   if (window == nullptr) {
+     Log.error("Failed to create surface: no window");
+@@ -1069,7 +1086,11 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+       .surfaceConfiguration =
+           wgpu::SurfaceConfiguration{
+               .format = surfaceFormat,
+-              .usage = wgpu::TextureUsage::RenderAttachment,
++              // External surface (patch 0024): CopySrc for aurora_request_surface_readback.
++              .usage = window::is_external() &&
++                               (g_surfaceCapabilities.usages & wgpu::TextureUsage::CopySrc) != wgpu::TextureUsage::None
++                           ? wgpu::TextureUsage::RenderAttachment | wgpu::TextureUsage::CopySrc
++                           : wgpu::TextureUsage::RenderAttachment,
+               .width = size.native_fb_width,
+               .height = size.native_fb_height,
+               .presentMode = presentMode,
+@@ -1170,7 +1191,7 @@ bool refresh_surface(bool recreate) {
+   uint32_t height = g_graphicsConfig.surfaceConfiguration.height;
+   uint32_t nativeWidth = width;
+   uint32_t nativeHeight = height;
+-  if (window::get_sdl_window() != nullptr) {
++  if (window::get_sdl_window() != nullptr || window::is_external()) {
+     const auto size = window::get_window_size();
+     width = size.fb_width;
+     height = size.fb_height;
+diff --git a/lib/window.cpp b/lib/window.cpp
+index 39e0217..4a05f24 100644
+--- a/lib/window.cpp
++++ b/lib/window.cpp
+@@ -57,6 +57,10 @@ std::atomic_bool g_surfaceReady = true;
+ #endif
+ bool g_lastPaused = false;
+ bool g_gotFocus = false;
++// External surface (patch 0024): the host view's size in points and its backing scale.
++std::atomic<uint32_t> g_externalWidth = 0;
++std::atomic<uint32_t> g_externalHeight = 0;
++std::atomic<float> g_externalScale = 1.f;
+ 
+ void retain_event_strings(SDL_Event& event) {
+   switch (event.type) {
+@@ -291,6 +295,14 @@ const AuroraEvent* poll_events() {
+   SDL_Event event;
+   // Clear out the previous scroll values to prevent ghost input
+   input::set_mouse_scroll(0, 0);
++  if (is_external() && !(get_window_size() == g_windowSize)) {
++    // External surface (patch 0024): the host resized its view (aurora_set_external_size).
++    resize_swapchain();
++    g_events.push_back(AuroraEvent{
++        .type = AURORA_WINDOW_RESIZED,
++        .windowSize = get_window_size(),
++    });
++  }
+   if (is_paused()) {
+     ZoneScopedN("SDL_WaitEvent (paused)");
+     if (SDL_WaitEvent(&event)) {
+@@ -318,6 +330,9 @@ const AuroraEvent* poll_events() {
+ }
+ 
+ bool create_window(AuroraBackend backend) {
++  if (is_external()) {
++    return true;
++  }
+   SDL_WindowFlags flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
+ #if TARGET_OS_IOS || TARGET_OS_TV
+   flags |= SDL_WINDOW_FULLSCREEN;
+@@ -414,6 +429,18 @@ bool initialize() {
+     // Before the video subsystem starts: Cocoa then neither activates the process nor gives it a Dock icon.
+     SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "1");
+   }
++  if (is_external()) {
++    // External surface (patch 0024): the host owns the window, the run loop and the process signals.
++    g_externalWidth.store(g_config.externalWidth != 0 ? g_config.externalWidth : 640);
++    g_externalHeight.store(g_config.externalHeight != 0 ? g_config.externalHeight : 480);
++    g_externalScale.store(g_config.externalScale > 0.f ? g_config.externalScale : 1.f);
++    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
++    TRY(SDL_InitSubSystem(SDL_INIT_EVENTS), "Error initializing SDL: {}", SDL_GetError());
++    if (g_config.allowJoystickBackgroundEvents) {
++      SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
++    }
++    return true;
++  }
+   TRY(SDL_InitSubSystem(SDL_INIT_EVENTS | SDL_INIT_VIDEO), "Error initializing SDL: {}", SDL_GetError());
+   time::internal::set_pause_reason(time::internal::PauseReason::Surface,
+                                    !g_surfaceReady.load(std::memory_order_acquire));
+@@ -444,7 +471,9 @@ bool initialize_event_watch() {
+ void shutdown() {
+   SDL_RemoveEventWatch(lifecycle_event_watch, nullptr);
+   destroy_window();
+-  TRY_WARN(SDL_EnableScreenSaver(), "Error enabling screensaver: {}", SDL_GetError());
++  if (!is_external()) {
++    TRY_WARN(SDL_EnableScreenSaver(), "Error enabling screensaver: {}", SDL_GetError());
++  }
+   SDL_Quit();
+ }
+ 
+@@ -453,9 +482,19 @@ AuroraWindowSize get_window_size() {
+   int height = 0;
+   int native_fb_w = 0;
+   int native_fb_h = 0;
+-  AURORA_ASSERT(SDL_GetWindowSize(g_window, &width, &height), "Failed to get window size: {}", SDL_GetError());
+-  AURORA_ASSERT(SDL_GetWindowSizeInPixels(g_window, &native_fb_w, &native_fb_h), "Failed to get window size in pixels: {}",
+-         SDL_GetError());
++  float scale = 1.f;
++  if (is_external()) {
++    width = static_cast<int>(g_externalWidth.load());
++    height = static_cast<int>(g_externalHeight.load());
++    scale = g_externalScale.load();
++    native_fb_w = std::max(1, static_cast<int>(std::lround(static_cast<float>(width) * scale)));
++    native_fb_h = std::max(1, static_cast<int>(std::lround(static_cast<float>(height) * scale)));
++  } else {
++    AURORA_ASSERT(SDL_GetWindowSize(g_window, &width, &height), "Failed to get window size: {}", SDL_GetError());
++    AURORA_ASSERT(SDL_GetWindowSizeInPixels(g_window, &native_fb_w, &native_fb_h),
++                  "Failed to get window size in pixels: {}", SDL_GetError());
++    scale = SDL_GetWindowDisplayScale(g_window);
++  }
+ 
+   int fb_w = native_fb_w;
+   int fb_h = native_fb_h;
+@@ -478,7 +517,6 @@ AuroraWindowSize get_window_size() {
+     }
+   }
+ 
+-  const float scale = SDL_GetWindowDisplayScale(g_window);
+   return {
+       .width = static_cast<uint32_t>(width),
+       .height = static_cast<uint32_t>(height),
+@@ -494,11 +532,13 @@ SDL_Window* get_sdl_window() { return g_window; }
+ 
+ SDL_Renderer* get_sdl_renderer() { return g_renderer; }
+ 
++bool is_external() noexcept { return g_config.externalMetalLayer != nullptr; }
++
+ bool is_paused() noexcept {
+   if (!is_presentable()) {
+     return true;
+   }
+-  if (g_config.headless) {
++  if (g_config.headless || is_external()) {
+     return false;
+   }
+   const auto flags = SDL_GetWindowFlags(g_window);
+@@ -514,7 +554,7 @@ bool is_paused() noexcept {
+ }
+ 
+ bool is_presentable() noexcept {
+-  return g_window != nullptr && !g_backgrounded.load(std::memory_order_acquire) &&
++  return (g_window != nullptr || is_external()) && !g_backgrounded.load(std::memory_order_acquire) &&
+          g_surfaceReady.load(std::memory_order_acquire);
+ }
+ 
+@@ -541,25 +581,40 @@ bool push_custom_event(CustomEvent eventType) {
+ }
+ 
+ void set_title(const char* title) {
++  if (g_window == nullptr) {
++    return;
++  }
+   TRY_WARN(SDL_SetWindowTitle(g_window, title), "Failed to set window title: {}", SDL_GetError());
+ }
+ 
+ void set_fullscreen(bool fullscreen) {
++  if (g_window == nullptr) {
++    return;
++  }
+   TRY_WARN(SDL_SetWindowFullscreen(g_window, fullscreen), "Failed to set window fullscreen: {}", SDL_GetError());
+ }
+ 
+ bool get_fullscreen() { return (SDL_GetWindowFlags(g_window) & SDL_WINDOW_FULLSCREEN) != 0u; }
+ 
+ void set_window_size(uint32_t width, uint32_t height) {
++  if (g_window == nullptr) {
++    return;
++  }
+   TRY_WARN(SDL_RestoreWindow(g_window), "Failed to un-maximize window: {}", SDL_GetError());
+   TRY_WARN(SDL_SetWindowSize(g_window, width, height), "Failed to set window size: {}", SDL_GetError());
+ }
+ 
+ void set_window_position(uint32_t x, uint32_t y) {
++  if (g_window == nullptr) {
++    return;
++  }
+   TRY_WARN(SDL_SetWindowPosition(g_window, x, y), "Failed to set window position: {}", SDL_GetError());
+ }
+ 
+ void center_window() {
++  if (g_window == nullptr) {
++    return;
++  }
+   TRY_WARN(SDL_SetWindowPosition(g_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED),
+            "Failed to center window: {}", SDL_GetError());
+ }
+@@ -570,7 +625,7 @@ static void push_future_resize_event() {
+ }
+ 
+ void request_frame_buffer_resize() {
+-  if (g_window != nullptr) {
++  if (g_window != nullptr || is_external()) {
+     // Defer so that we don't try to reconfigure the surface in the middle of game logic.
+     push_future_resize_event();
+   }
+@@ -611,6 +666,12 @@ void set_background_input(bool value) { SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACK
+ 
+ } // namespace aurora::window
+ 
++void aurora_set_external_size(uint32_t width, uint32_t height, float scale) {
++  aurora::window::g_externalWidth.store(std::max(width, 1u));
++  aurora::window::g_externalHeight.store(std::max(height, 1u));
++  aurora::window::g_externalScale.store(scale > 0.f ? scale : 1.f);
++}
++
+ #if defined(SDL_PLATFORM_ANDROID)
+ extern "C" JNIEXPORT void JNICALL Java_dev_encounter_aurora_AuroraSurface_nativeSetSurfaceReady(JNIEnv*, jclass,
+                                                                                                 jboolean ready) {
+diff --git a/lib/window.hpp b/lib/window.hpp
+index 0eecc3a..5da6fba 100644
+--- a/lib/window.hpp
++++ b/lib/window.hpp
+@@ -38,6 +38,8 @@ AuroraWindowSize get_window_size();
+ const AuroraEvent* poll_events();
+ SDL_Window* get_sdl_window();
+ SDL_Renderer* get_sdl_renderer();
++// External surface (patch 0024): rendering into the host's CAMetalLayer, no SDL window.
++bool is_external() noexcept;
+ bool is_paused() noexcept;
+ bool is_presentable() noexcept;
+ void set_surface_ready(bool ready) noexcept;

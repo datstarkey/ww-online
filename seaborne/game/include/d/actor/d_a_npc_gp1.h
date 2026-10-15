@@ -1,0 +1,172 @@
+#ifndef D_A_NPC_GP1_H
+#define D_A_NPC_GP1_H
+
+#include "d/d_npc.h"
+
+class J3DNode;
+
+class daNpc_Gp1_c : public fopNpc_npc_c {
+public:
+    daNpc_Gp1_c();
+    struct anm_prm_c {
+        /* 0x00 */ s8 anmNum;
+        /* 0x01 */ s8 btpNum;
+        /* 0x04 */ f32 morf;
+        /* 0x08 */ f32 speed;
+        /* 0x0C */ int loopMode;
+    };
+
+    void nodeGp1Control(J3DNode*, J3DModel*);
+    bool init_GP1_0();
+    bool createInit();
+    void setMtx(bool);
+    int anmNum_toResID(int);
+    s32 btpNum_toResID(int);
+    bool setBtp(bool, int);
+    bool iniTexPttrnAnm(bool);
+    void plyTexPttrnAnm();
+    void setAnm_tex(signed char);
+    BOOL setAnm_anm(anm_prm_c*);
+    void setAnm_NUM(int, int);
+    bool setAnm();
+    void chg_anmTag();
+    void control_anmTag();
+    void chg_anmAtr(unsigned char);
+    void control_anmAtr();
+    void setAnm_ATR(int);
+    void anmAtr(unsigned short);
+    void eventOrder();
+    void checkOrder();
+    bool chk_talk();
+    bool chk_drct(f32);
+    bool chk_partsNotMove();
+    bool chk_forceTlkArea();
+    void lookBack();
+    u16 next_msgStatus(u32* pMsgNo);
+    u32 getMsg_GP1_0();
+    u32 getMsg();
+    bool chkAttention();
+    void setAttention(bool);
+    fopAc_ac_c* searchByID(fpc_ProcID);
+    bool partner_srch_sub(void* (*)(void*, void*));
+    void partner_srch();
+    void ctrl_WAITanm();
+    u32 gp_movPass();
+    void gp_clcMovSpd();
+    void gp_nMove();
+    bool create_rupee();
+    bool charDecide(int);
+    void eInit_INI_KAERE_KAERE_();
+    void eInit_END_KAERE_KAERE_();
+    void event_actionInit(int);
+    bool event_action();
+    void privateCut(int);
+    void endEvent();
+    int isEventEntry();
+    void event_proc(int);
+    BOOL set_action(int (daNpc_Gp1_c::*)(void*), void*);
+    void setStt(signed char);
+    BOOL wait_1();
+    BOOL talk_1();
+    BOOL walk_1();
+    BOOL hair_1();
+    BOOL wait_2();
+    BOOL wait_action1(void*);
+    u8 demo();
+    BOOL _draw();
+    BOOL _execute();
+    BOOL _delete();
+    cPhs_State _create();
+    J3DModelData* create_Anm();
+    BOOL CreateHeap();
+
+public:
+    /* 0x06C4 */ u8 field_0x6c4[0x6CC - 0x6C4];
+    /* 0x06CC */ s8 m_hed_jnt_num;
+    /* 0x06CD */ s8 m_bbone_jnt_num;
+    /* 0x06CE */ s8 m_hnd_L_jnt_num;
+    /* 0x06CF */ u8 field_0x6cf;
+    /* 0x06D0 */ u32 field_0x6d0;
+    /* 0x06D4 */ J3DModel* field_0x6d4;
+    /* 0x06D8 */ J3DAnmTexPattern* m_hed_tex_pttrn;
+    /* 0x06DC */ mDoExt_btpAnm mBtpAnm;
+    /* 0x06F0 */ u8 field_0x6f0;
+    /* 0x06F1 */ u8 field_0x6f1[0x6F2 - 0x6F1];
+    /* 0x06F2 */ s16 field_0x6f2;
+    /* 0x06F4 */ int (daNpc_Gp1_c::*field_0x6f4)(void*);
+    /* 0x0700 */ dNpc_PathRun_c mPathRun;
+    /* 0x0708 */ dNpc_EventCut_c mDemoEventCut;
+    /* 0x0774 */ fpc_ProcID field_0x774;
+    /* 0x0778 */ f32 field_0x778;
+    /* 0x077C */ f32 field_0x77c;
+    /* 0x0780 */ f32 field_0x780;
+    /* 0x0784 */ s16 field_0x784;
+    /* 0x0786 */ s16 field_0x786;
+    /* 0x0788 */ s16 field_0x788;
+    /* 0x078A */ s16 field_0x78a;
+    /* 0x078C */ s16 field_0x78c;
+    /* 0x078E */ s16 field_0x78e;
+    /* 0x0790 */ cXyz mEyePos;
+    /* 0x079C */ f32 field_0x79c;
+    /* 0x07A0 */ f32 field_0x7a0;
+    /* 0x07A4 */ f32 field_0x7a4;
+    /* 0x07A8 */ cXyz field_0x7a8;
+    /* 0x07B4 */ u8 field_0x7b4[0x7C0 - 0x7B4];
+    /* 0x07C0 */ f32 field_0x7c0;
+    /* 0x07C4 */ f32 field_0x7c4;
+    /* 0x07C8 */ u8 field_0x7c8[0x7CC - 0x7C8];
+    /* 0x07CC */ f32 field_0x7cc;
+    /* 0x07D0 */ f32 field_0x7d0;
+    /* 0x07D4 */ f32 field_0x7d4;
+    /* 0x07D8 */ s16 field_0x7d8;
+    /* 0x07DA */ s16 field_0x7da;
+    /* 0x07DC */ s16 field_0x7dc;
+    /* 0x07DE */ s16 mEventIdx[3];
+    /* 0x07E4 */ s16 field_0x7e4;
+    /* 0x07E6 */ u8 field_0x7e6[0x7E8 - 0x7E6];
+    /* 0x07E8 */ s16 field_0x7e8;
+    /* 0x07EA */ s16 field_0x7ea;
+    /* 0x07EC */ s16 field_0x7ec;
+    /* 0x07EE */ s16 field_0x7ee;
+    /* 0x07F0 */ s16 field_0x7f0;
+    /* 0x07F2 */ s16 field_0x7f2;
+    /* 0x07F4 */ s16 field_0x7f4;
+    /* 0x07F6 */ s16 field_0x7f6;
+    /* 0x07F8 */ s8 field_0x7f8;
+    /* 0x07F9 */ s8 field_0x7f9;
+    /* 0x07FA */ s8 field_0x7fa;
+    /* 0x07FB */ u8 field_0x7fb;
+    /* 0x07FC */ u8 field_0x7fc;
+    /* 0x07FD */ u8 field_0x7fd;
+    /* 0x07FE */ u8 field_0x7fe;
+    /* 0x07FF */ u8 field_0x7ff;
+    /* 0x0800 */ u8 field_0x800;
+    /* 0x0801 */ u8 field_0x801;
+    /* 0x0802 */ u8 field_0x802;
+    /* 0x0803 */ u8 field_0x803[0x804 - 0x803];
+    /* 0x0804 */ s32 field_0x804;
+    /* 0x0808 */ u8 field_0x808;
+    /* 0x0809 */ u8 field_0x809;
+    /* 0x080A */ bool field_0x80a;
+    /* 0x080B */ u8 field_0x80b;
+    /* 0x080C */ s8 field_0x80c;
+    /* 0x080D */ s8 field_0x80d;
+    /* 0x080E */ s8 field_0x80e;
+    /* 0x080F */ u8 field_0x80f;
+    /* 0x0810 */ u8 field_0x810;
+    /* 0x0811 */ s8 field_0x811;
+    /* 0x0812 */ s8 field_0x812;
+    /* 0x0813 */ s8 field_0x813;
+    /* 0x0814 */ s8 field_0x814;
+    /* 0x0815 */ s8 field_0x815;
+    /* 0x0816 */ s8 field_0x816;
+    /* 0x0817 */ s8 field_0x817;
+    /* 0x0818 */ s8 field_0x818;
+    /* 0x0819 */ s8 field_0x819;
+    /* 0x081A */ s8 field_0x81a;
+    /* 0x081B */ u8 field_0x81b[0x81C - 0x81B];
+}; // Size: 0X81C
+
+STATIC_ASSERT(sizeof(daNpc_Gp1_c) == 0X81C);
+
+#endif /* D_A_NPC_GP1_H */

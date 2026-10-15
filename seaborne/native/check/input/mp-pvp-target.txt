@@ -1,0 +1,16 @@
+# Controller script of the multiplayer PVP proof (native/src/mods/ww_online/README.md, "PVP"): run with --preset pvp and
+# COS_MP_TEST_PEER=1 COS_MP_TEST_PVP=1 COS_MP_TEST_OFFSET=0:110 (the test puppet 110 units ahead): L held from frame 300
+# locks on to the puppet, then B slashes it every 60 frames.
+0   - 0 0
+300 L 0 0
+360 L+B 0 0
+366 L 0 0
+420 L+B 0 0
+426 L 0 0
+480 L+B 0 0
+486 L 0 0
+540 L+B 0 0
+546 L 0 0
+600 L+B 0 0
+606 L 0 0
+900 - 0 0

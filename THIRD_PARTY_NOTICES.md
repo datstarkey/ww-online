@@ -1,6 +1,42 @@
 # Third-party notices
 
-WW-Online includes code and data adapted from the projects below. Each is used under the MIT License, reproduced here as it requires.
+WW-Online vendors the source of the Seaborne game engine (first section, with its own licence files), and includes code and data adapted from the other projects below. Each of those is used under the MIT License, reproduced here as it requires.
+
+## Seaborne (the native game engine, `seaborne/`)
+
+Seaborne is vendored in `seaborne/` as source (`seaborne/VENDORED.md` names the commit). It is **based on [SwitchWaker](https://github.com/centollOS/SwitchWaker) by Pulpparty and depende3000** and the SwitchWaker contributors, and its `game/` folder is the [zeldaret/tww](https://github.com/zeldaret/tww) decompilation (CC0-1.0). Its own licence files govern it: [`seaborne/LICENSE`](seaborne/LICENSE) and, for every component it contains, builds against or fetches at build time, [`seaborne/THIRD_PARTY.md`](seaborne/THIRD_PARTY.md). In short:
+
+- the port's own code: MIT, under the notice below;
+- `seaborne/game/`: CC0-1.0 (`seaborne/game/LICENSE`);
+- `seaborne/native/dsp_hle/` (audio): **GPL-3.0-or-later** (`seaborne/native/dsp_hle/LICENSE`); the Dolphin DSP HLE sources the build fetches from [RecompCore](https://github.com/elliotttate/RecompCore) are GPL-2.0-or-later;
+- [Aurora](https://github.com/encounter/aurora), fetched at build time with its dependencies: MIT and the licences `seaborne/THIRD_PARTY.md` lists.
+
+A `libtww` built from `seaborne/` is GPL-3.0-or-later as a whole. WW-Online distributes Seaborne as source only and never ships a built `libtww`.
+
+```
+MIT License
+
+Copyright (c) 2026 Pulpparty and depende3000, and the SwitchWaker contributors
+Copyright (c) 2026 datstarkey (Seaborne)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
 ## WW_Hacking_API
 

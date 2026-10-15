@@ -51,10 +51,10 @@ public static class FirstRun
         return Decision.ShowSetup;
     }
 
-    /// <summary>Paths all set and valid, and the patched folder holds a patched game.</summary>
+    /// <summary>Paths all set and valid, and the patched folder holds a patched game (natively: the disc and the built game).</summary>
     public static bool IsWorkingSetup(GameSettingsService settingsService, GameSettings settings) =>
         settingsService.IsConfigured(settings) &&
-        File.Exists(Path.Combine(settings.GamePath, "sys", "main.dol"));
+        (settings.Backend == Native.GameBackend.Native || File.Exists(Path.Combine(settings.GamePath, "sys", "main.dol")));
 
     /// <summary>Record that the setup was finished or skipped.</summary>
     public static void MarkCompleted(GameSettingsService settingsService)
