@@ -330,7 +330,7 @@ public sealed class NativeSetupTests : IDisposable
         Assert.Equal(SetupStep.Patch, vm.Step);
         Assert.True(vm.ShowNativeBuild);
         await vm.ToolDetection;
-        Assert.Equal("tools found", native.ToolchainStatus);
+        Assert.Equal(OperatingSystem.IsMacOS() ? "tools found" : NativeBuild.NotSupported, native.ToolchainStatus);
         Assert.False(vm.CanGoNext); // not built
         Assert.True(vm.CanSkipStep);
         Assert.Equal("Build later", vm.SkipStepText);

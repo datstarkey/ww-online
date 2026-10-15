@@ -57,11 +57,18 @@ jobs:
 
   native-build:
     name: Native game (libtww from seaborne/, no disc)
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      # The engine needs C++20's std::jthread (Aurora), which older Xcode versions' libc++ lacks.
+      - name: Newest Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          clang++ --version
+          printf '#include <thread>\nint main() { std::jthread t([] {}); }\n' | clang++ -std=c++20 -x c++ - -o /dev/null
 
       # Before anything is fetched or built, so it sees the vendored source alone.
       - name: No Nintendo data in seaborne/

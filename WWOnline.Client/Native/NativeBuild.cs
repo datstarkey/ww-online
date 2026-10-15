@@ -25,6 +25,9 @@ public sealed class NativeBuild
         "xcode-select -p >/dev/null 2>&1 || { echo \"Xcode's command line tools are missing: run xcode-select --install\"; exit 1; }; " +
         "for t in clang cmake ninja git; do command -v $t >/dev/null 2>&1 || " +
         "{ echo \"$t is missing (Homebrew: brew install cmake ninja)\"; exit 1; }; done; " +
+        // The engine needs C++20's std::jthread, which older Xcode versions' libc++ lacks.
+        "printf '#include <thread>\\nint main() { std::jthread t([] {}); }\\n' | clang++ -std=c++20 -x c++ - -o /dev/null 2>/dev/null || " +
+        "{ echo \"Your Xcode is too old to build the game (it needs C++20's std::jthread): update Xcode or its command line tools\"; exit 1; }; " +
         "echo \"Xcode command line tools, cmake, ninja and git found\"";
 
     // A checkout at another pin (left by an older Seaborne) or a broken one is fetched again.
