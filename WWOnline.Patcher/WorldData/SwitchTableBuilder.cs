@@ -355,17 +355,11 @@ public static class SwitchTableBuilder
     }
 
     /// <summary>
-    /// Build the table from an extracted game: its sys/main.dol and files/res/Stage. Null when that game has
-    /// no stage folder (e.g. a vanilla folder with only the three files the patcher copies).
+    /// Build the table from an extracted game (its sys/main.dol and files/res/Stage) or a disc image. Null when that
+    /// game has no stage folder (e.g. a vanilla folder with only the three files the patcher copies).
     /// </summary>
-    public static SwitchTable? BuildFromGame(string gamePath)
-    {
-        var dolPath = Path.Combine(gamePath, "sys", "main.dol");
-        var stagesPath = StageDataReader.StagesPath(gamePath);
-        if (stagesPath == null || !File.Exists(dolPath))
-            return null;
-        return Build(StageDataReader.ReadAll(stagesPath, _ => { }), ReadObjectNames(new DolPatcher(dolPath)));
-    }
+    public static SwitchTable? BuildFromGame(string gamePath) =>
+        StageDataReader.ReadGame(gamePath, _ => { }) is { } game ? Build(game.Stages, ReadObjectNames(game.Dol)) : null;
 
     /// <summary>
     /// Build the table for a patch: the stage data from <paramref name="vanillaGamePath"/> (else the output

@@ -1,0 +1,16 @@
+# REL symbols the non-REL units reference; one static link holds both (regress.sh skips '#' lines).
+# daShip_c (d_a_ship.cpp): checkOutRange from the QoL probe (COS_QOL_PROBE_PATHS); the rest from ww_online's
+# peer boat (native/src/mods/ww_online/d_a_wwo_boat*.cpp), a daShip_c built and posed by the stock code.
+REL	__ZN8daShip_c10createHeapEv
+REL	__ZN8daShip_c11setRoomInfoEv
+REL	__ZN8daShip_c12setWaveAngleEPsS0_
+REL	__ZN8daShip_c13checkOutRangeEv
+REL	__ZN8daShip_c13setEffectDataEfs
+REL	__ZN8daShip_c17bodyJointCallBackEi
+REL	__ZN8daShip_c18craneJointCallBackEv
+REL	__ZN8daShip_c18headJointCallBack0Ev
+REL	__ZN8daShip_c18headJointCallBack1Ei
+REL	__ZN8daShip_c19cannonJointCallBackEi
+REL	__ZN8daShip_c9getWaterYEv
+# f_pc_profile.cpp points at the REL unit f_pc_profile_lst.cpp's list (step 3.4).
+REL	_g_fpcPfLst_ProfileList

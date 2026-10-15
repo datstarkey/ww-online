@@ -1,3 +1,4 @@
+using WWOnline.Native;
 using WWOnline.Services;
 using Xunit;
 
@@ -26,6 +27,7 @@ public sealed class FirstRunTests : IDisposable
         File.WriteAllBytes(dolphin, [0]);
 
         var s = _settings.Load();
+        s.Backend = GameBackend.Dolphin;
         s.VanillaGamePath = vanilla;
         s.GamePath = game;
         s.DolphinPath = dolphin;

@@ -1,0 +1,16 @@
+_tww_api_version
+_tww_view_create
+_tww_view_destroy
+_tww_init
+_tww_run_frame
+_tww_shutdown
+_tww_set_size
+_tww_set_keys
+_tww_set_fatal_callback
+_tww_frame_count
+_tww_present_count
+_tww_save_surface_png
+_tww_save_frame_png
+_tww_settings_catalogue
+_tww_settings_get
+_tww_settings_set

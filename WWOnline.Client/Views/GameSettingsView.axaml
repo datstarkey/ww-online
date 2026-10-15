@@ -1,0 +1,114 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             xmlns:native="using:WWOnline.Native"
+             x:Class="WWOnline.Views.GameSettingsView"
+             x:DataType="vm:GameSettingsViewModel">
+
+    <UserControl.Styles>
+        <!-- "Restart" / "Restart to apply" chips -->
+        <Style Selector="Border.tag">
+            <Setter Property="CornerRadius" Value="{StaticResource PillRadius}" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+        </Style>
+        <Style Selector="Border.tag TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+        </Style>
+        <Style Selector="Border.tag.pending">
+            <Setter Property="Background" Value="{StaticResource GoldTintBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource GoldLineBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.tag.pending TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource GoldTextBrush}" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- One of the game's tabs on Settings: where changes go, and the picked tab's settings -->
+    <StackPanel Spacing="20">
+        <Grid ColumnDefinitions="Auto,*">
+            <Ellipse Classes="ww-status-dot" Fill="{StaticResource RupeeBrush}" VerticalAlignment="Center"
+                     IsVisible="{Binding IsLive}" />
+            <Ellipse Classes="ww-status-dot" Fill="{StaticResource Text3Brush}" VerticalAlignment="Center"
+                     IsVisible="{Binding !IsLive}" />
+            <TextBlock Grid.Column="1" Text="{Binding StatusText}" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                       TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
+        </Grid>
+
+        <Border Classes="ww-error-banner" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding Error}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
+        </Border>
+
+        <Border Classes="ww-card" IsVisible="{Binding !HasCatalog}">
+            <TextBlock Text="Start the game once and its settings appear here. After that you can change them here before you play too."
+                       Classes="ww-muted" TextWrapping="Wrap" />
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding SelectedSection.Groups}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="20" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:GameSettingsGroup">
+                    <Border Classes="ww-card">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="{Binding Title}" Classes="ww-card-title" />
+                            <TextBlock Text="{Binding Description}" FontSize="13" TextWrapping="Wrap"
+                                       Foreground="{StaticResource Text2Brush}"
+                                       IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <ItemsControl ItemsSource="{Binding Items}" Margin="0,8,0,0">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:GameSettingItemViewModel">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="0,8" ToolTip.Tip="{Binding Tip}">
+                                            <StackPanel Spacing="2" VerticalAlignment="Center" Margin="0,0,24,0">
+                                                <WrapPanel>
+                                                    <TextBlock Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center"
+                                                               Margin="0,0,8,0" />
+                                                    <Border Classes="tag" IsVisible="{Binding NeedsRestart}"
+                                                            ToolTip.Tip="Applies the next time the game starts">
+                                                        <TextBlock Text="Restart" />
+                                                    </Border>
+                                                    <Border Classes="tag pending" IsVisible="{Binding RestartPending}"
+                                                            ToolTip.Tip="Changed since the game started: restart it to apply">
+                                                        <TextBlock Text="Restart to apply" />
+                                                    </Border>
+                                                    <Border Background="Transparent" VerticalAlignment="Center"
+                                                            IsVisible="{Binding !IsEditable}" ToolTip.Tip="{Binding Tip}">
+                                                        <Viewbox Width="13" Height="13">
+                                                            <Path Classes="icon" Data="{StaticResource IconLock}" Stroke="{StaticResource Text3Brush}" />
+                                                        </Viewbox>
+                                                    </Border>
+                                                </WrapPanel>
+                                                <TextBlock Text="{Binding Help}" FontSize="13" TextWrapping="Wrap"
+                                                           Foreground="{StaticResource Text2Brush}"
+                                                           IsVisible="{Binding Help, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="1" IsVisible="{Binding IsToggle}" IsChecked="{Binding IsOn}"
+                                                          IsEnabled="{Binding IsEditable}" OnContent="" OffContent=""
+                                                          VerticalAlignment="Center" AutomationProperties.Name="{Binding Label}" />
+                                            <ComboBox Grid.Column="1" IsVisible="{Binding IsList}" ItemsSource="{Binding Choices}"
+                                                      SelectedItem="{Binding Selected}" IsEnabled="{Binding IsEditable}"
+                                                      MinWidth="220" MaxWidth="320" VerticalAlignment="Center"
+                                                      AutomationProperties.Name="{Binding Label}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="native:GameSettingChoice">
+                                                        <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

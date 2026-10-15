@@ -1,0 +1,187 @@
+#ifndef D_A_NPC_YW1_H
+#define D_A_NPC_YW1_H
+
+#include "d/d_npc.h"
+
+class J3DNode;
+
+class daNpc_Yw1_c : public fopNpc_npc_c {
+public:
+    typedef int (daNpc_Yw1_c::*ActionFunc)(void*);
+
+    struct anm_prm_c {
+        /* 0x00 */ s8 mAnmNum;
+        /* 0x01 */ s8 mBtpNum;
+        /* 0x02 */ s16 field_0x02;
+        /* 0x04 */ f32 mMorf;
+        /* 0x08 */ f32 mSpeed;
+        /* 0x0C */ s32 mLoopMode;
+    };
+
+    void _nodeCB_Hair(J3DNode*, J3DModel*);
+    void _nodeCB_Head(J3DNode*, J3DModel*);
+    void _nodeCB_BackBone(J3DNode*, J3DModel*);
+    bool init_YW1_0();
+    bool init_YW1_1();
+    bool init_YW1_2();
+    bool init_YW1_3();
+    bool createInit();
+    void play_animation();
+    u8 upLift();
+    void setMtx(bool);
+    int bckResID(int);
+    int btpResID(int);
+    bool init_texPttrnAnm(signed char, bool);
+    void play_texPttrnAnm();
+    void setAnm_anm(anm_prm_c*);
+    void setAnm_NUM(int, int);
+    void setAnm();
+    void chngAnmTag();
+    void ctrlAnmTag();
+    void chngAnmAtr(unsigned char);
+    void ctrlAnmAtr();
+    void setAnm_ATR();
+    void anmAtr(unsigned short);
+    u16 next_msgStatus(u32* pMsgNo);
+    u32 getMsg_YW1_0();
+    u32 getMsg_YW1_1();
+    u32 getMsg_YW1_2();
+    u32 getMsg_YW1_3();
+    u32 getMsg();
+    void eventOrder();
+    void checkOrder();
+    BOOL chk_talk();
+    BOOL chk_parts_notMov();
+    fopAc_ac_c* searchByID(fpc_ProcID, int*);
+    bool partner_search_sub(void* (*)(void*, void*));
+    void partner_search();
+    void lookBack();
+    bool chkAttention();
+    void setAttention(bool);
+    bool decideType(int);
+    void privateCut(int);
+    void endEvent();
+    s32 isEventEntry();
+    void event_proc(int);
+    s32 set_action(ActionFunc, void*);
+    void setStt(signed char);
+    void chngTsuboAnm();
+    bool chk_areaIN(f32, f32, s16, cXyz);
+    void set_pthPoint(unsigned char);
+    void setHairAngle();
+    BOOL chk_brkTsubo();
+    u8 chk_bm1Odoroki();
+    BOOL wait_1();
+    BOOL wait_2();
+    BOOL wait_3();
+    BOOL walk_1();
+    BOOL turn_1();
+    BOOL talk_1();
+    int wait_action1(void*);
+    int wait_action2(void*);
+    u8 demo();
+    void shadowDraw();
+    BOOL _draw();
+    BOOL _execute();
+    BOOL _delete();
+    cPhs_State _create();
+    BOOL bodyCreateHeap();
+    BOOL headCreateHeap();
+    BOOL CreateHeap();
+
+public:
+    /* 0x06C4 */ request_of_phase_process_class mPhs;
+    /* 0x06CC */ s8 m_hed_jnt_num;
+    /* 0x06CD */ s8 m_bbone_jnt_num;
+    /* 0x06CE */ s8 m_hair1;
+    /* 0x06CF */ s8 m_hair2;
+    /* 0x06D0 */ s8 m_hair3;
+    /* 0x06D1 */ u8 field_0x6d1[0x6D4 - 0x6D1];
+    /* 0x06D4 */ u32 field_0x6d4;
+    /* 0x06D8 */ J3DModel* field_0x6d8;
+    /* 0x06DC */ mDoExt_btpAnm mBtpAnm;
+    /* 0x06F0 */ u8 field_0x6f0;
+    /* 0x06F1 */ u8 field_0x6f1[0x6F2 - 0x6F1];
+    /* 0x06F2 */ s16 field_0x6f2;
+    /* 0x06F4 */ ActionFunc mActionFunc;
+    /* 0x0700 */ u32 field_0x700;
+    /* 0x0704 */ u32 field_0x704;
+    /* 0x0708 */ u32 field_0x708;
+    /* 0x070C */ dNpc_PathRun_c mPathRun;
+    /* 0x0714 */ f32 field_0x714;
+    /* 0x0718 */ f32 field_0x718;
+    /* 0x071C */ f32 field_0x71c;
+    /* 0x0720 */ u16 field_0x720;
+    /* 0x0722 */ s16 field_0x722;
+    /* 0x0724 */ u16 field_0x724;
+    /* 0x0726 */ csXyz field_0x726;
+    /* 0x072C */ cXyz mEyePos;
+    /* 0x0738 */ cXyz field_0x738;
+    /* 0x0744 */ cXyz mHeadPos;
+    /* 0x0750 */ f32 field_0x750;
+    /* 0x0754 */ u8 field_0x754[0x758 - 0x754];
+    /* 0x0758 */ s16 field_0x758;
+    /* 0x075A */ s16 field_0x75a;
+    /* 0x075C */ s16 field_0x75c;
+    /* 0x075E */ u8 field_0x75e[0x760 - 0x75E];
+    /* 0x0760 */ s32 field_0x760;
+    /* 0x0764 */ u8 field_0x764[0x766 - 0x764];
+    /* 0x0766 */ s16 field_0x766;
+    /* 0x0768 */ u8 field_0x768[0x76C - 0x768];
+    /* 0x076C */ s16 field_0x76c;
+    /* 0x076E */ s16 field_0x76e;
+    /* 0x0770 */ u8 field_0x770;
+    /* 0x0771 */ u8 field_0x771;
+    /* 0x0772 */ u8 field_0x772;
+    /* 0x0773 */ u8 field_0x773;
+    /* 0x0774 */ u8 field_0x774;
+    /* 0x0775 */ bool field_0x775;
+    /* 0x0776 */ bool field_0x776;
+    /* 0x0777 */ u8 field_0x777;
+    /* 0x0778 */ u8 field_0x778;
+    /* 0x0779 */ u8 field_0x779;
+    /* 0x077A */ u8 field_0x77a;
+    /* 0x077B */ u8 field_0x77b;
+    /* 0x077C */ u8 field_0x77c;
+    /* 0x077D */ bool field_0x77d;
+    /* 0x077E */ u8 field_0x77e;
+    /* 0x077F */ u8 field_0x77f[0x780 - 0x77F];
+    /* 0x0780 */ s16 field_0x780;
+    /* 0x0782 */ s16 field_0x782;
+    /* 0x0784 */ s16 field_0x784;
+    /* 0x0786 */ s16 field_0x786;
+    /* 0x0788 */ u8 field_0x788[0x794 - 0x788];
+    /* 0x0794 */ cXyz field_0x794;
+    /* 0x07A0 */ s16 field_0x7a0;
+    /* 0x07A2 */ s16 field_0x7a2;
+    /* 0x07A4 */ s16 field_0x7a4;
+    /* 0x07A6 */ s16 field_0x7a6;
+    /* 0x07A8 */ s16 field_0x7a8;
+    /* 0x07AA */ s16 field_0x7aa;
+    /* 0x07AC */ s16 field_0x7ac;
+    /* 0x07AE */ s16 field_0x7ae;
+    /* 0x07B0 */ s16 field_0x7b0;
+    /* 0x07B2 */ s16 field_0x7b2;
+    /* 0x07B4 */ s16 field_0x7b4;
+    /* 0x07B6 */ s16 field_0x7b6;
+    /* 0x07B8 */ s16 field_0x7b8;
+    /* 0x07BA */ s16 field_0x7ba;
+    /* 0x07BC */ s8 field_0x7bc;
+    /* 0x07BD */ u8 field_0x7bd;
+    /* 0x07BE */ u8 field_0x7be;
+    /* 0x07BF */ s8 field_0x7bf;
+    /* 0x07C0 */ s8 field_0x7c0;
+    /* 0x07C1 */ s8 field_0x7c1;
+    /* 0x07C2 */ s8 field_0x7c2;
+    /* 0x07C3 */ s8 field_0x7c3;
+    /* 0x07C4 */ s8 field_0x7c4;
+    /* 0x07C5 */ s8 mType;
+    /* 0x07C6 */ s8 field_0x7c6;
+    /* 0x07C7 */ s8 field_0x7c7;
+    /* 0x07C8 */ s8 field_0x7c8;
+    /* 0x07C9 */ u8 field_0x7c9[0x7CC - 0x7C9];
+}; // Size: 0X7CC
+
+STATIC_ASSERT(sizeof(daNpc_Yw1_c) == 0X7CC);
+
+#endif /* D_A_NPC_YW1_H */

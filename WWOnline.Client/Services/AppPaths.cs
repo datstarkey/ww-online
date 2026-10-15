@@ -48,8 +48,16 @@ public static class AppPaths
     /// when that is set, so a throwaway profile never touches the real cache. Never in the repo, the
     /// app folder or PatchData.
     /// </summary>
-    public static string IconCacheDirectory => Path.Combine(
-        SettingsDirectoryOverride ?? Path.Combine(LocalAppDataRoot, AppDataFolderName), IconCacheFolderName);
+    public static string IconCacheDirectory => Path.Combine(LocalCacheRoot, IconCacheFolderName);
+
+    /// <summary>
+    /// The native backend's local build (NativeBuild): the fetched audio sources and the build folders with
+    /// libtww. Next to <see cref="IconCacheDirectory"/> and like it under <see cref="SettingsDirectoryVariable"/>
+    /// when that is set; never inside the Seaborne source it builds.
+    /// </summary>
+    public static string GameCacheDirectory => Path.Combine(LocalCacheRoot, "game");
+
+    private static string LocalCacheRoot => SettingsDirectoryOverride ?? Path.Combine(LocalAppDataRoot, AppDataFolderName);
 
     /// <summary>
     /// Log folder: <c>logs/</c> under the working directory for dev builds (unchanged behaviour),

@@ -1,4 +1,5 @@
 using WWOnline.Data;
+using WWOnline.Native;
 using WWOnline.Shared.Models;
 
 namespace WWOnline.Services;
@@ -28,30 +29,15 @@ public static class SmallKeyMemory
         for (int i = 0; i < SlotCount; i++)
             slots[i] = i == slot && live != null ? Parse(live, 0) : Parse(saved, i * GameMemoryAddresses.WorldFlags.MemorySize);
 
-        var pending = dolphin.Read(GameMemoryAddresses.WorldFlags.PendingKeyDelta);
-        var evt = dolphin.ReadMemory(GameMemoryAddresses.Events.EventMode, 1);
-        var menu = dolphin.ReadMemory(GameMemoryAddresses.Events.MenuPause, 1);
-        bool idle = pending == 0 && evt is [0] && menu is [0];
+        var pending = dolphin.Play.ReadPending()?[(int)TwwInvCounter.Key];
+        var scene = dolphin.ReadScene();
+        bool idle = pending == 0 && scene is { IsIdle: true };
 
-        var name = dolphin.ReadMemory(GameMemoryAddresses.Stage.CurrentStageName.Address, 8);
-        string stage = name == null ? "" : System.Text.Encoding.ASCII.GetString(name, 0, Array.IndexOf(name, (byte)0) is int n and >= 0 ? n : name.Length);
-        int room = dolphin.ReadMemory(GameMemoryAddresses.Stage.CurrentRoomNumber.Address, 1) is [var r] ? (sbyte)r : -1;
-
-        return new SmallKeyObservation(slots, live != null ? slot : null, keyHud, idle, stage, room);
+        return new SmallKeyObservation(slots, live != null ? slot : null, keyHud, idle, scene?.Stage ?? "", scene?.Room ?? -1);
     }
 
     /// <summary>The current stage's save slot (dStage_stagInfo_GetSaveTbl) and key-HUD flag (dStage_stagInfo_ChkKeyDisp).</summary>
-    public static (int? Slot, bool KeyHud) ReadStage(IDolphinService dolphin)
-    {
-        var ptrBytes = dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.StagInfoPtr, 4);
-        if (ptrBytes == null) return (null, false);
-        uint p = ReadU32(ptrBytes, 0);
-        if (p < 0x80000000 || p >= 0x84000000) return (null, false);
-        var b = dolphin.ReadMemory(p + GameMemoryAddresses.WorldFlags.StagSaveTblOffset, 1);
-        if (b == null) return (null, false);
-        int slot = (b[0] >> 1) & 0x7F;
-        return (slot < SlotCount ? slot : null, (b[0] & GameMemoryAddresses.WorldFlags.StagKeyDispMask) != 0);
-    }
+    public static (int? Slot, bool KeyHud) ReadStage(IDolphinService dolphin) => dolphin.Play.ReadStage();
 
     /// <summary>Make one write. A pending change is written only while none is queued (the game's own += would race it).</summary>
     public static bool Apply(IDolphinService dolphin, KeyWrite w)
@@ -59,8 +45,8 @@ public static class SmallKeyMemory
         switch (w.Kind)
         {
             case KeyWriteKind.Pending:
-                if (dolphin.Read(GameMemoryAddresses.WorldFlags.PendingKeyDelta) != 0) return false;
-                return dolphin.Write(GameMemoryAddresses.WorldFlags.PendingKeyDelta, (short)w.Value);
+                if (dolphin.Play.ReadPending()?[(int)TwwInvCounter.Key] != 0) return false;
+                return dolphin.Play.Add(TwwInvCounter.Key, (short)w.Value);
             case KeyWriteKind.Live:
                 return dolphin.WriteMemory(GameMemoryAddresses.WorldFlags.LiveKeyNum, [(byte)Math.Clamp(w.Value, 0, SmallKeyReconciler.MaxKeys)]);
             case KeyWriteKind.Saved:

@@ -59,18 +59,11 @@ public static class SmallKeyTableBuilder
     }
 
     /// <summary>
-    /// The table for an extracted game folder (sys/main.dol + files/res/Stage), or null when it has none.
-    /// Stages that can't be read are reported to <paramref name="skipped"/> and left out.
+    /// The table for an extracted game folder or a disc image (<see cref="StageDataReader.ReadGame"/>), or null when it
+    /// has no stage data. Stages that can't be read are reported to <paramref name="skipped"/> and left out.
     /// </summary>
-    public static SmallKeyTable? BuildFromGame(string gamePath, Action<string>? skipped = null)
-    {
-        var dolPath = Path.Combine(gamePath, "sys", "main.dol");
-        var stages = StageDataReader.StagesPath(gamePath);
-        if (stages == null || !File.Exists(dolPath))
-            return null;
-        var procs = ReadObjectNames(new DolPatcher(dolPath));
-        return Build(StageDataReader.ReadAll(stages, skipped ?? (_ => { })).ToList(), procs);
-    }
+    public static SmallKeyTable? BuildFromGame(string gamePath, Action<string>? skipped = null) =>
+        StageDataReader.ReadGame(gamePath, skipped ?? (_ => { })) is { } game ? Build(game.Stages, ReadObjectNames(game.Dol)) : null;
 
     /// <summary>The table for these stages, with <paramref name="procs"/> mapping object names to processes.</summary>
     public static SmallKeyTable Build(IReadOnlyCollection<StageData> stages, IReadOnlyDictionary<string, short> procs)

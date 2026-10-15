@@ -45,7 +45,8 @@
                     <Button Classes="ww-seg" Classes.active="{Binding IsToolWarp}" Content="Warp" Command="{Binding PickWarpCommand}" />
                     <Button Classes="ww-seg" Classes.active="{Binding IsToolStats}" Content="Stats" Command="{Binding PickStatsCommand}" />
                     <Border Width="1" Margin="6,8" Background="{StaticResource InputLineBrush}" />
-                    <Button Classes="ww-seg mono dev" Classes.active="{Binding IsToolMemory}" Content="Memory" Command="{Binding PickMemoryCommand}" />
+                    <Button Classes="ww-seg mono dev" Classes.active="{Binding IsToolMemory}" Content="Memory" Command="{Binding PickMemoryCommand}"
+                            IsVisible="{Binding IsMemoryAvailable}" />
                 </StackPanel>
             </Border>
 

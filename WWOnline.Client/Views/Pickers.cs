@@ -39,6 +39,25 @@ internal static class Pickers
         return files.FirstOrDefault()?.Path.LocalPath;
     }
 
+    /// <summary>A built libtww (libtww.dylib), or null when cancelled.</summary>
+    public static async Task<string?> PickLibraryAsync(Control owner)
+    {
+        var topLevel = TopLevel.GetTopLevel(owner);
+        if (topLevel == null) return null;
+
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select libtww.dylib",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("libtww") { Patterns = ["libtww.dylib", "*.dylib"] },
+                new FilePickerFileType("All files") { Patterns = ["*"] },
+            ],
+        });
+        return files.FirstOrDefault()?.Path.LocalPath;
+    }
+
     /// <summary>Dolphin.exe, or null when cancelled.</summary>
     public static async Task<string?> PickDolphinAsync(Control owner)
     {

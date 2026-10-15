@@ -228,6 +228,9 @@
         <StreamGeometry x:Key="IconInfo">M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M12 11v6M12 7.5h0.01</StreamGeometry>
         <StreamGeometry x:Key="IconSearch">M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M20 20l-3.5 -3.5</StreamGeometry>
         <StreamGeometry x:Key="IconMonitor">M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2H5a2 2 0 0 1 -2 -2V6a2 2 0 0 1 2 -2zM8 21h8M12 18v3</StreamGeometry>
+        <StreamGeometry x:Key="IconPopOut">M14 4h6v6M20 4l-8 8M18 14v4a2 2 0 0 1 -2 2H6a2 2 0 0 1 -2 -2V8a2 2 0 0 1 2 -2h4</StreamGeometry>
+        <StreamGeometry x:Key="IconPopIn">M10 20H6a2 2 0 0 1 -2 -2V6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v4M20 13l-7 7M13 14v6h6</StreamGeometry>
+        <StreamGeometry x:Key="IconFullScreen">M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5</StreamGeometry>
         <StreamGeometry x:Key="IconShard">M12 3l10 18H2z</StreamGeometry>
         <StreamGeometry x:Key="IconDoor">M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-4M10 16l4 -4l-4 -4M14 12H4</StreamGeometry>
         <StreamGeometry x:Key="IconShirt">M9 3.5L3.5 6.5l2 4.5l2.5 -1V20.5h8V10l2.5 1l2 -4.5L15 3.5c-0.5 1.6 -1.6 2.5 -3 2.5s-2.5 -0.9 -3 -2.5z</StreamGeometry>
@@ -605,6 +608,20 @@
         <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
     </Style>
 
+    <!-- The strip above the embedded game (nothing may be drawn over its native view) and its compact buttons -->
+    <Style Selector="Border.ww-game-bar">
+        <Setter Property="Height" Value="48" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="Background" Value="{StaticResource SidebarBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource SidebarBorderBrush}" />
+        <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Button.ww-ghost.ww-game-bar">
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Padding" Value="12,0" />
+        <Setter Property="FontSize" Value="13" />
+    </Style>
+
     <!-- Danger outlined (Leave room, Clear) -->
     <Style Selector="Button.ww-danger">
         <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
@@ -722,6 +739,13 @@
     <Style Selector="Button.ww-seg.active /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource TextBrush}" />
         <Setter Property="Foreground" Value="{StaticResource GroundBrush}" />
+    </Style>
+    <!-- Smaller options inside an inset (magic, capacity, Settings' tabs) -->
+    <Style Selector="Button.ww-seg.small">
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="CornerRadius" Value="9" />
     </Style>
     <Style Selector="Button.ww-seg.mono">
         <Setter Property="FontFamily" Value="{StaticResource FontMono}" />

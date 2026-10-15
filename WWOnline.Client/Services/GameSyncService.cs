@@ -29,11 +29,13 @@ public class GameSyncService : IDisposable
     private readonly SharedHeartService _hearts;
     private readonly RoomSwitchSyncService _roomSwitchSync;
     private readonly PlayerEventService _playerEvents;
+    private readonly PvpService _pvp;
 
     private System.Timers.Timer? _puppetBroadcastTimer;
     private System.Timers.Timer? _gameStateBroadcastTimer;
     private const int GameStateBroadcastIntervalMs = 500; // 2Hz, unconditional
     private int _isBroadcasting;
+    private uint? _lastSentFrame;
     private int _isBroadcastingGameState;
     private bool _running;
     private bool _disposed;
@@ -54,7 +56,8 @@ public class GameSyncService : IDisposable
         SharedSmallKeyService smallKeys,
         SharedHeartService hearts,
         RoomSwitchSyncService roomSwitchSync,
-        PlayerEventService playerEvents)
+        PlayerEventService playerEvents,
+        PvpService pvp)
     {
         _signalR = signalR;
         _puppetSync = puppetSync;
@@ -70,6 +73,7 @@ public class GameSyncService : IDisposable
         _hearts = hearts;
         _roomSwitchSync = roomSwitchSync;
         _playerEvents = playerEvents;
+        _pvp = pvp;
     }
 
     /// <summary>
@@ -122,9 +126,12 @@ public class GameSyncService : IDisposable
         _hearts.Start();
         // Other players' projectiles: the REL's events block <-> the hub (bombs, cannon)
         _playerEvents.Start();
+        // PVP: hits between Links (native games only)
+        _pvp.Start();
 
-        // Start puppet broadcast timer (reads local player and sends to server at 20Hz)
-        _puppetBroadcastTimer = new System.Timers.Timer(50); // 20Hz — fast combo swings (~0.3s) need the extra samples
+        // Start puppet broadcast timer (reads local player and sends to server): 20Hz on Dolphin — fast combo swings
+        // (~0.3s) need the extra samples; natively every game frame (30Hz), each stamped with its frame's time.
+        _puppetBroadcastTimer = new System.Timers.Timer(_puppetSync.IsNative ? PuppetSyncService.NativeTickMs : 50);
         _puppetBroadcastTimer.Elapsed += (_, _) =>
         {
             if (Interlocked.CompareExchange(ref _isBroadcasting, 1, 0) != 0) return;
@@ -195,6 +202,7 @@ public class GameSyncService : IDisposable
         _smallKeys.Stop();
         _hearts.Stop();
         _playerEvents.Stop();
+        _pvp.Stop();
 
         // Stop puppet sync (clears shared memory and slot assignments)
         _puppetSync.Stop();
@@ -285,6 +293,14 @@ public class GameSyncService : IDisposable
         var connection = _signalR.Connection;
         if (connection?.State != HubConnectionState.Connected)
             return;
+
+        // Natively the ticks outpace the frames: send each frame once.
+        if (_puppetSync.NativeFrame is { } frame)
+        {
+            if (frame == _lastSentFrame)
+                return;
+            _lastSentFrame = frame;
+        }
 
         var data = _puppetSync.ReadLocalPlayerState();
         if (data == null)

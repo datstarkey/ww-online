@@ -133,7 +133,7 @@ public static class DeliveryBagMemory
     {
         if (Read(dolphin) is not { } now || !now.SameItemsAs(expected)) return BagWriteResult.Raced;
         var saveSelect = ReadSelectSlots(dolphin);
-        var playSelect = dolphin.ReadMemory(GameMemoryAddresses.Player.PlaySelectItems, BagMemory.ButtonCount);
+        var playSelect = dolphin.Play.ReadSelectItems();
 
         if (!BagMemory.WriteChanged(dolphin, Start, expected.Items, next.Items)) return BagWriteResult.Failed;
 
@@ -143,7 +143,7 @@ public static class DeliveryBagMemory
             if (changed)
             {
                 dolphin.WriteMemory(GameMemoryAddresses.Player.SelectItemSlots, save);
-                dolphin.WriteMemory(GameMemoryAddresses.Player.PlaySelectItems, play);
+                dolphin.Play.WriteSelectItems(play);
             }
         }
 

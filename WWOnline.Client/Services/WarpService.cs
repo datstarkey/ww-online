@@ -154,9 +154,8 @@ public static class WarpExecutor
                 for (int attempt = 1; attempt <= MoveAttempts; attempt++)
                 {
                     // Still the same Link in the same room? (A door or a void-out in between makes the move stale.)
-                    if (WarpMemory.ReadU32(dolphin, GameMemoryAddresses.Warp.LinkActorPtr) != local.Link ||
-                        (!plan.AcrossRooms && dolphin.Read(GameMemoryAddresses.Stage.CurrentRoomNumber) != local.Room) ||
-                        WarpMemory.IsStageChangePending(dolphin))
+                    if (dolphin.ReadScene() is not { NextStagePending: false } scene || scene.LinkActor != local.Link ||
+                        (!plan.AcrossRooms && (byte)scene.Room != local.Room))
                     {
                         Logger.Information("[warp] move stopped: Link changed room or stage (attempt {Attempt})", attempt);
                         return new(false, "You changed areas before the warp finished.");
@@ -236,24 +235,20 @@ public sealed class WarpService
     /// <summary>The local game as the planner needs it; null when Dolphin isn't attached.</summary>
     public LocalWarpSnapshot? ReadLocal()
     {
-        if (!_dolphin.IsConnected)
+        if (!_dolphin.IsConnected || _dolphin.ReadScene() is not { } scene)
             return null;
-        string stage = WarpMemory.ReadStartStage(_dolphin)?.Name ?? "";
-        byte room = _dolphin.Read(GameMemoryAddresses.Stage.CurrentRoomNumber) ?? 0;
-        uint link = WarpMemory.ReadU32(_dolphin, GameMemoryAddresses.Warp.LinkActorPtr);
         // The minigame gate lives in the 20Hz puppet tick (it needs every tick to spot a stale type).
         bool minigame = _puppets.LocalWarp?.Busy == WarpBusy.Minigame;
-        var busy = WarpMemory.ReadBusy(_dolphin, minigame);
-        bool menu = _dolphin.ReadMemory(GameMemoryAddresses.Events.MenuPause, 1) is not [0];
-        uint modeFlg = link == 0 ? 0 : WarpMemory.ReadU32(_dolphin, link + PuppetLayout.DAPY_OFF_MODE_FLG);
-        return new LocalWarpSnapshot(stage, room, link, busy, menu, modeFlg, link != 0 && IsRidingShip(_dolphin, link));
+        var busy = WarpMemory.ReadBusy(scene, _dolphin.Read(GameMemoryAddresses.Player.CurrentHealth), minigame);
+        uint link = scene.LinkActor;
+        return new LocalWarpSnapshot(scene.Stage, (byte)scene.Room, link, busy, scene.MenuPaused, scene.LinkModeFlg,
+            link != 0 && IsRidingShip(scene.PlayerStatus0, scene.LinkProc));
     }
 
     /// <summary>Riding the King of Red Lions: the SHIP_RIDE status bit or a ship proc (as PuppetSyncService.ReadLocalBoat).</summary>
-    public static bool IsRidingShip(IDolphinService dolphin, uint link)
+    public static bool IsRidingShip(uint status0, uint curProc)
     {
-        uint status0 = WarpMemory.ReadU32(dolphin, GameMemoryAddresses.Player.PlayerStatusBitfield0.Address);
-        byte proc = (byte)(WarpMemory.ReadU32(dolphin, link + PuppetLayout.DAPY_OFF_CUR_PROC) & 0xFF);
+        byte proc = (byte)(curProc & 0xFF);
         return (status0 & GameMemoryAddresses.Sea.PlayerStatus0ShipRide) != 0
                || proc is >= GameMemoryAddresses.Sea.ProcShipFirst and <= GameMemoryAddresses.Sea.ProcShipLast
                || proc == GameMemoryAddresses.Sea.ProcDemoShipSit;

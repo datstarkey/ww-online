@@ -14,6 +14,14 @@ namespace WWOnline.Services;
 ///   --allow-stale           let --auto-attach attach although the game build is stale
 ///                           (dev-test.ps1 -AllowStale; otherwise it refuses)
 ///   --log-file &lt;path&gt;     write this instance's log to exactly this file
+///   --hidden                dev/CI: no window, no Dock icon, never activated (the embedded game renders
+///                           headless into a view outside any window)
+///   --test-dir &lt;dir&gt;     dev/CI, native: where --test-shots saves its PNGs
+///   --test-shots &lt;f,f&gt;   dev/CI, native: at each game frame, save the game's frame and the view's surface
+///                           (frame-N.png, surface-N.png) and log the location, wallet and peers
+///   --test-rupees &lt;frame&gt;:&lt;delta&gt; dev/CI, native: add rupees at that game frame (a wallet change to sync)
+///   --test-warp &lt;frame&gt;:&lt;player&gt; dev/CI, native: at that game frame, press the Room page's "Warp to" on that player
+///   --pvp                   dev/CI: with --host-server, host the PVP demo's room (Co-op plus PVP, HostedRoomRules.PvpArena)
 ///
 /// Headless modes (no UI; the process exits with a status code — see <see cref="HeadlessCommands"/>):
 ///   --check-build           is the patched game up to date? Dev: against the GameMod sources
@@ -47,7 +55,13 @@ public sealed record StartupOptions(
     string? Patches = null,
     string? BuildPatchData = null,
     string? GameModPath = null,
-    bool AllowStale = false)
+    bool AllowStale = false,
+    bool Hidden = false,
+    string? TestDir = null,
+    string? TestShots = null,
+    string? TestRupees = null,
+    string? TestWarp = null,
+    bool Pvp = false)
 {
     public bool IsHeadless => CheckBuild || Patch || BuildPatchData != null;
 
@@ -67,6 +81,12 @@ public sealed record StartupOptions(
         string? buildPatchData = null;
         string? gameModPath = null;
         bool allowStale = false;
+        bool hidden = false;
+        string? testDir = null;
+        string? testShots = null;
+        string? testRupees = null;
+        string? testWarp = null;
+        bool pvp = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -116,11 +136,29 @@ public sealed record StartupOptions(
                 case "--gamemod" when i + 1 < args.Length:
                     gameModPath = args[++i];
                     break;
+                case "--hidden":
+                    hidden = true;
+                    break;
+                case "--test-dir" when i + 1 < args.Length:
+                    testDir = args[++i];
+                    break;
+                case "--test-shots" when i + 1 < args.Length:
+                    testShots = args[++i];
+                    break;
+                case "--test-rupees" when i + 1 < args.Length:
+                    testRupees = args[++i];
+                    break;
+                case "--test-warp" when i + 1 < args.Length:
+                    testWarp = args[++i];
+                    break;
+                case "--pvp":
+                    pvp = true;
+                    break;
             }
         }
 
         // Logging isn't configured yet at parse time — Program logs the result once it is.
         return new StartupOptions(playerName, host, port, autoConnect, autoAttach, dolphinPid, logFile, checkBuild, patch, hostServer, patches,
-            buildPatchData, gameModPath, allowStale);
+            buildPatchData, gameModPath, allowStale, hidden, testDir, testShots, testRupees, testWarp, pvp);
     }
 }

@@ -1,0 +1,6 @@
+# Controller script of the puppet body-collision proof (native/src/mods/ww_online/README.md, "PVP"): run with
+# COS_MP_TEST_PEER=1 COS_MP_TEST_FIXED=1 COS_MP_TEST_OFFSET=0:300 (the test puppet stays 300 units ahead of where Link
+# came into play); the stick held forward from frame 400 walks him into it.
+0   - 0 0
+400 - 0 127
+900 - 0 0

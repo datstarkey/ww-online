@@ -36,6 +36,7 @@ public sealed class RoomSwitchSyncService : IDisposable
     private readonly RoomSettingsService _room;
     private readonly SwitchTableProvider _tables;
     private readonly LiveWorldPoke _liveWorld;
+    private readonly IWorldGame _world;
     private readonly SceneStabilityGate _scene = new(StableTicksRequired);
     private readonly ConcurrentQueue<RoomSwitches> _inbox = new();
     private readonly object _tickLock = new();
@@ -50,9 +51,11 @@ public sealed class RoomSwitchSyncService : IDisposable
     private bool _sending;
     private int _joining;
 
+    /// <param name="world">The game outside the save window; null: Dolphin's memory (<see cref="DolphinWorldGame"/>).</param>
     public RoomSwitchSyncService(IDolphinService dolphin, SignalRClientService signalR, RoomSettingsService room,
-        SwitchTableProvider tables, LiveWorldPoke liveWorld)
+        SwitchTableProvider tables, LiveWorldPoke liveWorld, IWorldGame? world = null)
     {
+        _world = world ?? new DolphinWorldGame(dolphin);
         _dolphin = dolphin;
         _signalR = signalR;
         _room = room;
@@ -146,7 +149,7 @@ public sealed class RoomSwitchSyncService : IDisposable
         }
         if (_tables.Table is not { } table) return;
 
-        var here = ReadPlace();
+        var here = _world.ReadPlace();
         if (here == null) return;
         if (_candidatePlace == null || !_candidatePlace.SamePlace(here))
         {
@@ -262,28 +265,6 @@ public sealed class RoomSwitchSyncService : IDisposable
         });
     }
 
-    /// <summary>Stage name, save slot (dStage_stagInfo_GetSaveTbl) and stay room, or null if unreadable.</summary>
-    private RoomSwitches? ReadPlace()
-    {
-        var name = _dolphin.ReadMemory(GameMemoryAddresses.Stage.CurrentStageName.Address, 8);
-        var room = _dolphin.ReadMemory(GameMemoryAddresses.Stage.CurrentRoomNumber.Address, 1);
-        var ptr = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.StagInfoPtr, 4);
-        if (name == null || room == null || ptr is not { Length: 4 }) return null;
-        uint stag = ReadU32(ptr, 0);
-        if (stag < 0x80000000 || stag >= 0x84000000) return null;
-        var prop = _dolphin.ReadMemory(stag + GameMemoryAddresses.WorldFlags.StagSaveTblOffset, 1);
-        if (prop == null) return null;
-
-        int nul = Array.IndexOf(name, (byte)0);
-        var place = new RoomSwitches
-        {
-            Stage = System.Text.Encoding.ASCII.GetString(name, 0, nul >= 0 ? nul : name.Length),
-            Slot = (prop[0] >> 1) & 0x7F,
-            Room = room[0],
-        };
-        return place.IsValid() ? place : null;
-    }
-
     /// <summary>
     /// This game's dan switches and the stay room's zone switches, or null if unreadable.
     /// <paramref name="ready"/> is false while mDan isn't this slot's or the room has no zone (then the
@@ -315,10 +296,7 @@ public sealed class RoomSwitchSyncService : IDisposable
     /// <summary>The zone of <paramref name="room"/> (dStage_roomControl_c::getZoneNo), if it has a live one for that room.</summary>
     private int? ZoneOf(int room)
     {
-        var zb = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.RoomZoneNo(room), 1);
-        if (zb == null) return null;
-        int zone = (sbyte)zb[0];
-        if (zone is < 0 or >= GameMemoryAddresses.WorldFlags.ZoneCount) return null;
+        if (_world.RoomZoneNo(room) is not int zone || zone is < 0 or >= GameMemoryAddresses.WorldFlags.ZoneCount) return null;
         var owner = _dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.Zone(zone) + GameMemoryAddresses.WorldFlags.ZoneOffRoomNo, 1);
         return owner != null && (sbyte)owner[0] == room ? zone : null;
     }

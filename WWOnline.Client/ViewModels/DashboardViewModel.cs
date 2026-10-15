@@ -63,6 +63,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _sharedSpoilsOn = true;
     [ObservableProperty] private bool _sharedDeliveryOn = true;
     [ObservableProperty] private bool _allowWarpingOn = true;
+    [ObservableProperty] private bool _pvpOn;
     [ObservableProperty] private string _roomOwnerText = "";
     [ObservableProperty] private string _ownerName = "";
 
@@ -287,6 +288,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         SharedSpoilsOn = rules.SharedSpoils;
         SharedDeliveryOn = rules.SharedDelivery;
         AllowWarpingOn = rules.AllowWarping;
+        PvpOn = rules.Pvp;
         UpdatePreset(rules.MatchingPreset());
         IsOwner = _room.IsOwner;
         OwnerName = rules.OwnerName ?? "";
@@ -351,6 +353,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     partial void OnSharedSpoilsOnChanged(bool value) => PushRules();
     partial void OnSharedDeliveryOnChanged(bool value) => PushRules();
     partial void OnAllowWarpingOnChanged(bool value) => PushRules();
+    partial void OnPvpOnChanged(bool value) => PushRules();
 
     private void PushRules()
     {
@@ -364,9 +367,10 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
         var spoils = SharedSpoilsOn;
         var delivery = SharedDeliveryOn;
         var warping = AllowWarpingOn;
+        var pvp = PvpOn;
         _ = Task.Run(async () =>
         {
-            try { await _room.SetAsync(wallet, world, items, story, projectiles, bait, spoils, delivery, warping); }
+            try { await _room.SetAsync(wallet, world, items, story, projectiles, bait, spoils, delivery, warping, pvp); }
             catch (Exception ex) { Serilog.Log.Warning(ex, "[room] failed to update room rules"); }
         });
     }

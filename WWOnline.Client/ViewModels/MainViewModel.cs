@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using WWOnline.Native;
 using WWOnline.Services;
 using WWOnline.Shared;
 
@@ -9,7 +10,8 @@ public enum ViewName
 {
     Dashboard,
     Appearance,
-    /// <summary>The Dolphin page (attach + live game state; GameStateViewModel).</summary>
+    /// <summary>The Dolphin page (attach + live game state; GameStateViewModel), or the game itself once the
+    /// native game runs (<see cref="MainViewModel.IsGameViewActive"/>).</summary>
     LiveState,
     Activity,
     Tools,
@@ -26,6 +28,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private readonly GameStateViewModel _gameStateViewModel;
     private readonly GameLogViewModel _gameLogViewModel;
     private readonly DebugToolsViewModel _debugToolsViewModel;
+    private readonly GameHost? _nativeHost;
     private bool _disposed;
 
     /// <summary>The first-run setup, shown over the whole window while <see cref="IsWizardOpen"/>.</summary>
@@ -56,7 +59,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(IsToolsActive))]
     [NotifyPropertyChangedFor(nameof(IsSettingsActive))]
     [NotifyPropertyChangedFor(nameof(ShowPatchBanner))]
+    [NotifyPropertyChangedFor(nameof(IsGameViewActive))]
     private ViewName _currentViewName = ViewName.Dashboard;
+
+    /// <summary>The native game once it has started (MainWindow then hosts its view), else null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsGameViewActive))]
+    private GameHost? _nativeGame;
+
+    /// <summary>The game page shows the embedded game instead of the Dolphin page.</summary>
+    public bool IsGameViewActive => NativeGame != null && IsLiveStateActive;
+
+    /// <summary>The embedded game docked here or popped out into its own window.</summary>
+    public GameWindowViewModel GameWindow { get; }
+
+    /// <summary>The game page's name in the sidebar.</summary>
+    public string LiveStateLabel => _nativeHost != null ? "Game" : "Dolphin";
 
     public bool IsDashboardActive => CurrentViewName == ViewName.Dashboard;
     public bool IsAppearanceActive => CurrentViewName == ViewName.Appearance;
@@ -82,9 +100,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// this app would patch in (a changed selection, or an update that shipped new game code). Until it
     /// does, WW-Online won't start Dolphin or attach to it by itself (GameLaunchService). Not shown on
     /// the Settings page, which has its own, or over the setup. The app never patches by itself: the
-    /// banner's Patch now is the player's click.
+    /// banner's Patch now is the player's click. Never on the native backend, which patches nothing.
     /// </summary>
-    public bool ShowPatchBanner => PatchOptions.NeedsRepatch && !PatchOptions.IsCheckingBuild && !IsSettingsActive && !IsWizardOpen;
+    public bool ShowPatchBanner => _nativeHost == null && PatchOptions.NeedsRepatch && !PatchOptions.IsCheckingBuild &&
+                                   !IsSettingsActive && !IsWizardOpen;
 
     public MainViewModel(
         GameSettingsService gameSettingsService,
@@ -97,9 +116,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DebugToolsViewModel debugToolsViewModel,
         UpdateViewModel updateViewModel,
         SetupWizardViewModel wizard,
-        StartupOptions startupOptions)
+        StartupOptions startupOptions,
+        GameHost? nativeHost = null)
     {
         Wizard = wizard;
+        _nativeHost = nativeHost;
         _gameSettingsService = gameSettingsService;
         _settingsViewModel = settingsViewModel;
         _appearanceViewModel = appearanceViewModel;
@@ -109,6 +130,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _gameStateViewModel = gameStateViewModel;
         _gameLogViewModel = gameLogViewModel;
         _debugToolsViewModel = debugToolsViewModel;
+        GameWindow = new GameWindowViewModel(ShowLiveState);
 
         // Check if settings are configured, show appropriate view
         var settings = _gameSettingsService.Load();
@@ -133,7 +155,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         Wizard.Closed += OnWizardClosed;
         if (FirstRun.Resolve(_gameSettingsService, startupOptions) == FirstRun.Decision.ShowSetup)
             OpenSetup();
+
+        if (_nativeHost != null)
+            _nativeHost.Started += OnNativeGameStarted;
     }
+
+    // The game thread waits for its view: host it now, on the game page.
+    private void OnNativeGameStarted() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+    {
+        NativeGame = _nativeHost;
+        ShowLiveState();
+    });
 
     /// <summary>Show the setup from the start (first run, Settings → Run setup, the banner's Run setup).</summary>
     [RelayCommand]
@@ -232,6 +264,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void ShowSettings()
     {
+        _settingsViewModel.Game?.ReloadAsync();
         CurrentView = _settingsViewModel;
         CurrentViewName = ViewName.Settings;
     }
@@ -246,5 +279,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         PatchOptions.PropertyChanged -= OnPatchOptionsPropertyChanged;
         _settingsViewModel.SetupRequested -= OpenSetup;
         Wizard.Closed -= OnWizardClosed;
+        if (_nativeHost != null)
+            _nativeHost.Started -= OnNativeGameStarted;
     }
 }

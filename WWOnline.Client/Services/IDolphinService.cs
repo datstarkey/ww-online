@@ -115,6 +115,9 @@ public interface IDolphinService : IDisposable
     /// </summary>
     bool WriteBytes(ByteArrayMemoryAddress address, byte[] data);
     
+    /// <summary>The play side of the shared inventory (outside the save): game memory, or typed calls on the native game.</summary>
+    IPlayInventory Play { get; }
+
     /// <summary>Read complete game state</summary>
     Task<GameState?> ReadGameStateAsync();
 }

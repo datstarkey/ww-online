@@ -691,6 +691,28 @@
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
                                         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                                             <Border Classes="ww-icon-tile" VerticalAlignment="Center">
+                                                <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconHeart}" Stroke="{StaticResource HeartBrush}" /></Viewbox>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
+                                                <TextBlock Text="PVP" FontWeight="SemiBold" FontSize="15" />
+                                                <TextBlock Text="Players can hurt each other: your sword, arrows and bombs take their hearts, with the game's own guard and knockback. Only between players on the built-in game." FontSize="13"
+                                                           Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="2" Classes="ww-pill" Classes.on="{Binding PvpOn}">
+                                                <Panel>
+                                                    <TextBlock Text="ON" IsVisible="{Binding PvpOn}" />
+                                                    <TextBlock Text="OFF" IsVisible="{Binding !PvpOn}" />
+                                                </Panel>
+                                            </Border>
+                                            <ToggleButton Grid.Column="3" Classes="ww-switch" Margin="12,0,0,0" IsVisible="{Binding IsEditing}"
+                                                          IsChecked="{Binding PvpOn}"
+                                                          ToolTip.Tip="Other players can be targeted and hit, and their hits take your hearts. Dolphin players are never hit."
+                                                          AutomationProperties.Name="PVP" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Padding="0,14">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <Border Classes="ww-icon-tile" VerticalAlignment="Center">
                                                 <Viewbox Width="20" Height="20"><Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
                                             </Border>
                                             <StackPanel Grid.Column="1" Margin="16,0" Spacing="3" VerticalAlignment="Center">
@@ -823,6 +845,15 @@
                                             <TextBlock Grid.Column="1" Text="Other players' projectiles" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedProjectilesOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedProjectilesOn}" />
+                                        </Grid>
+                                    </Border>
+                                    <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44"
+                                            ToolTip.Tip="Players can hurt each other (built-in game only).">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                            <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconHeart}" Stroke="{StaticResource HeartBrush}" /></Viewbox>
+                                            <TextBlock Grid.Column="1" Text="PVP" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding PvpOn}" />
+                                            <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !PvpOn}" />
                                         </Grid>
                                     </Border>
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44"

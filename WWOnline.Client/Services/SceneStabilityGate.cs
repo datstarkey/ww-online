@@ -23,17 +23,13 @@ public class SceneStabilityGate
 
     public bool Check(IDolphinService dolphin)
     {
-        var link = dolphin.Read(GameMemoryAddresses.Player.LinkActorPointer);
-        var nameBytes = dolphin.ReadMemory(GameMemoryAddresses.Stage.CurrentStageName.Address, 8);
-        var nextStage = dolphin.ReadMemory(GameMemoryAddresses.WorldFlags.NextStageEnable, 1);
-        if (link is null or 0 || nameBytes == null || nextStage == null || nextStage[0] != 0)
+        if (dolphin.ReadScene() is not { LinkPresent: true, NextStagePending: false } scene)
         {
             _stableTicks = 0;
             return false;
         }
 
-        int nul = Array.IndexOf(nameBytes, (byte)0);
-        var stage = System.Text.Encoding.ASCII.GetString(nameBytes, 0, nul >= 0 ? nul : nameBytes.Length);
+        var stage = scene.Stage;
         if (stage.Length == 0 || StageIDs.IsNonGameplayStage(stage))
         {
             // Title demo / file select: Link exists but the save is the empty default one.
@@ -60,7 +56,5 @@ public class SceneStabilityGate
     /// No event running (talks, shops, trades, cutscenes: play.mEvtCtrl.mMode != 0) and the pause menu is
     /// closed: safe to rewrite save data the game itself only changes from an event (a bag, a figurine).
     /// </summary>
-    public static bool IsIdle(IDolphinService dolphin) =>
-        dolphin.ReadMemory(GameMemoryAddresses.Events.EventMode, 1) is [0] &&
-        dolphin.ReadMemory(GameMemoryAddresses.Events.MenuPause, 1) is [0];
+    public static bool IsIdle(IDolphinService dolphin) => dolphin.ReadScene() is { IsIdle: true };
 }

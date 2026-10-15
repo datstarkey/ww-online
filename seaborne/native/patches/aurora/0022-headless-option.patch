@@ -1,0 +1,60 @@
+Headless option (AuroraConfig::headless, off by default)
+
+For test runs on a desktop someone is using: the window is created hidden and never shown, a hidden
+or unfocused window does not pause the frame loop (is_paused), and SDL_HINT_MAC_BACKGROUND_APP is set
+before the video subsystem starts, so on macOS the process gets no Dock icon and is never activated.
+Frames still render and present to the hidden window's surface.
+
+--- a/include/aurora/aurora.h
++++ b/include/aurora/aurora.h
+@@ -123,6 +123,14 @@
+    * shows every draw, as on the console, at the cost of a stall the first time a pipeline is used.
+    */
+   bool blockingPipelines;
++
++  /*
++   * Headless (Seaborne patch 0022): the window is created hidden and never shown, a hidden or
++   * unfocused window does not pause the frame loop, and on macOS the process runs as a background
++   * application (SDL_HINT_MAC_BACKGROUND_APP: no Dock icon, never activated). Frames still render and
++   * present to the hidden window's surface, so EFB readbacks (screenshots) work as usual.
++   */
++  bool headless;
+ } AuroraConfig;
+ 
+ typedef struct {
+--- a/lib/aurora.cpp
++++ b/lib/aurora.cpp
+@@ -177,7 +177,9 @@
+   AURORA_ASSERT(window::create_renderer(), "Failed to initialize SDL renderer: {}", SDL_GetError());
+ #endif
+ 
+-  window::show_window();
++  if (!g_config.headless) {
++    window::show_window();
++  }
+   thread::set_current({
+       .name = "Main thread",
+       .affinity = thread::Affinity::SharedCache,
+--- a/lib/window.cpp
++++ b/lib/window.cpp
+@@ -410,6 +410,10 @@
+   /* We don't want to initialize anything input related here, otherwise the add events will get lost to the void */
+   TRY(SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight"), "Error setting {}: {}", SDL_HINT_ORIENTATIONS,
+       SDL_GetError());
++  if (g_config.headless) {
++    // Before the video subsystem starts: Cocoa then neither activates the process nor gives it a Dock icon.
++    SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "1");
++  }
+   TRY(SDL_InitSubSystem(SDL_INIT_EVENTS | SDL_INIT_VIDEO), "Error initializing SDL: {}", SDL_GetError());
+   time::internal::set_pause_reason(time::internal::PauseReason::Surface,
+                                    !g_surfaceReady.load(std::memory_order_acquire));
+@@ -494,6 +498,9 @@
+   if (!is_presentable()) {
+     return true;
+   }
++  if (g_config.headless) {
++    return false;
++  }
+   const auto flags = SDL_GetWindowFlags(g_window);
+   if ((flags & SDL_WINDOW_HIDDEN) != 0u) {
+     return true;

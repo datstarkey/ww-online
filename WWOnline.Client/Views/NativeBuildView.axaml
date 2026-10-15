@@ -1,0 +1,59 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:WWOnline.ViewModels"
+             x:Class="WWOnline.Views.NativeBuildView"
+             x:DataType="vm:NativeSetupViewModel">
+    <!-- Building libtww from Seaborne's source (NativeBuild), or a libtww chosen by hand -->
+    <StackPanel Spacing="12">
+        <StackPanel Spacing="6">
+            <TextBlock Text="Game engine source (Seaborne)" FontWeight="SemiBold" />
+            <TextBlock FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
+                       Text="WW-Online comes with it and builds the game from it on this Mac. The game reads your disc when it starts, not while building. The first build needs the network and takes a few minutes." />
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBox Grid.Column="0" Text="{Binding SourcePath}" Classes="mono" Watermark="Path to Seaborne's source" />
+                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseSourceCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+            </Grid>
+            <TextBlock Text="{Binding SourceError}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}"
+                       IsVisible="{Binding SourceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="{Binding ToolchainStatus}" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Foreground="{StaticResource Text2Brush}" />
+            <Button Grid.Column="1" Content="Check build tools" Command="{Binding CheckToolsCommand}" Classes="ww-ghost"
+                    IsEnabled="{Binding !IsCheckingTools}" Margin="10,0,0,0" />
+        </Grid>
+
+        <Border Classes="ww-terminal">
+            <StackPanel Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Content="Build the game" Command="{Binding BuildCommand}" Classes="ww-accent"
+                            IsEnabled="{Binding CanBuild}" IsVisible="{Binding !IsBuilding}" />
+                    <Button Content="Cancel" Command="{Binding CancelBuildCommand}" Classes="ww-ghost" IsVisible="{Binding IsBuilding}" />
+                </StackPanel>
+                <StackPanel Spacing="8" IsVisible="{Binding IsBuilding}">
+                    <ProgressBar IsIndeterminate="True" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="{Binding BuildStep}" FontSize="13" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding BuildProgress}" FontSize="12" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                </StackPanel>
+                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding IsGameReady}">
+                    <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0">
+                        <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
+                    </Viewbox>
+                    <TextBlock Grid.Column="1" Text="The game is built and ready." FontSize="13" Foreground="{StaticResource RupeeLightBrush}" />
+                </Grid>
+                <Border Classes="ww-error-banner" IsVisible="{Binding BuildError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding BuildError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap" />
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Spacing="6">
+            <TextBlock Text="Built game (libtww)" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBox Grid.Column="0" Text="{Binding LibraryPath}" Classes="mono" IsReadOnly="True" Watermark="Filled in by the build" />
+                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseLibraryCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+            </Grid>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

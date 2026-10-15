@@ -67,12 +67,32 @@ public static class AnimMirror
         }
 
         anim.Tracks = tracks;
+        anim.ItemTrack = ItemTrack(body);
         anim.FaceBtp = TextureAnim(tex, 0);
         anim.FaceBtk = TextureAnim(tex, PuppetLayout.DAPY_OFF_TEX_SCROLL_HEAP - PuppetLayout.DAPY_OFF_TEX_ANM_HEAP);
         anim.FaceBtpFrame = U16(texFrames, 0);
         anim.FaceBtkFrame = U16(texFrames, 2);
         anim.HandLeft = hands[0];
         anim.HandRight = hands[1];
+    }
+
+    /// <summary>upper[2], the item track (in the same read), for receivers that play it with its frame.</summary>
+    private static AnimTrack ItemTrack(byte[] body)
+    {
+        int pack = PuppetLayout.DAPY_OFF_ANM_RATIO_UPPER0 + 2 * PuppetLayout.DAPY_ANM_RATIO_SIZE - BodyStart;
+        int heap = PuppetLayout.DAPY_OFF_ANM_HEAP_UPPER0 + 2 * PuppetLayout.DAPY_ANM_HEAP_SIZE - BodyStart;
+        int fc = PuppetLayout.DAPY_OFF_FRAME_CTRL_UPPER0 + 2 * PuppetLayout.DAPY_FRAME_CTRL_SIZE - BodyStart;
+        return new AnimTrack
+        {
+            Bck = U32(body, pack + PuppetLayout.ANM_RATIO_OFF_ANM) == 0 ? AnimTrack.None : U16(body, heap + PuppetLayout.ANM_HEAP_OFF_IDX),
+            Start = (short)U16(body, fc + PuppetLayout.FRAME_CTRL_OFF_START),
+            End = (short)U16(body, fc + PuppetLayout.FRAME_CTRL_OFF_END),
+            Loop = (short)U16(body, fc + PuppetLayout.FRAME_CTRL_OFF_LOOP),
+            Attribute = body[fc + PuppetLayout.FRAME_CTRL_OFF_ATTR],
+            Frame = Finite(F32(body, fc + PuppetLayout.FRAME_CTRL_OFF_FRAME)),
+            Rate = Finite(F32(body, fc + PuppetLayout.FRAME_CTRL_OFF_RATE)),
+            Ratio = Finite(F32(body, pack + PuppetLayout.ANM_RATIO_OFF_RATIO)),
+        };
     }
 
     /// <summary>

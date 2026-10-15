@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
+using WWOnline.Native;
 using WWOnline.Services;
 using WWOnline.Shared.Hubs;
 
@@ -48,6 +49,9 @@ public partial class SetupStepItem : ObservableObject
 /// entered. Finishing or skipping the setup sets <see cref="GameSettings.SetupCompleted"/>
 /// (<see cref="FirstRun"/>). Patching goes through the same GamePatcherService.PatchGameAsync call as
 /// the Settings page's Patch game button.
+///
+/// On the native backend (<see cref="GameSettings.Backend"/>) the steps are Welcome, Your disc (picked and
+/// verified), You, Build the game and Play (<see cref="Native"/>): no Dolphin, no patches, no patching.
 /// </summary>
 public partial class SetupWizardViewModel : ViewModelBase, IDisposable
 {
@@ -71,16 +75,35 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     /// <summary>The Appearance page's view-model: its tunic swatches, picked here too.</summary>
     public AppearanceViewModel Appearance { get; }
 
-    public ObservableCollection<SetupStepItem> Steps { get; } =
+    /// <summary>The native backend's disc and build (shared with Settings).</summary>
+    public NativeSetupViewModel Native { get; }
+
+    private static readonly (SetupStep Step, string Title)[] DolphinSteps =
     [
-        new(SetupStep.Welcome, 1, "Welcome"),
-        new(SetupStep.Dolphin, 2, "Dolphin"),
-        new(SetupStep.Game, 3, "Your game"),
-        new(SetupStep.Patches, 4, "Game patches"),
-        new(SetupStep.Player, 5, "You"),
-        new(SetupStep.Patch, 6, "Patch"),
-        new(SetupStep.Done, 7, "Play"),
+        (SetupStep.Welcome, "Welcome"), (SetupStep.Dolphin, "Dolphin"), (SetupStep.Game, "Your game"),
+        (SetupStep.Patches, "Game patches"), (SetupStep.Player, "You"), (SetupStep.Patch, "Patch"), (SetupStep.Done, "Play"),
     ];
+
+    private static readonly (SetupStep Step, string Title)[] NativeSteps =
+    [
+        (SetupStep.Welcome, "Welcome"), (SetupStep.Game, "Your disc"), (SetupStep.Player, "You"),
+        (SetupStep.Patch, "Build the game"), (SetupStep.Done, "Play"),
+    ];
+
+    public ObservableCollection<SetupStepItem> Steps { get; } = [];
+
+    /// <summary>The native backend: the disc and build steps instead of Dolphin's.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsDolphinBackend), nameof(ShowDolphinGame), nameof(ShowNativeGame), nameof(ShowDolphinPatch),
+        nameof(ShowNativeBuild), nameof(CanGoNext), nameof(CanSkipStep), nameof(SkipStepText), nameof(IsGameReady), nameof(DolphinHint),
+        nameof(ShowNotPatchedWarning), nameof(ShowNotBuiltWarning))]
+    private bool _isNative;
+
+    public bool IsDolphinBackend => !IsNative;
+    public bool ShowDolphinGame => IsGame && !IsNative;
+    public bool ShowNativeGame => IsGame && IsNative;
+    public bool ShowDolphinPatch => IsPatch && !IsNative;
+    public bool ShowNativeBuild => IsPatch && IsNative;
 
     /// <summary>Raised when the setup closes (finished or skipped).</summary>
     public event Action? Closed;
@@ -93,7 +116,8 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsWelcome), nameof(IsGame), nameof(IsDolphin), nameof(IsPatches), nameof(IsPlayer),
         nameof(IsPatch), nameof(IsDone), nameof(CanGoBack), nameof(CanGoNext), nameof(NextText), nameof(CanSkipStep),
-        nameof(SkipStepText), nameof(StepCaption))]
+        nameof(SkipStepText), nameof(StepCaption), nameof(ShowDolphinGame), nameof(ShowNativeGame), nameof(ShowDolphinPatch),
+        nameof(ShowNativeBuild))]
     private SetupStep _step = SetupStep.Welcome;
 
     public bool IsWelcome => Step == SetupStep.Welcome;
@@ -105,7 +129,7 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     public bool IsDone => Step == SetupStep.Done;
 
     /// <summary>"Step 2 of 7".</summary>
-    public string StepCaption => $"Step {(int)Step + 1} of {Steps.Count}";
+    public string StepCaption => $"Step {StepIndex(Step) + 1} of {Steps.Count}";
 
     // ── Game folders ──────────────────────────────────────────────
 
@@ -215,14 +239,20 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
 
     public bool CanPatch => !IsPatching && VanillaOk && GamePathOk;
 
-    /// <summary>The patched game is ready: patched just now, or already up to date.</summary>
-    public bool IsGameReady => PatchSucceeded || (!IsPatching && PatchOptions.IsUpToDate);
+    /// <summary>The patched game is ready: patched just now, or already up to date (natively: the game is built).</summary>
+    public bool IsGameReady => IsNative ? Native.IsGameReady : PatchSucceeded || (!IsPatching && PatchOptions.IsUpToDate);
+
+    /// <summary>The Play step's warnings: not patched (Dolphin) / not built (native).</summary>
+    public bool ShowNotPatchedWarning => !IsGameReady && !IsNative;
+    public bool ShowNotBuiltWarning => !IsGameReady && IsNative;
 
     /// <summary>On the Patch step: the game was already up to date before patching here.</summary>
     public bool ShowAlreadyUpToDate => !PatchSucceeded && !IsPatching && PatchError == null && PatchOptions.IsUpToDate;
 
     /// <summary>The Play step's line about Dolphin.</summary>
-    public string DolphinHint => AutoLaunchDolphin && DolphinOk
+    public string DolphinHint => IsNative
+        ? "When you host or join a room, WW-Online starts the game on its Game page."
+        : AutoLaunchDolphin && DolphinOk
         ? "When you host or join, WW-Online starts Dolphin with your patched game and attaches to it."
         : $"Start your patched game in Dolphin ({Path.Combine(GamePath, "sys", "main.dol")}), then attach on the Dolphin page.";
     public bool ShowPatchButton => !IsPatching && !PatchSucceeded;
@@ -233,9 +263,16 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
 
     // ── Navigation ────────────────────────────────────────────────
 
-    public bool CanGoBack => Step is not (SetupStep.Welcome or SetupStep.Done) && !IsPatching && !IsExtracting;
+    public bool CanGoBack => Step is not (SetupStep.Welcome or SetupStep.Done) && !IsPatching && !IsExtracting &&
+                             !Native.IsBuilding && !Native.IsVerifyingDisc;
 
-    public bool CanGoNext => Step switch
+    public bool CanGoNext => IsNative ? Step switch
+    {
+        SetupStep.Game => Native.DiscOk && !Native.IsVerifyingDisc,
+        SetupStep.Player => !string.IsNullOrWhiteSpace(ProtocolCheck.SanitizeName(PlayerName)),
+        SetupStep.Patch => Native.IsGameReady,
+        _ => true,
+    } : Step switch
     {
         SetupStep.Game => VanillaOk && GamePathOk && !IsExtracting,
         SetupStep.Dolphin => DolphinOk,
@@ -254,17 +291,18 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     /// <summary>Dolphin and Patch can be left for later (the app then says what's missing).</summary>
     public bool CanSkipStep => Step switch
     {
+        SetupStep.Patch when IsNative => !Native.IsBuilding && !Native.IsGameReady,
         SetupStep.Dolphin => true,
         SetupStep.Patch => !IsPatching && !PatchSucceeded,
         _ => false,
     };
 
-    public string SkipStepText => Step == SetupStep.Patch ? "Patch later" : "Skip for now";
+    public string SkipStepText => Step == SetupStep.Patch ? IsNative ? "Build later" : "Patch later" : "Skip for now";
 
     public SetupWizardViewModel(GameSettingsService settings, GamePatcherService patcher, PatchOptionsViewModel patchOptions,
-        AppearanceViewModel appearance)
+        AppearanceViewModel appearance, NativeSetupViewModel native)
         : this(settings, patcher.PatchGameAsync, patchOptions, appearance, DolphinLocator.FindCandidates,
-            new DolphinTool(new ProcessRunner()), a => Avalonia.Threading.Dispatcher.UIThread.Post(a))
+            new DolphinTool(new ProcessRunner()), a => Avalonia.Threading.Dispatcher.UIThread.Post(a), native)
     {
     }
 
@@ -275,9 +313,13 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     /// <param name="findDolphin">Finds Dolphin.exe files (DolphinLocator.FindCandidates).</param>
     /// <param name="dolphinTool">Extracts disc images (a fake process runner in tests).</param>
     /// <param name="post">Runs an action on the UI thread (tests pass <c>a =&gt; a()</c>).</param>
+    /// <param name="native">The native disc and build (one on a real process runner if null).</param>
     public SetupWizardViewModel(GameSettingsService settings, PatchGameFunc patchGame, PatchOptionsViewModel patchOptions,
-        AppearanceViewModel appearance, Func<IReadOnlyList<string>> findDolphin, DolphinTool dolphinTool, Action<Action> post)
+        AppearanceViewModel appearance, Func<IReadOnlyList<string>> findDolphin, DolphinTool dolphinTool, Action<Action> post,
+        NativeSetupViewModel? native = null)
     {
+        Native = native ?? new NativeSetupViewModel(settings, new NativeBuild(new ProcessRunner()), post);
+        Native.PropertyChanged += OnNativePropertyChanged;
         _dolphinTool = dolphinTool;
         _settings = settings;
         _patchGame = patchGame;
@@ -300,6 +342,11 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     private void Load()
     {
         var s = _settings.Load();
+        IsNative = s.Backend == GameBackend.Native;
+        Steps.Clear();
+        var steps = IsNative ? NativeSteps : DolphinSteps;
+        for (int i = 0; i < steps.Length; i++) Steps.Add(new SetupStepItem(steps[i].Step, i + 1, steps[i].Title));
+        Native.Load();
         VanillaGamePath = s.VanillaGamePath ?? "";
         GamePath = s.GamePath ?? "";
         DolphinPath = s.DolphinPath ?? "";
@@ -382,6 +429,8 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(CanGoNext));
         OnPropertyChanged(nameof(CanPatch));
         OnPropertyChanged(nameof(IsGameReady));
+        OnPropertyChanged(nameof(ShowNotPatchedWarning));
+        OnPropertyChanged(nameof(ShowNotBuiltWarning));
         OnPropertyChanged(nameof(ShowAlreadyUpToDate));
         OnPropertyChanged(nameof(DolphinHint));
     }
@@ -390,6 +439,13 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     partial void OnPatchSucceededChanged(bool value) => Refresh();
     partial void OnPatchErrorChanged(string? value) => Refresh();
     partial void OnAutoLaunchDolphinChanged(bool value) => Refresh();
+
+    private void OnNativePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        Refresh();
+        OnPropertyChanged(nameof(CanGoBack));
+        OnPropertyChanged(nameof(CanSkipStep));
+    }
 
     private void OnPatchOptionsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -407,7 +463,7 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
         if (!CanGoNext) return;
         switch (Step)
         {
-            case SetupStep.Game:
+            case SetupStep.Game when !IsNative: // natively the disc is saved once verified
                 SaveGameFolders();
                 break;
             case SetupStep.Dolphin:
@@ -420,13 +476,13 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
                 Finish();
                 return;
         }
-        GoTo(Step + 1);
+        GoTo(StepAt(StepIndex(Step) + 1));
     }
 
     [RelayCommand]
     private void Back()
     {
-        if (CanGoBack) GoTo(Step - 1);
+        if (CanGoBack) GoTo(StepAt(StepIndex(Step) - 1));
     }
 
     /// <summary>Leave this step for later: Dolphin (keeps whatever was saved) or Patch.</summary>
@@ -435,14 +491,14 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     {
         if (!CanSkipStep) return;
         if (Step == SetupStep.Dolphin) SaveDolphin(null);
-        GoTo(Step + 1);
+        GoTo(StepAt(StepIndex(Step) + 1));
     }
 
     /// <summary>Close the setup without finishing it. Counts as done: it won't open by itself again.</summary>
     [RelayCommand]
     private void SkipSetup()
     {
-        if (IsPatching || IsExtracting) return;
+        if (IsPatching || IsExtracting || Native.IsBuilding) return;
         Logger.Information("[setup] skipped at {Step}", Step);
         Close();
     }
@@ -700,13 +756,24 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
 
     // ── Steps ─────────────────────────────────────────────────────
 
-    private void GoTo(SetupStep step)
+    private int StepIndex(SetupStep step)
     {
-        if (step < SetupStep.Welcome || step > SetupStep.Done) return;
+        for (int i = 0; i < Steps.Count; i++)
+            if (Steps[i].Step == step) return i;
+        return -1;
+    }
+
+    /// <summary>The step at <paramref name="index"/> of this backend's list, or null past either end.</summary>
+    private SetupStep? StepAt(int index) => index >= 0 && index < Steps.Count ? Steps[index].Step : null;
+
+    private void GoTo(SetupStep? to)
+    {
+        if (to is not { } step) return;
         Step = step;
         if (step == SetupStep.Dolphin && !HasSearchedForDolphin) FindDolphin();
-        if (step == SetupStep.Game) ToolDetection = DetectDolphinToolAsync();
-        if (step == SetupStep.Patch && !PatchSucceeded)
+        if (step == SetupStep.Game && !IsNative) ToolDetection = DetectDolphinToolAsync();
+        if (step == SetupStep.Patch && IsNative && Native.ToolchainStatus == null) ToolDetection = Native.CheckTools();
+        if (step == SetupStep.Patch && !PatchSucceeded && !IsNative)
         {
             PatchOptions.SetGamePath(GamePath.Trim());
             _ = PatchOptions.RefreshBuildStatusAsync();
@@ -753,6 +820,7 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
         if (_disposed) return;
         _disposed = true;
         PatchOptions.PropertyChanged -= OnPatchOptionsPropertyChanged;
+        Native.PropertyChanged -= OnNativePropertyChanged;
         _lifetime.Cancel();
         _lifetime.Dispose();
         _extractCts?.Dispose();

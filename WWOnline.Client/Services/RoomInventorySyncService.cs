@@ -1,6 +1,7 @@
 using Serilog;
 using WWOnline.Data;
 using WWOnline.Hubs;
+using WWOnline.Native;
 using WWOnline.Shared.Models;
 
 namespace WWOnline.Services;
@@ -319,7 +320,7 @@ public class RoomInventorySyncService : IDisposable
     {
         byte allowed = Math.Max(derived, _lastApplied?.MaxMagic ?? (byte)0);
         if (_dolphin.Read(GameMemoryAddresses.Player.MaxMagicMeter) is not byte game || game <= allowed) return;
-        if (!SceneStabilityGate.IsIdle(_dolphin) || _dolphin.Read(GameMemoryAddresses.Hearts.PendingMaxMagic) is not 0) return;
+        if (!SceneStabilityGate.IsIdle(_dolphin) || _dolphin.Play.ReadPending()?[(int)TwwInvCounter.MaxMagic] is not 0) return;
         _dolphin.Write(GameMemoryAddresses.Player.MaxMagicMeter, allowed);
         if (_dolphin.Read(GameMemoryAddresses.Player.CurrentMagicMeter) is byte mp && mp > allowed)
             _dolphin.Write(GameMemoryAddresses.Player.CurrentMagicMeter, allowed);

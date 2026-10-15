@@ -1,0 +1,1358 @@
+[
+ {
+  "id": 0,
+  "name": "black_tex",
+  "header": "black_tex.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 64
+ },
+ {
+  "id": 1,
+  "name": "msg_data",
+  "header": "msg_data.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 608
+ },
+ {
+  "id": 2,
+  "name": "msg_data_ge",
+  "header": "msg_data_ge.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 672
+ },
+ {
+  "id": 3,
+  "name": "msg_data_fr",
+  "header": "msg_data_fr.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 608
+ },
+ {
+  "id": 4,
+  "name": "msg_data_sp",
+  "header": "msg_data_sp.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 576
+ },
+ {
+  "id": 5,
+  "name": "msg_data_it",
+  "header": "msg_data_it.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 640
+ },
+ {
+  "id": 6,
+  "name": "font_data",
+  "header": "font_data.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 74336
+ },
+ {
+  "id": 7,
+  "name": "l_backRevZMat",
+  "header": "l_backRevZMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 65
+ },
+ {
+  "id": 8,
+  "name": "l_frontZMat",
+  "header": "l_frontZMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 60
+ },
+ {
+  "id": 9,
+  "name": "l_frontNoZSubMat",
+  "header": "l_frontNoZSubMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 42
+ },
+ {
+  "id": 10,
+  "name": "l_bonboriPos",
+  "header": "l_bonboriPos__d_drawlist.h",
+  "kind": "COS_ASSET_F32",
+  "size": 504
+ },
+ {
+  "id": 11,
+  "name": "l_bonboriDL",
+  "header": "l_bonboriDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 167
+ },
+ {
+  "id": 12,
+  "name": "l_s_beam_checkPos",
+  "header": "l_s_beam_checkPos__d_drawlist.h",
+  "kind": "COS_ASSET_F32",
+  "size": 480
+ },
+ {
+  "id": 13,
+  "name": "l_s_beam_checkDL",
+  "header": "l_s_beam_checkDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 248
+ },
+ {
+  "id": 14,
+  "name": "l_cubePos",
+  "header": "l_cubePos__d_drawlist.h",
+  "kind": "COS_ASSET_F32",
+  "size": 96
+ },
+ {
+  "id": 15,
+  "name": "l_cubeDL",
+  "header": "l_cubeDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 74
+ },
+ {
+  "id": 16,
+  "name": "l_bonbori2Pos",
+  "header": "l_bonbori2Pos__d_drawlist.h",
+  "kind": "COS_ASSET_F32",
+  "size": 1032
+ },
+ {
+  "id": 17,
+  "name": "l_bonbori2DL",
+  "header": "l_bonbori2DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 680
+ },
+ {
+  "id": 18,
+  "name": "l_matDL",
+  "header": "l_matDL__draw__18dDlst_alphaModel_cFPA4_f.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 100
+ },
+ {
+  "id": 19,
+  "name": "l_shadowVolPos",
+  "header": "l_shadowVolPos__d_drawlist.h",
+  "kind": "COS_ASSET_F32",
+  "size": 96
+ },
+ {
+  "id": 20,
+  "name": "l_shadowVolDL",
+  "header": "l_shadowVolDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 74
+ },
+ {
+  "id": 21,
+  "name": "l_shadowProjMat",
+  "header": "l_shadowProjMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 85
+ },
+ {
+  "id": 22,
+  "name": "l_shadowVolMat",
+  "header": "l_shadowVolMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 90
+ },
+ {
+  "id": 23,
+  "name": "l_clearMat",
+  "header": "l_clearMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 85
+ },
+ {
+  "id": 24,
+  "name": "l_frontMat",
+  "header": "l_frontMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 85
+ },
+ {
+  "id": 25,
+  "name": "l_backSubMat",
+  "header": "l_backSubMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 60
+ },
+ {
+  "id": 26,
+  "name": "l_simpleShadowPos",
+  "header": "l_simpleShadowPos__d_drawlist.h",
+  "kind": "COS_ASSET_F32",
+  "size": 168
+ },
+ {
+  "id": 27,
+  "name": "l_shadowVolumeDL",
+  "header": "l_shadowVolumeDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 88
+ },
+ {
+  "id": 28,
+  "name": "l_shadowSealTexDL",
+  "header": "l_shadowSealTexDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 85
+ },
+ {
+  "id": 29,
+  "name": "l_shadowSealTex2DL",
+  "header": "l_shadowSealTex2DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 85
+ },
+ {
+  "id": 30,
+  "name": "l_shadowSealDL",
+  "header": "l_shadowSealDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 105
+ },
+ {
+  "id": 31,
+  "name": "l_matDL",
+  "header": "l_matDL__imageDraw__21dDlst_shadowControl_cFPA4_f.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 132
+ },
+ {
+  "id": 32,
+  "name": "l_mirrorProjMat",
+  "header": "l_mirrorProjMat.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 85
+ },
+ {
+  "id": 33,
+  "name": "l_backMat",
+  "header": "l_backMat__draw__23dDlst_alphaInvVolPacketFv.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 108
+ },
+ {
+  "id": 34,
+  "name": "l_Txq_bessou_hanaTEX",
+  "header": "l_Txq_bessou_hanaTEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 4096
+ },
+ {
+  "id": 35,
+  "name": "l_pos3",
+  "header": "l_pos3__d_flower.h",
+  "kind": "COS_ASSET_F32",
+  "size": 2892
+ },
+ {
+  "id": 36,
+  "name": "l_color3",
+  "header": "l_color3__d_flower.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 8
+ },
+ {
+  "id": 37,
+  "name": "l_texCoord3",
+  "header": "l_texCoord3__d_flower.h",
+  "kind": "COS_ASSET_F32",
+  "size": 376
+ },
+ {
+  "id": 38,
+  "name": "l_QbsafDL",
+  "header": "l_QbsafDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 158
+ },
+ {
+  "id": 39,
+  "name": "l_QbsfwDL",
+  "header": "l_QbsfwDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 1643
+ },
+ {
+  "id": 40,
+  "name": "l_Txo_ob_flower_white_64x64TEX",
+  "header": "l_Txo_ob_flower_white_64x64TEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 2048
+ },
+ {
+  "id": 41,
+  "name": "l_pos",
+  "header": "l_pos__d_flower.h",
+  "kind": "COS_ASSET_F32",
+  "size": 576
+ },
+ {
+  "id": 42,
+  "name": "l_color",
+  "header": "l_color__d_flower.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 8
+ },
+ {
+  "id": 43,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_flower.h",
+  "kind": "COS_ASSET_F32",
+  "size": 208
+ },
+ {
+  "id": 44,
+  "name": "l_OhanaDL",
+  "header": "l_OhanaDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 266
+ },
+ {
+  "id": 45,
+  "name": "l_Ohana_gutDL",
+  "header": "l_Ohana_gutDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 176
+ },
+ {
+  "id": 46,
+  "name": "l_Txo_ob_flower_pink_64x64TEX",
+  "header": "l_Txo_ob_flower_pink_64x64TEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 2048
+ },
+ {
+  "id": 47,
+  "name": "l_pos2",
+  "header": "l_pos2__d_flower.h",
+  "kind": "COS_ASSET_F32",
+  "size": 336
+ },
+ {
+  "id": 48,
+  "name": "l_color2",
+  "header": "l_color2__d_flower.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 20
+ },
+ {
+  "id": 49,
+  "name": "l_texCoord2",
+  "header": "l_texCoord2__d_flower.h",
+  "kind": "COS_ASSET_F32",
+  "size": 288
+ },
+ {
+  "id": 50,
+  "name": "l_Ohana_highDL",
+  "header": "l_Ohana_highDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 290
+ },
+ {
+  "id": 51,
+  "name": "l_Ohana_high_gutDL",
+  "header": "l_Ohana_high_gutDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 140
+ },
+ {
+  "id": 52,
+  "name": "l_matDL3",
+  "header": "l_matDL3.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 168
+ },
+ {
+  "id": 53,
+  "name": "l_matDL",
+  "header": "l_matDL__d_flower.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 168
+ },
+ {
+  "id": 54,
+  "name": "l_matDL2",
+  "header": "l_matDL2.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 168
+ },
+ {
+  "id": 55,
+  "name": "l_Txa_swood_bTEX",
+  "header": "l_Txa_swood_bTEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 2048
+ },
+ {
+  "id": 56,
+  "name": "l_pos",
+  "header": "l_pos__d_wood.h",
+  "kind": "COS_ASSET_F32",
+  "size": 744
+ },
+ {
+  "id": 57,
+  "name": "l_color",
+  "header": "l_color__d_wood.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 80
+ },
+ {
+  "id": 58,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_wood.h",
+  "kind": "COS_ASSET_F32",
+  "size": 80
+ },
+ {
+  "id": 59,
+  "name": "l_Oba_swood_bDL",
+  "header": "l_Oba_swood_bDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 284
+ },
+ {
+  "id": 60,
+  "name": "l_Oba_swood_b_cutDL",
+  "header": "l_Oba_swood_b_cutDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 203
+ },
+ {
+  "id": 61,
+  "name": "l_matDL",
+  "header": "l_matDL__d_wood.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 163
+ },
+ {
+  "id": 62,
+  "name": "l_Txa_swood_aTEX",
+  "header": "l_Txa_swood_aTEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 2048
+ },
+ {
+  "id": 63,
+  "name": "l_pos",
+  "header": "l_pos__d_tree.h",
+  "kind": "COS_ASSET_F32",
+  "size": 972
+ },
+ {
+  "id": 64,
+  "name": "l_color",
+  "header": "l_color__d_tree.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 40
+ },
+ {
+  "id": 65,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_tree.h",
+  "kind": "COS_ASSET_F32",
+  "size": 128
+ },
+ {
+  "id": 66,
+  "name": "l_Oba_swood_noneDL",
+  "header": "l_Oba_swood_noneDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 37
+ },
+ {
+  "id": 67,
+  "name": "l_Oba_swood_a_cuttDL",
+  "header": "l_Oba_swood_a_cuttDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 175
+ },
+ {
+  "id": 68,
+  "name": "l_Oba_swood_a_cutuDL",
+  "header": "l_Oba_swood_a_cutuDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 103
+ },
+ {
+  "id": 69,
+  "name": "l_Oba_swood_a_hapaDL",
+  "header": "l_Oba_swood_a_hapaDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 356
+ },
+ {
+  "id": 70,
+  "name": "l_Oba_swood_a_mikiDL",
+  "header": "l_Oba_swood_a_mikiDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 194
+ },
+ {
+  "id": 71,
+  "name": "l_matDL",
+  "header": "l_matDL__d_tree.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 163
+ },
+ {
+  "id": 72,
+  "name": "l_Txa_kage_32TEX",
+  "header": "l_Txa_kage_32TEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 512
+ },
+ {
+  "id": 73,
+  "name": "g_dTree_Oba_kage_32DL",
+  "header": "g_dTree_Oba_kage_32DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 43
+ },
+ {
+  "id": 74,
+  "name": "g_dTree_shadowMatDL",
+  "header": "g_dTree_shadowMatDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 144
+ },
+ {
+  "id": 75,
+  "name": "l_chainS3TCTEX",
+  "header": "l_chainS3TCTEX__d_chain.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 512
+ },
+ {
+  "id": 76,
+  "name": "l_pos",
+  "header": "l_pos__d_chain.h",
+  "kind": "COS_ASSET_F32",
+  "size": 144
+ },
+ {
+  "id": 77,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_chain.h",
+  "kind": "COS_ASSET_F32",
+  "size": 96
+ },
+ {
+  "id": 78,
+  "name": "l_chainDL",
+  "header": "l_chainDL__d_chain.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 122
+ },
+ {
+  "id": 79,
+  "name": "l_matDL",
+  "header": "l_matDL__d_chain.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 168
+ },
+ {
+  "id": 80,
+  "name": "l_chainS3TCTEX",
+  "header": "l_chainS3TCTEX__d_hookshot.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 512
+ },
+ {
+  "id": 81,
+  "name": "l_pos",
+  "header": "l_pos__d_hookshot.h",
+  "kind": "COS_ASSET_F32",
+  "size": 144
+ },
+ {
+  "id": 82,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_hookshot.h",
+  "kind": "COS_ASSET_F32",
+  "size": 96
+ },
+ {
+  "id": 83,
+  "name": "l_chainDL",
+  "header": "l_chainDL__d_hookshot.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 122
+ },
+ {
+  "id": 84,
+  "name": "l_matDL",
+  "header": "l_matDL__d_hookshot.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 168
+ },
+ {
+  "id": 85,
+  "name": "l_YfloorPos",
+  "header": "l_YfloorPos__d_magma.h",
+  "kind": "COS_ASSET_F32",
+  "size": 48
+ },
+ {
+  "id": 86,
+  "name": "l_YfloorDL",
+  "header": "l_YfloorDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 39
+ },
+ {
+  "id": 87,
+  "name": "l_YfloorMatDL",
+  "header": "l_YfloorMatDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 85
+ },
+ {
+  "id": 88,
+  "name": "l_YballPos",
+  "header": "l_YballPos__d_magma.h",
+  "kind": "COS_ASSET_F32",
+  "size": 396
+ },
+ {
+  "id": 89,
+  "name": "l_YballDL",
+  "header": "l_YballDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 118
+ },
+ {
+  "id": 90,
+  "name": "l_YballMatDL",
+  "header": "l_YballMatDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 75
+ },
+ {
+  "id": 91,
+  "name": "l_K_kusa_00TEX",
+  "header": "l_K_kusa_00TEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 4096
+ },
+ {
+  "id": 92,
+  "name": "l_Vmori_pos",
+  "header": "l_Vmori_pos.h",
+  "kind": "COS_ASSET_F32",
+  "size": 324
+ },
+ {
+  "id": 93,
+  "name": "l_Vmori_color",
+  "header": "l_Vmori_color.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 20
+ },
+ {
+  "id": 94,
+  "name": "l_Vmori_texCoord",
+  "header": "l_Vmori_texCoord.h",
+  "kind": "COS_ASSET_F32",
+  "size": 72
+ },
+ {
+  "id": 95,
+  "name": "l_Vmori_00DL",
+  "header": "l_Vmori_00DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 176
+ },
+ {
+  "id": 96,
+  "name": "l_Vmori_01DL",
+  "header": "l_Vmori_01DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 140
+ },
+ {
+  "id": 97,
+  "name": "l_Vmori_matDL",
+  "header": "l_Vmori_matDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 168
+ },
+ {
+  "id": 98,
+  "name": "l_Txa_ob_kusa_aTEX",
+  "header": "l_Txa_ob_kusa_aTEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 2048
+ },
+ {
+  "id": 99,
+  "name": "l_pos",
+  "header": "l_pos__d_grass.h",
+  "kind": "COS_ASSET_F32",
+  "size": 324
+ },
+ {
+  "id": 100,
+  "name": "l_color",
+  "header": "l_color__d_grass.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 32
+ },
+ {
+  "id": 101,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_grass.h",
+  "kind": "COS_ASSET_F32",
+  "size": 72
+ },
+ {
+  "id": 102,
+  "name": "l_Oba_kusa_aDL",
+  "header": "l_Oba_kusa_aDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 167
+ },
+ {
+  "id": 103,
+  "name": "l_Oba_kusa_a_cutDL",
+  "header": "l_Oba_kusa_a_cutDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 140
+ },
+ {
+  "id": 104,
+  "name": "l_matDL",
+  "header": "l_matDL__d_grass.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 168
+ },
+ {
+  "id": 105,
+  "name": "l_sightMatDL",
+  "header": "l_sightMatDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 124
+ },
+ {
+  "id": 106,
+  "name": "l_sightDL",
+  "header": "l_sightDL__d_a_boomerang.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 55
+ },
+ {
+  "id": 107,
+  "name": "l_matDL",
+  "header": "l_matDL__draw__18daBoomerang_blur_cFv.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 149
+ },
+ {
+  "id": 108,
+  "name": "l_sightDL",
+  "header": "l_sightDL__d_a_player_main.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 137
+ },
+ {
+  "id": 109,
+  "name": "l_invisibleMat",
+  "header": "l_invisibleMat__draw__19mDoExt_invJntPacketFv.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 133
+ },
+ {
+  "id": 110,
+  "name": "l_matDL",
+  "header": "l_matDL__m_Do_ext.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 141
+ },
+ {
+  "id": 111,
+  "name": "l_toonMatDL",
+  "header": "l_toonMatDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 156
+ },
+ {
+  "id": 112,
+  "name": "l_mat1DL",
+  "header": "l_mat1DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 150
+ },
+ {
+  "id": 113,
+  "name": "l_toonMat1DL",
+  "header": "l_toonMat1DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 165
+ },
+ {
+  "id": 114,
+  "name": "l_matDL",
+  "header": "l_matDL__d_cloth_packet.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52
+ },
+ {
+  "id": 115,
+  "name": "l_alpha_matDL",
+  "header": "l_alpha_matDL__d_cloth_packet.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52
+ },
+ {
+  "id": 116,
+  "name": "l_matDL",
+  "header": "l_matDL__d_menu_cloth.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52
+ },
+ {
+  "id": 117,
+  "name": "l_pos",
+  "header": "l_pos__d_a_grid.h",
+  "kind": "COS_ASSET_F32",
+  "size": 1020
+ },
+ {
+  "id": 118,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_a_grid.h",
+  "kind": "COS_ASSET_F32",
+  "size": 680
+ },
+ {
+  "id": 119,
+  "name": "l_DL",
+  "header": "l_DL__d_a_grid.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 563
+ },
+ {
+  "id": 120,
+  "name": "l_matDL",
+  "header": "l_matDL__d_a_grid.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52
+ },
+ {
+  "id": 121,
+  "name": "l_flag02TEX",
+  "header": "l_flag02TEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 2048
+ },
+ {
+  "id": 122,
+  "name": "l_majuu_flag_pos",
+  "header": "l_majuu_flag_pos.h",
+  "kind": "COS_ASSET_F32",
+  "size": 252
+ },
+ {
+  "id": 123,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_a_majuu_flag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 168
+ },
+ {
+  "id": 124,
+  "name": "l_majuu_flag_matDL",
+  "header": "l_majuu_flag_matDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52
+ },
+ {
+  "id": 125,
+  "name": "l_majuu_flagDL",
+  "header": "l_majuu_flagDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 152
+ },
+ {
+  "id": 126,
+  "name": "l_pos",
+  "header": "l_pos__d_a_pirate_flag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 300
+ },
+ {
+  "id": 127,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_a_pirate_flag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 200
+ },
+ {
+  "id": 128,
+  "name": "l_pirate_flag_DL",
+  "header": "l_pirate_flag_DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 164
+ },
+ {
+  "id": 129,
+  "name": "l_pirate_flag_matDL",
+  "header": "l_pirate_flag_matDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52
+ },
+ {
+  "id": 130,
+  "name": "l_B_sand2TEX",
+  "header": "l_B_sand2TEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 65536
+ },
+ {
+  "id": 131,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_a_bwdg.h",
+  "kind": "COS_ASSET_F32",
+  "size": 33800
+ },
+ {
+  "id": 132,
+  "name": "l_Hsand1DL",
+  "header": "l_Hsand1DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 50144
+ },
+ {
+  "id": 133,
+  "name": "l_matDL",
+  "header": "l_matDL__d_a_bwdg.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 186
+ },
+ {
+  "id": 134,
+  "name": "l_txa_dummy_hataTEX",
+  "header": "l_txa_dummy_hataTEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 8192
+ },
+ {
+  "id": 135,
+  "name": "l_pos",
+  "header": "l_pos__d_a_goal_flag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 540
+ },
+ {
+  "id": 136,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_a_goal_flag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 360
+ },
+ {
+  "id": 137,
+  "name": "l_goal_flag_DL",
+  "header": "l_goal_flag_DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 260
+ },
+ {
+  "id": 138,
+  "name": "l_goal_flag_matDL",
+  "header": "l_goal_flag_matDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52
+ },
+ {
+  "id": 139,
+  "name": "l_pos",
+  "header": "l_pos__d_a_sail.h",
+  "kind": "COS_ASSET_F32",
+  "size": 1008
+ },
+ {
+  "id": 140,
+  "name": "l_texCoord",
+  "header": "l_texCoord__d_a_sail.h",
+  "kind": "COS_ASSET_F32",
+  "size": 672
+ },
+ {
+  "id": 141,
+  "name": "l_sail_DL",
+  "header": "l_sail_DL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 527
+ },
+ {
+  "id": 142,
+  "name": "l_sail_matDL",
+  "header": "l_sail_matDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52
+ },
+ {
+  "id": 143,
+  "name": "l_Txa_kizoku_mastTEX",
+  "header": "l_Txa_kizoku_mastTEX.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 2048
+ },
+ {
+  "id": 144,
+  "name": "l_mast_pos",
+  "header": "l_mast_pos__d_a_sail.h",
+  "kind": "COS_ASSET_F32",
+  "size": 240
+ },
+ {
+  "id": 145,
+  "name": "l_mast_color",
+  "header": "l_mast_color__d_a_sail.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 32
+ },
+ {
+  "id": 146,
+  "name": "l_mast_texCoord",
+  "header": "l_mast_texCoord__d_a_sail.h",
+  "kind": "COS_ASSET_F32",
+  "size": 64
+ },
+ {
+  "id": 147,
+  "name": "l_AmastDL",
+  "header": "l_AmastDL.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 356
+ },
+ {
+  "id": 148,
+  "name": "l_pg_mantle1TEX__d_a_mant",
+  "header": "l_pg_mantle1TEX__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 8192,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_pg_mantle1TEX",
+  "nth": 0
+ },
+ {
+  "id": 149,
+  "name": "l_pg_mantle1_palettePAL__d_a_mant",
+  "header": "l_pg_mantle1_palettePAL__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 32,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_pg_mantle1_palettePAL",
+  "nth": 0
+ },
+ {
+  "id": 150,
+  "name": "l_tn_boro_b1TEX__d_a_mant",
+  "header": "l_tn_boro_b1TEX__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 8192,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_tn_boro_b1TEX",
+  "nth": 0
+ },
+ {
+  "id": 151,
+  "name": "l_tn_boro_b1_palettePAL__d_a_mant",
+  "header": "l_tn_boro_b1_palettePAL__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 32,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_tn_boro_b1_palettePAL",
+  "nth": 0
+ },
+ {
+  "id": 152,
+  "name": "l_tn_boro_k1TEX__d_a_mant",
+  "header": "l_tn_boro_k1TEX__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 8192,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_tn_boro_k1TEX",
+  "nth": 0
+ },
+ {
+  "id": 153,
+  "name": "l_tn_boro_k1_palettePAL__d_a_mant",
+  "header": "l_tn_boro_k1_palettePAL__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 32,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_tn_boro_k1_palettePAL",
+  "nth": 0
+ },
+ {
+  "id": 154,
+  "name": "l_tn_boro1TEX__d_a_mant",
+  "header": "l_tn_boro1TEX__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 8192,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_tn_boro1TEX",
+  "nth": 0
+ },
+ {
+  "id": 155,
+  "name": "l_tn_boro1_palettePAL__d_a_mant",
+  "header": "l_tn_boro1_palettePAL__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 32,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_tn_boro1_palettePAL",
+  "nth": 0
+ },
+ {
+  "id": 156,
+  "name": "l_tn_mantle1TEX__d_a_mant",
+  "header": "l_tn_mantle1TEX__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 8192,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_tn_mantle1TEX",
+  "nth": 0
+ },
+ {
+  "id": 157,
+  "name": "l_tn_mantle1_palettePAL__d_a_mant",
+  "header": "l_tn_mantle1_palettePAL__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 32,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_tn_mantle1_palettePAL",
+  "nth": 0
+ },
+ {
+  "id": 158,
+  "name": "l_pos__d_a_mant",
+  "header": "l_pos__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 972,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_pos",
+  "nth": 0
+ },
+ {
+  "id": 159,
+  "name": "l_texCoord__d_a_mant",
+  "header": "l_texCoord__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 648,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_texCoord",
+  "nth": 0
+ },
+ {
+  "id": 160,
+  "name": "l_DL__d_a_mant",
+  "header": "l_DL__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 488,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_DL",
+  "nth": 0
+ },
+ {
+  "id": 161,
+  "name": "l_matDL__d_a_mant",
+  "header": "l_matDL__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 166,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_matDL",
+  "nth": 0
+ },
+ {
+  "id": 162,
+  "name": "l_matDL2__d_a_mant",
+  "header": "l_matDL2__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 70,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_matDL2",
+  "nth": 0
+ },
+ {
+  "id": 163,
+  "name": "l_matDL_LIGHTOFF__d_a_mant",
+  "header": "l_matDL_LIGHTOFF__d_a_mant.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 148,
+  "object": "d_a_mant/obj/d/actor/d_a_mant.o",
+  "symbol": "l_matDL_LIGHTOFF",
+  "nth": 0
+ },
+ {
+  "id": 164,
+  "name": "l_k_taru02TEX__d_a_obj_buoyflag",
+  "header": "l_k_taru02TEX__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 1024,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_k_taru02TEX",
+  "nth": 0
+ },
+ {
+  "id": 165,
+  "name": "l_pos_Khasi__d_a_obj_buoyflag",
+  "header": "l_pos_Khasi__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 132,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_pos",
+  "nth": 0
+ },
+ {
+  "id": 166,
+  "name": "l_texCoord_Khasi__d_a_obj_buoyflag",
+  "header": "l_texCoord_Khasi__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 56,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_texCoord",
+  "nth": 0
+ },
+ {
+  "id": 167,
+  "name": "l_Khasi_00DL__d_a_obj_buoyflag",
+  "header": "l_Khasi_00DL__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 167,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_Khasi_00DL",
+  "nth": 0
+ },
+ {
+  "id": 168,
+  "name": "l_k_hata01TEX__d_a_obj_buoyflag",
+  "header": "l_k_hata01TEX__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 4096,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_k_hata01TEX",
+  "nth": 0
+ },
+ {
+  "id": 169,
+  "name": "l_pos_Khata__d_a_obj_buoyflag",
+  "header": "l_pos_Khata__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 420,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_pos",
+  "nth": 1
+ },
+ {
+  "id": 170,
+  "name": "l_texCoord_Khata__d_a_obj_buoyflag",
+  "header": "l_texCoord_Khata__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_F32",
+  "size": 280,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_texCoord",
+  "nth": 1
+ },
+ {
+  "id": 171,
+  "name": "l_Khata_00DL__d_a_obj_buoyflag",
+  "header": "l_Khata_00DL__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 239,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_Khata_00DL",
+  "nth": 0
+ },
+ {
+  "id": 172,
+  "name": "l_matDL__d_a_obj_buoyflag",
+  "header": "l_matDL__d_a_obj_buoyflag.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 52,
+  "object": "d_a_obj_buoyflag/obj/d/actor/d_a_obj_buoyflag.o",
+  "symbol": "l_matDL",
+  "nth": 0
+ },
+ {
+  "id": 173,
+  "name": "jdsp__dsptask",
+  "header": "jdsp__dsptask.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 7456,
+  "object": "obj/JSystem/JAudio/dsptask.o",
+  "symbol": "jdsp",
+  "nth": 0
+ },
+ {
+  "id": 174,
+  "name": "JUTResFONT_Ascfont_fix12__JUTFontData_Ascfont_fix12",
+  "header": "JUTResFONT_Ascfont_fix12__JUTFontData_Ascfont_fix12.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 16736,
+  "object": "obj/JSystem/JUtility/JUTFontData_Ascfont_fix12.o",
+  "symbol": "JUTResFONT_Ascfont_fix12",
+  "nth": 0
+ },
+ {
+  "id": 175,
+  "name": "sFontData__JUTDirectPrint",
+  "header": "sFontData__JUTDirectPrint.h",
+  "kind": "COS_ASSET_F32",
+  "size": 256,
+  "object": "obj/JSystem/JUtility/JUTDirectPrint.o",
+  "symbol": "sFontData",
+  "nth": 0
+ },
+ {
+  "id": 176,
+  "name": "sFontData2__JUTDirectPrint",
+  "header": "sFontData2__JUTDirectPrint.h",
+  "kind": "COS_ASSET_F32",
+  "size": 308,
+  "object": "obj/JSystem/JUtility/JUTDirectPrint.o",
+  "symbol": "sFontData2",
+  "nth": 0
+ },
+ {
+  "id": 177,
+  "name": "DSPInitCode__OSAudioSystem",
+  "header": "DSPInitCode__OSAudioSystem.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 128,
+  "object": "obj/dolphin/os/OSAudioSystem.o",
+  "symbol": "DSPInitCode",
+  "nth": 0
+ },
+ {
+  "id": 178,
+  "name": "CardData__CARDUnlock",
+  "header": "CardData__CARDUnlock.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 352,
+  "object": "obj/dolphin/card/CARDUnlock.o",
+  "symbol": "CardData",
+  "nth": 0
+ },
+ {
+  "id": 179,
+  "name": "D54__GBAJoyBoot",
+  "header": "D54__GBAJoyBoot.h",
+  "kind": "COS_ASSET_RAW",
+  "size": 45,
+  "object": "obj/dolphin/gba/GBAJoyBoot.o",
+  "symbol": "D54",
+  "nth": 0
+ }
+]

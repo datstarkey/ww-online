@@ -56,13 +56,6 @@
         <Style Selector="Button.ww-bare:pointerover Image.item-icon.owned">
             <Setter Property="Opacity" Value="1" />
         </Style>
-        <!-- Segmented options inside an inset (magic, capacity) -->
-        <Style Selector="Button.ww-seg.small">
-            <Setter Property="MinHeight" Value="36" />
-            <Setter Property="Padding" Value="14,0" />
-            <Setter Property="FontSize" Value="13" />
-            <Setter Property="CornerRadius" Value="9" />
-        </Style>
     </UserControl.Styles>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">

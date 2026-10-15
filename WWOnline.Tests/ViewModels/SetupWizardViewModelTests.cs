@@ -1,3 +1,4 @@
+using WWOnline.Native;
 using WWOnline.Patcher.Patches;
 using WWOnline.Services;
 using WWOnline.Tests.Services;
@@ -20,6 +21,9 @@ public sealed class SetupWizardViewModelTests : IDisposable
     {
         _settings = new GameSettingsService(Path.Combine(_dir, "settings"));
         _catalog = new FakeCatalog(_settings);
+        var s = _settings.Load();
+        s.Backend = GameBackend.Dolphin; // the Dolphin setup (the default on macOS is native: NativeSetupTests)
+        _settings.Save(s);
     }
 
     public void Dispose()

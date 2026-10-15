@@ -1,10 +1,22 @@
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using WWOnline.Native;
 using WWOnline.Services;
 using WWOnline.Shared;
 
 namespace WWOnline.ViewModels;
+
+/// <summary>The Settings page's tabs: the app's own, then the native game's (<see cref="SettingsViewModel.Game"/>).</summary>
+public enum SettingsTab
+{
+    GameFiles,
+    /// <summary>The optional game patches (Dolphin only).</summary>
+    Patches,
+    General,
+    /// <summary>One of the native game's tabs (<see cref="GameSettingsViewModel.SelectedSection"/>).</summary>
+    Game
+}
 
 public partial class SettingsViewModel : ViewModelBase, IDisposable
 {
@@ -48,6 +60,45 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     /// <summary>App version and "check for updates" (Settings → About).</summary>
     public UpdateViewModel Updates { get; }
 
+    /// <summary>The native backend's disc and build (shown while <see cref="IsNative"/>).</summary>
+    public NativeSetupViewModel? Native { get; }
+
+    /// <summary>The native game's own options, as further tabs (native backend only).</summary>
+    public GameSettingsViewModel? Game { get; }
+
+    public bool HasGame => Game != null;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsGameFilesTab), nameof(IsPatchesTab), nameof(IsGeneralTab), nameof(IsGameTab))]
+    private SettingsTab _tab;
+
+    public bool IsGameFilesTab => Tab == SettingsTab.GameFiles;
+    public bool IsPatchesTab => Tab == SettingsTab.Patches;
+    public bool IsGeneralTab => Tab == SettingsTab.General;
+    public bool IsGameTab => Tab == SettingsTab.Game;
+
+    /// <summary>The backend this run uses: a change applies after a restart.</summary>
+    private readonly GameBackend _runningBackend;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNative), nameof(IsDolphin), nameof(BackendRestartNeeded))]
+    private GameBackend _backend;
+
+    /// <summary>The embedded native game (radio button; <see cref="IsDolphin"/> is the other one).</summary>
+    public bool IsNative
+    {
+        get => Backend == GameBackend.Native;
+        set { if (value) Backend = GameBackend.Native; }
+    }
+
+    public bool IsDolphin
+    {
+        get => Backend == GameBackend.Dolphin;
+        set { if (value) Backend = GameBackend.Dolphin; }
+    }
+
+    public bool BackendRestartNeeded => Backend != _runningBackend;
+
     public event Action? SettingsSaved;
 
     /// <summary>"Run setup again": MainViewModel opens the first-run setup.</summary>
@@ -82,8 +133,12 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     private static readonly byte[] PreviewItems = [0x20, 0x22, 0x27, 0x2F, 0x4D, 0x4E];
 
     public SettingsViewModel(GameSettingsService gameSettingsService, GamePatcherService gamePatcherService,
-        PatchOptionsViewModel patchOptions, UpdateViewModel updates, ItemIconService iconService, ItemIcons icons)
+        PatchOptionsViewModel patchOptions, UpdateViewModel updates, ItemIconService iconService, ItemIcons icons,
+        NativeSetupViewModel? native = null, GameSettingsViewModel? game = null)
     {
+        Native = native;
+        Game = game;
+        _runningBackend = gameSettingsService.Load().Backend;
         _gameSettingsService = gameSettingsService;
         _gamePatcherService = gamePatcherService;
         _iconService = iconService;
@@ -118,6 +173,33 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
 
     private bool CanExtractIcons() => !IsExtractingIcons;
 
+    [RelayCommand]
+    private void ShowTab(SettingsTab tab)
+    {
+        if (tab == SettingsTab.Game && Game == null) return;
+        Tab = tab;
+    }
+
+    /// <summary>Shows one of the game's tabs.</summary>
+    [RelayCommand]
+    private void ShowGameSection(GameSettingsSection section)
+    {
+        if (Game == null) return;
+        Game.SelectedSection = section;
+        Tab = SettingsTab.Game;
+    }
+
+    partial void OnTabChanged(SettingsTab value)
+    {
+        if (Game != null) Game.IsShown = value == SettingsTab.Game;
+    }
+
+    // The patches tab goes with Dolphin.
+    partial void OnBackendChanged(GameBackend value)
+    {
+        if (value != GameBackend.Dolphin && Tab == SettingsTab.Patches) Tab = SettingsTab.GameFiles;
+    }
+
     /// <summary>Show the saved paths again (after the setup wizard changed them).</summary>
     public void ReloadFromSettings()
     {
@@ -126,6 +208,8 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         GamePath = settings.GamePath;
         VanillaGamePath = settings.VanillaGamePath;
         AutoLaunchDolphin = settings.AutoLaunchDolphin;
+        Backend = settings.Backend;
+        Native?.Load();
         ValidationError = null;
         IsSaved = false;
     }
@@ -230,6 +314,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         settings.GamePath = GamePath;
         settings.VanillaGamePath = VanillaGamePath;
         settings.AutoLaunchDolphin = AutoLaunchDolphin;
+        settings.Backend = Backend;
 
         var error = _gameSettingsService.ValidatePaths(settings);
         if (error != null)

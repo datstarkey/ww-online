@@ -19,7 +19,7 @@ public sealed class HeartTableProvider : StageTableProvider<HeartTable>
     protected override string Tag => "[hearts]";
 
     protected override string MissingMessage =>
-        "no game folder with stage data (files/res/Stage + sys/main.dol): max health can't be derived until one is set on the Settings page";
+        "no game folder (files/res/Stage + sys/main.dol) or GameCube disc image: max health can't be derived until one is set on the Settings page";
 
     private static HeartTable? BuildFrom(string gamePath)
     {

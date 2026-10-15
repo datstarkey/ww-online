@@ -1,4 +1,6 @@
+using System.Text.Json.Serialization;
 using WWOnline.Data;
+using WWOnline.Native;
 
 namespace WWOnline.Services;
 
@@ -7,6 +9,19 @@ public class GameSettings
     public string DolphinPath { get; set; } = "";
     public string GamePath { get; set; } = "";
     public string VanillaGamePath { get; set; } = "";
+
+    /// <summary>Dolphin or the embedded native game. Read once at startup: a change applies after a restart.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<GameBackend>))]
+    public GameBackend Backend { get; set; } = NativePaths.DefaultBackend(OperatingSystem.IsMacOS());
+
+    /// <summary>The native backend's GZLE01 disc image (<see cref="NativePaths.Disc(GameSettings)"/>).</summary>
+    public string DiscImagePath { get; set; } = "";
+
+    /// <summary>The native backend's libtww (<see cref="NativePaths.Library(GameSettings)"/>).</summary>
+    public string NativeLibraryPath { get; set; } = "";
+
+    /// <summary>A Seaborne source chosen in the setup (<see cref="NativePaths.Source(GameSettings)"/>); empty = the bundled one.</summary>
+    public string NativeSourcePath { get; set; } = "";
 
     /// <summary>Start Dolphin with the patched game and attach to it after hosting or joining a room
     /// (GameLaunchService). Only ever happens while the patched game is up to date.</summary>
@@ -59,6 +74,9 @@ public class GameSettingsService
 
     public string? ValidatePaths(GameSettings settings)
     {
+        if (settings.Backend == GameBackend.Native)
+            return ValidateNativePaths(settings);
+
         if (string.IsNullOrWhiteSpace(settings.DolphinPath))
             return "Dolphin path is required";
 
@@ -75,6 +93,20 @@ public class GameSettingsService
         if (string.IsNullOrWhiteSpace(settings.GamePath))
             return "Patched game output path is required";
 
+        return null;
+    }
+
+    /// <summary>The native backend's disc image and libtww (an environment variable wins over each setting).</summary>
+    public static string? ValidateNativePaths(GameSettings settings)
+    {
+        if (NativePaths.Disc(settings) is not { } disc)
+            return "Choose your Wind Waker disc image";
+        if (!File.Exists(disc))
+            return $"Disc image not found: {disc}";
+        if (NativePaths.Library(settings) is not { } library)
+            return "The game isn't built yet";
+        if (!File.Exists(library))
+            return $"The built game (libtww) not found: {library}";
         return null;
     }
 

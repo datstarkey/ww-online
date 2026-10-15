@@ -1,6 +1,7 @@
 using Serilog;
 using WWOnline.Data;
 using WWOnline.Hubs;
+using WWOnline.Native;
 using WWOnline.Shared.Hubs;
 
 namespace WWOnline.Services;
@@ -167,7 +168,7 @@ public class SharedWalletService : IDisposable
         if (!_scene.Check(_dolphin)) return;
 
         // The game is still applying a queued change — wait for it to land.
-        if ((_dolphin.Read(GameMemoryAddresses.Player.PendingRupeeDelta) ?? 0) != 0) return;
+        if ((_dolphin.Play.ReadPending()?[(int)TwwInvCounter.Rupee] ?? 0) != 0) return;
         if (_dolphin.Read(GameMemoryAddresses.Player.RupeeCount) is not ushort raw) return;
         int current = raw;
         int capacity = _dolphin.Read(GameMemoryAddresses.Player.CurrentWallet) is byte size

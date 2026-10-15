@@ -18,9 +18,10 @@ public static class HubConstants
     /// (JoinSpoils, SendSpoilsDelta, ReceiveSpoilsTotal, SpoilsCounts, RoomSettings.SharedSpoils) and warp
     /// to player (PuppetData.Warp, RoomSettings.AllowWarping). 6: Nintendo Gallery figurines in the room
     /// story (StoryFlags.Figurines) and the shared delivery bag (JoinDelivery, SendDeliveryDelta,
-    /// ReceiveDeliveryTotal, DeliveryCounts, RoomSettings.SharedDelivery).
+    /// ReceiveDeliveryTotal, DeliveryCounts, RoomSettings.SharedDelivery). 13: PVP (RoomSettings.Pvp, SendPvpHit /
+    /// ReceivePvpHit, PvpHit, JoinRequest.Capabilities, PlayerInfo.Capabilities, ActionState.DamageFlash).
     /// </summary>
-    public const int ProtocolVersion = 12; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait + spoils bags (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait; JoinSpoils / SendSpoilsDelta / ReceiveSpoilsTotal, SharedSpoils), warp to player (PuppetData.Warp, AllowWarping). 6: figurines in the room story (StoryFlags.Figurines), shared delivery bag (JoinDelivery / SendDeliveryDelta / ReceiveDeliveryTotal, SharedDelivery), heart sources in the room inventory (RoomInventory.HeartSources), warp jars in the room story (StoryFlags.WarpJars). 7: the sea map and charts in the room inventory (RoomInventory.SeaMap) and Beedle's points in the room story (StoryFlags.BeedlePoints). 8: parked boats (BoatState.Parked) and the boat hull colour (AppearanceState.BoatR/G/B). 9: the postbox letters in the room story (StoryFlags.Letters). 10: sunken treasure salvaged in the sea slot's world flags (StageFlags.Ocean / SalvagedCharts). 11: the side quests' counters, levels and prize tiers in the room story (StoryFlags.QuestRegisters). 12: the boat's own room (BoatState.RoomNumber): parked boats seen where they are, off the sea too
+    public const int ProtocolVersion = 13; // 2: held items (#6), boat parts (#7). 3: room switches (JoinRoomSwitches / SendRoomSwitches / ReceiveRoomSwitches). 4: player events / projectiles (SendPlayerEvent / ReceivePlayerEvent, SharedProjectiles). 5: anim mirror (AnimationState.Tracks, face, hands), shared bait + spoils bags (JoinBait / SendBaitDelta / ReceiveBaitTotal, SharedBait; JoinSpoils / SendSpoilsDelta / ReceiveSpoilsTotal, SharedSpoils), warp to player (PuppetData.Warp, AllowWarping). 6: figurines in the room story (StoryFlags.Figurines), shared delivery bag (JoinDelivery / SendDeliveryDelta / ReceiveDeliveryTotal, SharedDelivery), heart sources in the room inventory (RoomInventory.HeartSources), warp jars in the room story (StoryFlags.WarpJars). 7: the sea map and charts in the room inventory (RoomInventory.SeaMap) and Beedle's points in the room story (StoryFlags.BeedlePoints). 8: parked boats (BoatState.Parked) and the boat hull colour (AppearanceState.BoatR/G/B). 9: the postbox letters in the room story (StoryFlags.Letters). 10: sunken treasure salvaged in the sea slot's world flags (StageFlags.Ocean / SalvagedCharts). 11: the side quests' counters, levels and prize tiers in the room story (StoryFlags.QuestRegisters). 12: the boat's own room (BoatState.RoomNumber): parked boats seen where they are, off the sea too. 13: PVP (RoomSettings.Pvp, SendPvpHit / ReceivePvpHit, JoinRequest.Capabilities, PlayerInfo.Capabilities, ActionState.DamageFlash)
 
     // Hub method names (server-side methods invoked by clients)
 
@@ -74,6 +75,10 @@ public static class HubConstants
     /// cannon fired, arrow shot). Relayed only to the players who can see the caller, while SharedProjectiles is on.</summary>
     public const string SendPlayerEvent = "SendPlayerEvent";
 
+    /// <summary>A hit the caller's Link landed on another player's puppet (a <see cref="Models.PvpHit"/>). Relayed to
+    /// that player only, while the Pvp rule is on and both games take PVP hits (PvpHitGate).</summary>
+    public const string SendPvpHit = "SendPvpHit";
+
     // Client callback names (server → client)
     public const string ReceiveStageFlags = "ReceiveStageFlags";
     public const string ReceiveRupeeTotal = "ReceiveRupeeTotal";
@@ -85,6 +90,7 @@ public static class HubConstants
     public const string ReceiveStoryFlags = "ReceiveStoryFlags";
     public const string ReceiveRoomSwitches = "ReceiveRoomSwitches";
     public const string ReceivePlayerEvent = "ReceivePlayerEvent";
+    public const string ReceivePvpHit = "ReceivePvpHit";
 
     /// <summary>Largest wallet in the game (dSv_player_status_a_c wallet size 2).</summary>
     public const int MaxRupees = 5000;

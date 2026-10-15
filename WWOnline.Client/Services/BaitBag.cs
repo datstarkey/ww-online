@@ -235,7 +235,7 @@ public static class BaitBagMemory
     {
         if (Read(dolphin) is not { } now || !now.SameAs(expected)) return BagWriteResult.Raced;
         var saveSelect = ReadSelectSlots(dolphin);
-        var playSelect = dolphin.ReadMemory(GameMemoryAddresses.Player.PlaySelectItems, BaitBag.ButtonCount);
+        var playSelect = dolphin.Play.ReadSelectItems();
 
         bool ok = BagMemory.WriteChanged(dolphin, GameMemoryAddresses.Inventory.BaitItems, expected.Items, next.Items) &&
                   BagMemory.WriteChanged(dolphin, GameMemoryAddresses.Inventory.BaitNums, expected.Nums, next.Nums);
@@ -247,7 +247,7 @@ public static class BaitBagMemory
             if (changed)
             {
                 dolphin.WriteMemory(GameMemoryAddresses.Player.SelectItemSlots, save);
-                dolphin.WriteMemory(GameMemoryAddresses.Player.PlaySelectItems, play);
+                dolphin.Play.WriteSelectItems(play);
             }
         }
 

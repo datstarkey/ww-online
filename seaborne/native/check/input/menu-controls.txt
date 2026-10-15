@@ -1,0 +1,83 @@
+# COS_SMOKE=options-menu with --stage sea:44:206: the Controls tab's press-to-bind flow (pc_bindings.h).
+# L+R+Z opens the menu, R three times to Controls; down 13 rows to "Controller: B button", A starts its
+# capture and "#bind" makes the capture see the gamepad's north button (SDL name y): B = y. Down 12 more
+# to "Keyboard: A button", A, Space: A = Space; down once to "Keyboard: B button", A, Space again: B takes
+# Space and A gets B's old key, K (a swap). B closes the menu. Headless: no real button is pressed.
+#expect opened 1
+#expect setting COS_BIND_PAD_B y
+#expect saved COS_BIND_PAD_B=y
+#expect saved COS_BIND_KEY_B=Space
+#expect saved COS_BIND_KEY_A=K
+#expect end 800
+# frame buttons stickX stickY
+400 L+R+Z 0 0
+403 - 0 0
+410 R 0 0
+412 - 0 0
+416 R 0 0
+418 - 0 0
+422 R 0 0
+424 - 0 0
+430 DOWN 0 0
+432 - 0 0
+434 DOWN 0 0
+436 - 0 0
+438 DOWN 0 0
+440 - 0 0
+442 DOWN 0 0
+444 - 0 0
+446 DOWN 0 0
+448 - 0 0
+450 DOWN 0 0
+452 - 0 0
+454 DOWN 0 0
+456 - 0 0
+458 DOWN 0 0
+460 - 0 0
+462 DOWN 0 0
+464 - 0 0
+466 DOWN 0 0
+468 - 0 0
+470 DOWN 0 0
+472 - 0 0
+474 DOWN 0 0
+476 - 0 0
+478 DOWN 0 0
+480 - 0 0
+482 A 0 0
+484 - 0 0
+#bind 492 y
+502 DOWN 0 0
+504 - 0 0
+506 DOWN 0 0
+508 - 0 0
+510 DOWN 0 0
+512 - 0 0
+514 DOWN 0 0
+516 - 0 0
+518 DOWN 0 0
+520 - 0 0
+522 DOWN 0 0
+524 - 0 0
+526 DOWN 0 0
+528 - 0 0
+530 DOWN 0 0
+532 - 0 0
+534 DOWN 0 0
+536 - 0 0
+538 DOWN 0 0
+540 - 0 0
+542 DOWN 0 0
+544 - 0 0
+546 DOWN 0 0
+548 - 0 0
+550 A 0 0
+552 - 0 0
+#bind 560 Space
+570 DOWN 0 0
+572 - 0 0
+574 A 0 0
+576 - 0 0
+#bind 584 Space
+594 B 0 0
+596 - 0 0

@@ -19,7 +19,7 @@ public sealed class SmallKeyTableProvider : StageTableProvider<SmallKeyTable>
     protected override string Tag => "[keys]";
 
     protected override string MissingMessage =>
-        "no game folder with stage data (files/res/Stage + sys/main.dol): small keys won't be shared until one is set on the Settings page";
+        "no game folder (files/res/Stage + sys/main.dol) or GameCube disc image: small keys won't be shared until one is set on the Settings page";
 
     private static SmallKeyTable? BuildFrom(string gamePath)
     {

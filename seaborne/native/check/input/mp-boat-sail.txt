@@ -1,0 +1,5 @@
+# Controller script of the multiplayer boat proof (native/src/mods/ww_online/README.md, "Boats"): run with --preset sailing
+# (on the boat at sea:11:102) and COS_MP_TEST_PEER=1; X raises the sail at frame 400 (the sail is on X in the preset).
+0   - 0 0 0 0
+400 X 0 0 0 0
+406 - 0 0 0 0

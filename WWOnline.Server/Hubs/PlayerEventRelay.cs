@@ -46,16 +46,11 @@ public sealed class PlayerEventRelay
         ForeignOrigin,
     }
 
-    private readonly record struct Location(string Stage, byte Room, Vector3 Position, DateTime At);
-
-    private sealed class Bucket
-    {
-        public double Tokens = BurstEvents;
-        public DateTime Last;
-    }
+    /// <summary>Where a player was at their last puppet update.</summary>
+    public readonly record struct Location(string Stage, byte Room, Vector3 Position, DateTime At);
 
     private readonly ConcurrentDictionary<string, Location> _locations = new();
-    private readonly ConcurrentDictionary<string, Bucket> _buckets = new();
+    private readonly RateBuckets _buckets = new(BurstEvents, EventsPerSecond);
 
     // PlayerEvent.Origin -> the connection sending under it, and back. An origin is taken by the first
     // connection that uses it and freed when that connection leaves. It can also be taken over once its
@@ -75,14 +70,15 @@ public sealed class PlayerEventRelay
             new Vector3(data.Position.X, data.Position.Y, data.Position.Z), utcNow);
     }
 
-    private bool TryGetFresh(string connectionId, DateTime utcNow, out Location at) =>
+    /// <summary>The player's location, unless they have none or it is older than <see cref="LocationTtl"/>.</summary>
+    public bool TryGetFresh(string connectionId, DateTime utcNow, out Location at) =>
         _locations.TryGetValue(connectionId, out at) && utcNow - at.At <= LocationTtl;
 
     /// <summary>The player left: forget their location and rate.</summary>
     public void Forget(string connectionId)
     {
         _locations.TryRemove(connectionId, out _);
-        _buckets.TryRemove(connectionId, out _);
+        _buckets.Forget(connectionId);
         lock (_originLock)
         {
             if (_connectionOrigin.Remove(connectionId, out var origin))
@@ -131,17 +127,7 @@ public sealed class PlayerEventRelay
         if (!ClaimOrigin(senderId, evt.Origin, utcNow))
             return Verdict.ForeignOrigin;
 
-        var bucket = _buckets.GetOrAdd(senderId, _ => new Bucket { Last = utcNow });
-        lock (bucket)
-        {
-            double elapsed = Math.Max(0, (utcNow - bucket.Last).TotalSeconds);
-            bucket.Last = utcNow;
-            bucket.Tokens = Math.Min(BurstEvents, bucket.Tokens + elapsed * EventsPerSecond);
-            if (bucket.Tokens < 1)
-                return Verdict.RateLimited;
-            bucket.Tokens -= 1;
-        }
-        return Verdict.Relay;
+        return _buckets.TrySpend(senderId, utcNow) ? Verdict.Relay : Verdict.RateLimited;
     }
 
     /// <summary>

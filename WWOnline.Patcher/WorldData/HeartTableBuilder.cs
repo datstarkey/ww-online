@@ -39,16 +39,11 @@ public static class HeartTableBuilder
         _ => 0,
     };
 
-    /// <summary>The table for an extracted game folder (sys/main.dol + files/res/Stage), or null when it has none.</summary>
-    public static HeartTable? BuildFromGame(string gamePath, Action<string>? skipped = null)
-    {
-        var dolPath = Path.Combine(gamePath, "sys", "main.dol");
-        var stages = StageDataReader.StagesPath(gamePath);
-        if (stages == null || !File.Exists(dolPath))
-            return null;
-        var procs = SmallKeyTableBuilder.ReadObjectNames(new DolPatcher(dolPath));
-        return Build(StageDataReader.ReadAll(stages, skipped ?? (_ => { })).ToList(), procs);
-    }
+    /// <summary>The table for an extracted game folder or a disc image (<see cref="StageDataReader.ReadGame"/>), or null when it has no stage data.</summary>
+    public static HeartTable? BuildFromGame(string gamePath, Action<string>? skipped = null) =>
+        StageDataReader.ReadGame(gamePath, skipped ?? (_ => { })) is { } game
+            ? Build(game.Stages, SmallKeyTableBuilder.ReadObjectNames(game.Dol))
+            : null;
 
     /// <summary>The table for these stages (<paramref name="procs"/>: object name → process) plus the catalogue's rewards.</summary>
     public static HeartTable Build(IReadOnlyCollection<StageData> stages, IReadOnlyDictionary<string, short> procs,

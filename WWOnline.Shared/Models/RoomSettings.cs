@@ -55,6 +55,13 @@ public class RoomSettings
     /// </summary>
     public bool AllowWarping { get; set; } = true;
 
+    /// <summary>
+    /// Players can hurt each other: their Links' hits on each other's puppets take hearts, with the game's own guard,
+    /// knockback and death. Only between native games (<see cref="ClientCapabilities.PvpHits"/>); a Dolphin player is
+    /// never a target. Off by default, and the presets leave it alone.
+    /// </summary>
+    public bool Pvp { get; set; }
+
     /// <summary>Connection id of the current room owner (read-only for clients; set by the server).</summary>
     public string OwnerConnectionId { get; set; } = "";
 
@@ -76,7 +83,7 @@ public class RoomSettings
 
     /// <summary>
     /// Full sync: every rule on. Co-op: the progress rules and warping off, projectiles on. Custom leaves
-    /// the rules alone. Returns this.
+    /// the rules alone. No preset touches <see cref="Pvp"/>. Returns this.
     /// </summary>
     public RoomSettings ApplyPreset(RoomPreset preset)
     {
@@ -91,7 +98,7 @@ public class RoomSettings
     public string RulesSummary() =>
         $"shared wallet {OnOff(SharedWallet)}, shared world {OnOff(SharedWorld)}, shared items {OnOff(SharedItems)}, " +
         $"shared story {OnOff(SharedStory)}, shared bait bag {OnOff(SharedBait)}, shared spoils bag {OnOff(SharedSpoils)}, shared delivery bag {OnOff(SharedDelivery)}, other players' projectiles {OnOff(SharedProjectiles)}, " +
-        $"warping {OnOff(AllowWarping)}";
+        $"warping {OnOff(AllowWarping)}, PVP {OnOff(Pvp)}";
 
     private static string OnOff(bool b) => b ? "ON" : "OFF";
 }

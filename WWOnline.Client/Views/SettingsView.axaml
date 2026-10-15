@@ -1,19 +1,27 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:WWOnline.ViewModels"
+             xmlns:views="using:WWOnline.Views"
              x:Class="WWOnline.Views.SettingsView"
-             x:DataType="vm:SettingsViewModel">
+             x:DataType="vm:SettingsViewModel"
+             x:Name="Root">
 
+    <UserControl.Styles>
+        <Style Selector="Border.tab-bar Button.ww-seg">
+            <Setter Property="Margin" Value="2" />
+        </Style>
+    </UserControl.Styles>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-        <StackPanel Margin="32,28,32,32" Spacing="20">
-
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="32,28,32,0" Spacing="20">
             <!-- Header -->
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="6">
                     <TextBlock Text="Settings" Classes="ww-title" />
                     <TextBlock Text="Your emulator, game folders and the patches that go into your game."
-                               FontSize="14" Foreground="{StaticResource Text2Brush}" />
+                               FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding !HasGame}" />
+                    <TextBlock Text="Your game files, the app, and the game's own options."
+                               FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding HasGame}" />
                 </StackPanel>
                 <Button Grid.Column="1" Classes="ww-secondary" VerticalAlignment="Center" Margin="16,0,0,0"
                         Command="{Binding RunSetupCommand}" AutomationProperties.Name="Run setup again"
@@ -27,204 +35,284 @@
                 </Button>
             </Grid>
 
-            <Grid ColumnDefinitions="1.3*,20,*">
-
-                <!-- Paths + Launch -->
-                <Border Grid.Column="0" Classes="ww-card" Padding="24,22" VerticalAlignment="Top">
-                    <StackPanel Spacing="16">
-                        <TextBlock Text="Game folders" Classes="ww-card-title" />
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Dolphin executable" FontWeight="SemiBold" />
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBox Grid.Column="0" Text="{Binding DolphinPath}" Classes="mono" Watermark="Path to Dolphin.exe" />
-                                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDolphinPathCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
-                            </Grid>
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Vanilla game folder" FontWeight="SemiBold" />
-                            <TextBlock Text="Your extracted US game (GZLE01), with sys and files inside. Only read, never changed." FontSize="13" Foreground="{StaticResource Text2Brush}" />
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBox Grid.Column="0" Text="{Binding VanillaGamePath}" Classes="mono" Watermark="Path to vanilla game folder" />
-                                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseVanillaGamePathCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
-                            </Grid>
-                        </StackPanel>
-
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="Patched game folder" FontWeight="SemiBold" />
-                            <TextBlock Text="Where the patched game files are written" FontSize="13" Foreground="{StaticResource Text2Brush}" />
-                            <Grid ColumnDefinitions="*,Auto">
-                                <TextBox Grid.Column="0" Text="{Binding GamePath}" Classes="mono" Watermark="Path to patched game output folder" />
-                                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseGamePathCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
-                            </Grid>
-                        </StackPanel>
-
-                        <Border Classes="ww-divider" Margin="0,4" />
-
-                        <TextBlock Text="LAUNCH" Classes="ww-label" />
-                        <StackPanel Spacing="2">
-                            <ToggleSwitch IsChecked="{Binding AutoLaunchDolphin}"
-                                          Content="Start Dolphin and attach when you host or join a room" />
-                            <TextBlock Text="Only while your patched game is up to date. Otherwise WW-Online tells you to patch it first."
-                                       FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text3Brush}" />
-                        </StackPanel>
-
-                        <Border Classes="ww-error-banner"
-                                IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                            <TextBlock Text="{Binding ValidationError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
-                        </Border>
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <Button Content="Save settings" Command="{Binding SaveSettingsCommand}" Classes="ww-primary" />
-                            <TextBlock Text="&#x2713; Settings saved" Foreground="{StaticResource RupeeLightBrush}" FontWeight="SemiBold"
-                                       VerticalAlignment="Center" IsVisible="{Binding IsSaved}" />
-                        </StackPanel>
+            <!-- Tab bar: the app's tabs, then the native game's own (its options menu, keyboard, controller) -->
+            <Border Classes="ww-inset tab-bar" Padding="2" HorizontalAlignment="Left">
+                <WrapPanel>
+                    <Button Classes="ww-seg small" Classes.active="{Binding IsGameFilesTab}" Content="Game files"
+                            Command="{Binding ShowTabCommand}" CommandParameter="{x:Static vm:SettingsTab.GameFiles}" />
+                    <Button Classes="ww-seg small" Classes.active="{Binding IsPatchesTab}" Content="Game patches"
+                            Command="{Binding ShowTabCommand}" CommandParameter="{x:Static vm:SettingsTab.Patches}"
+                            IsVisible="{Binding IsDolphin}" />
+                    <Button Classes="ww-seg small" Classes.active="{Binding IsGeneralTab}" Content="General"
+                            Command="{Binding ShowTabCommand}" CommandParameter="{x:Static vm:SettingsTab.General}" />
+                    <StackPanel Orientation="Horizontal" IsVisible="{Binding HasGame}">
+                        <Border Width="1" Margin="6,10" Background="{StaticResource InputLineBrush}" />
+                        <ItemsControl ItemsSource="{Binding Game.Sections}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:GameSettingsSection">
+                                    <Button Classes="ww-seg small" Classes.active="{Binding IsSelected}" Content="{Binding Title}"
+                                            Command="{Binding #Root.((vm:SettingsViewModel)DataContext).ShowGameSectionCommand}"
+                                            CommandParameter="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <!-- Before the game has listed its settings: where they will be -->
+                        <Button Classes="ww-seg small" Classes.active="{Binding IsGameTab}" Content="Game options"
+                                Command="{Binding ShowTabCommand}" CommandParameter="{x:Static vm:SettingsTab.Game}"
+                                IsVisible="{Binding !Game.HasCatalog, FallbackValue=False}" />
                     </StackPanel>
-                </Border>
-
-                <!-- Patch the game: build status + button -->
-                <Border Grid.Column="2" Classes="ww-card" Padding="24,22" VerticalAlignment="Top">
-                    <StackPanel Spacing="14">
-                        <StackPanel Spacing="4">
-                            <TextBlock Text="Patch the game" Classes="ww-card-title" />
-                            <TextBlock Text="Builds your patched game from the vanilla copy, with the game patches chosen below."
-                                       FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <!-- Build status -->
-                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding PatchOptions.IsCheckingBuild}">
-                            <Ellipse Classes="ww-status-dot ww-pulse" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center" />
-                            <TextBlock Text="Checking the patched game…" FontSize="13" Foreground="{StaticResource Text2Brush}" />
-                        </StackPanel>
-                        <Border Classes="ww-warn-banner" IsVisible="{Binding PatchOptions.NeedsRepatch}">
-                            <Grid ColumnDefinitions="Auto,*">
-                                <Viewbox Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,10,0">
-                                    <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />
-                                </Viewbox>
-                                <StackPanel Grid.Column="1" Spacing="2">
-                                    <TextBlock Text="Patch the game to play" FontWeight="SemiBold" Foreground="{StaticResource GoldTextBrush}" />
-                                    <TextBlock Text="Until then WW-Online won't start Dolphin or attach to it for you." FontSize="13"
-                                               TextWrapping="Wrap" Foreground="{StaticResource GoldTextSoftBrush}" />
-                                    <TextBlock Text="{Binding PatchOptions.BuildStatusText}" FontSize="13" TextWrapping="Wrap"
-                                               Foreground="{StaticResource GoldTextSoftBrush}" />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                        <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding PatchOptions.IsUpToDate}">
-                            <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0">
-                                <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
-                            </Viewbox>
-                            <TextBlock Grid.Column="1" Text="{Binding PatchOptions.BuildStatusText}" FontSize="13" TextWrapping="Wrap"
-                                       Foreground="{StaticResource RupeeLightBrush}" />
-                        </Grid>
-                        <TextBlock Text="{Binding PatchOptions.BuildStatusText}" FontSize="13" TextWrapping="Wrap"
-                                   Foreground="{StaticResource DangerBrush}" IsVisible="{Binding PatchOptions.BuildCheckFailed}" />
-
-                        <TextBlock Text="{Binding PatchOptions.SelectionSummary}" Classes="ww-faint" />
-
-                        <Border Classes="ww-terminal">
-                            <StackPanel Spacing="10">
-                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                    <Button Content="Patch game" Command="{Binding PatchGameCommand}" Classes="ww-accent" />
-                                    <TextBlock Text="&#x2713; Patching complete" Foreground="{StaticResource RupeeLightBrush}"
-                                               VerticalAlignment="Center" IsVisible="{Binding IsPatched}" />
-                                </StackPanel>
-                                <StackPanel Spacing="8" IsVisible="{Binding IsPatching}">
-                                    <ProgressBar IsIndeterminate="True" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
-                                    <TextBlock Text="{Binding PatchProgress}" FontSize="12" Foreground="{StaticResource Text2Brush}"
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-                                <TextBlock Text="{Binding PatchError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
-                                           IsVisible="{Binding PatchError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Border>
-            </Grid>
-
-            <!-- Game patches (the same checklist as the setup's Game patches step) -->
-            <Border Classes="ww-card" Padding="24,22">
-                <StackPanel Spacing="16">
-                    <StackPanel Spacing="4">
-                        <TextBlock Text="Game patches" Classes="ww-card-title" />
-                        <TextBlock FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
-                                   Text="Optional quality-of-life patches, ported from Better Wind Waker and the Wind Waker Randomizer. Your picks save straight away and go in the next time you patch the game." />
-                    </StackPanel>
-                    <ContentControl Content="{Binding PatchOptions}" />
-                </StackPanel>
-            </Border>
-
-            <!-- Item icons: read from the player's own game files into a local cache (ItemIconService) -->
-            <Border Classes="ww-card" Padding="20,14">
-                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
-                    <TextBlock Text="ITEM ICONS" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
-                    <ItemsControl Grid.Column="1" ItemsSource="{Binding IconPreview}" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="IImage">
-                                <Image Source="{Binding}" Width="26" Height="26" RenderOptions.BitmapInterpolationMode="HighQuality" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <TextBlock Grid.Column="2" Text="{Binding IconStatusText}" FontSize="13" Foreground="{StaticResource Text2Brush}"
-                               VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
-                    <Button Grid.Column="3" Classes="ww-secondary" MinHeight="36" Padding="14,0"
-                            Content="Read icons from game" Command="{Binding ExtractIconsCommand}"
-                            ToolTip.Tip="Decode the item icons from your own game files (vanilla folder, else the patched one). They stay on this PC." />
-                </Grid>
-            </Border>
-
-            <!-- Bug report -->
-            <Border Classes="ww-card" Padding="20,14">
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-                    <TextBlock Text="BUG REPORT" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
-                    <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="13"
-                               Foreground="{StaticResource Text2Brush}" Margin="0,0,12,0"
-                               Text="{Binding BugReportStatus, TargetNullValue='', FallbackValue=''}"
-                               IsVisible="{Binding BugReportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                    <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="13"
-                               Foreground="{StaticResource Text2Brush}" Margin="0,0,12,0"
-                               Text="Something went wrong? Save your recent logs to a zip and attach it to an issue."
-                               IsVisible="{Binding BugReportStatus, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                    <Button Grid.Column="2" Classes="ww-secondary" MinHeight="36" Padding="14,0" Margin="0,0,8,0"
-                            AutomationProperties.Name="Open the issues page"
-                            Command="{Binding OpenIssuesCommand}">
-                        <TextBlock Text="Report an issue" VerticalAlignment="Center" />
-                    </Button>
-                    <Button Grid.Column="3" Classes="ww-secondary" MinHeight="36" Padding="14,0"
-                            AutomationProperties.Name="Save bug report"
-                            Command="{Binding SaveBugReportCommand}">
-                        <TextBlock Text="Save bug report" VerticalAlignment="Center" />
-                    </Button>
-                </Grid>
-            </Border>
-
-            <!-- About -->
-            <Border Classes="ww-card" Padding="20,14">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                    <TextBlock Text="ABOUT" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
-                    <!-- A Grid, not a horizontal StackPanel, so a long error message trims instead of running under the button -->
-                    <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,*" VerticalAlignment="Center" Margin="0,0,12,0">
-                        <TextBlock Text="{Binding Updates.CurrentVersionText}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Text="·" Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" Margin="10,0" />
-                        <TextBlock Grid.Column="2" Text="{Binding Updates.StatusText}" FontSize="13" Foreground="{StaticResource Text2Brush}"
-                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                   ToolTip.Tip="{Binding Updates.StatusText}" />
-                    </Grid>
-                    <Button Grid.Column="2" Classes="ww-secondary" MinHeight="36" Padding="14,0"
-                            AutomationProperties.Name="Check for updates"
-                            Command="{Binding Updates.CheckForUpdatesCommand}" IsVisible="{Binding Updates.IsEnabled}">
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Viewbox Width="15" Height="15" VerticalAlignment="Center">
-                                <Path Classes="icon" Data="{StaticResource IconRefresh}" Stroke="{StaticResource TextBrush}" />
-                            </Viewbox>
-                            <TextBlock Text="Check for updates" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </Grid>
+                </WrapPanel>
             </Border>
         </StackPanel>
-    </ScrollViewer>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="32,20,32,32" Spacing="20">
+
+                <StackPanel Spacing="20" IsVisible="{Binding IsGameFilesTab}">
+                    <!-- Which game: Dolphin, or the embedded native game (GameSettings.Backend, read at startup) -->
+                    <Border Classes="ww-card" Padding="24,18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Game" Classes="ww-card-title" />
+                            <StackPanel Orientation="Horizontal" Spacing="24">
+                                <RadioButton GroupName="Backend" Content="Dolphin (Windows)" IsChecked="{Binding IsDolphin}" />
+                                <RadioButton GroupName="Backend" Content="Built-in game (macOS)" IsChecked="{Binding IsNative}" />
+                            </StackPanel>
+                            <TextBlock Text="Save, then restart WW-Online to switch." FontSize="12" Foreground="{StaticResource GoldTextSoftBrush}"
+                                       IsVisible="{Binding BackendRestartNeeded}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- The built-in game: disc image and building it -->
+                    <Border Classes="ww-card" Padding="24,22" IsVisible="{Binding IsNative}">
+                        <StackPanel Spacing="18">
+                            <TextBlock Text="Built-in game" Classes="ww-card-title" />
+                            <views:NativeDiscView DataContext="{Binding Native}" />
+                            <Border Classes="ww-divider" />
+                            <views:NativeBuildView DataContext="{Binding Native}" />
+                            <Border Classes="ww-error-banner"
+                                    IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding ValidationError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Button Content="Save settings" Command="{Binding SaveSettingsCommand}" Classes="ww-primary" />
+                                <TextBlock Text="&#x2713; Settings saved" Foreground="{StaticResource RupeeLightBrush}" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" IsVisible="{Binding IsSaved}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid ColumnDefinitions="1.3*,20,*" IsVisible="{Binding IsDolphin}">
+
+                        <!-- Paths + Launch -->
+                        <Border Grid.Column="0" Classes="ww-card" Padding="24,22" VerticalAlignment="Top">
+                            <StackPanel Spacing="16">
+                                <TextBlock Text="Game folders" Classes="ww-card-title" />
+
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Dolphin executable" FontWeight="SemiBold" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBox Grid.Column="0" Text="{Binding DolphinPath}" Classes="mono" Watermark="Path to Dolphin.exe" />
+                                        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDolphinPathCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+                                    </Grid>
+                                </StackPanel>
+
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Vanilla game folder" FontWeight="SemiBold" />
+                                    <TextBlock Text="Your extracted US game (GZLE01), with sys and files inside. Only read, never changed." FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBox Grid.Column="0" Text="{Binding VanillaGamePath}" Classes="mono" Watermark="Path to vanilla game folder" />
+                                        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseVanillaGamePathCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+                                    </Grid>
+                                </StackPanel>
+
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Patched game folder" FontWeight="SemiBold" />
+                                    <TextBlock Text="Where the patched game files are written" FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBox Grid.Column="0" Text="{Binding GamePath}" Classes="mono" Watermark="Path to patched game output folder" />
+                                        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseGamePathCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+                                    </Grid>
+                                </StackPanel>
+
+                                <Border Classes="ww-divider" Margin="0,4" />
+
+                                <TextBlock Text="LAUNCH" Classes="ww-label" />
+                                <StackPanel Spacing="2">
+                                    <ToggleSwitch IsChecked="{Binding AutoLaunchDolphin}"
+                                                  Content="Start Dolphin and attach when you host or join a room" />
+                                    <TextBlock Text="Only while your patched game is up to date. Otherwise WW-Online tells you to patch it first."
+                                               FontSize="12" TextWrapping="Wrap" Foreground="{StaticResource Text3Brush}" />
+                                </StackPanel>
+
+                                <Border Classes="ww-error-banner"
+                                        IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding ValidationError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
+                                </Border>
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Button Content="Save settings" Command="{Binding SaveSettingsCommand}" Classes="ww-primary" />
+                                    <TextBlock Text="&#x2713; Settings saved" Foreground="{StaticResource RupeeLightBrush}" FontWeight="SemiBold"
+                                               VerticalAlignment="Center" IsVisible="{Binding IsSaved}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Patch the game: build status + button -->
+                        <Border Grid.Column="2" Classes="ww-card" Padding="24,22" VerticalAlignment="Top">
+                            <StackPanel Spacing="14">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Patch the game" Classes="ww-card-title" />
+                                    <TextBlock Text="Builds your patched game from the vanilla copy, with the game patches chosen below."
+                                               FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <!-- Build status -->
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding PatchOptions.IsCheckingBuild}">
+                                    <Ellipse Classes="ww-status-dot ww-pulse" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Checking the patched game…" FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                                </StackPanel>
+                                <Border Classes="ww-warn-banner" IsVisible="{Binding PatchOptions.NeedsRepatch}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Viewbox Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,10,0">
+                                            <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource GoldCBrush}" />
+                                        </Viewbox>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="Patch the game to play" FontWeight="SemiBold" Foreground="{StaticResource GoldTextBrush}" />
+                                            <TextBlock Text="Until then WW-Online won't start Dolphin or attach to it for you." FontSize="13"
+                                                       TextWrapping="Wrap" Foreground="{StaticResource GoldTextSoftBrush}" />
+                                            <TextBlock Text="{Binding PatchOptions.BuildStatusText}" FontSize="13" TextWrapping="Wrap"
+                                                       Foreground="{StaticResource GoldTextSoftBrush}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding PatchOptions.IsUpToDate}">
+                                    <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0">
+                                        <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Grid.Column="1" Text="{Binding PatchOptions.BuildStatusText}" FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{StaticResource RupeeLightBrush}" />
+                                </Grid>
+                                <TextBlock Text="{Binding PatchOptions.BuildStatusText}" FontSize="13" TextWrapping="Wrap"
+                                           Foreground="{StaticResource DangerBrush}" IsVisible="{Binding PatchOptions.BuildCheckFailed}" />
+
+                                <TextBlock Text="{Binding PatchOptions.SelectionSummary}" Classes="ww-faint" />
+
+                                <Border Classes="ww-terminal">
+                                    <StackPanel Spacing="10">
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <Button Content="Patch game" Command="{Binding PatchGameCommand}" Classes="ww-accent" />
+                                            <TextBlock Text="&#x2713; Patching complete" Foreground="{StaticResource RupeeLightBrush}"
+                                                       VerticalAlignment="Center" IsVisible="{Binding IsPatched}" />
+                                        </StackPanel>
+                                        <StackPanel Spacing="8" IsVisible="{Binding IsPatching}">
+                                            <ProgressBar IsIndeterminate="True" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+                                            <TextBlock Text="{Binding PatchProgress}" FontSize="12" Foreground="{StaticResource Text2Brush}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding PatchError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                                                   IsVisible="{Binding PatchError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Game patches (the same checklist as the setup's Game patches step) -->
+                <Border Classes="ww-card" Padding="24,22" IsVisible="{Binding IsPatchesTab}">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Game patches" Classes="ww-card-title" />
+                            <TextBlock FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
+                                       Text="Optional quality-of-life patches, ported from Better Wind Waker and the Wind Waker Randomizer. Your picks save straight away and go in the next time you patch the game." />
+                        </StackPanel>
+                        <ContentControl Content="{Binding PatchOptions}" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Spacing="20" IsVisible="{Binding IsGeneralTab}">
+                    <!-- Item icons: read from the player's own game files into a local cache (ItemIconService) -->
+                    <Border Classes="ww-card" Padding="20,14">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                            <TextBlock Text="ITEM ICONS" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding IconPreview}" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="IImage">
+                                        <Image Source="{Binding}" Width="26" Height="26" RenderOptions.BitmapInterpolationMode="HighQuality" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Grid.Column="2" Text="{Binding IconStatusText}" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                                       VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,12,0" />
+                            <Button Grid.Column="3" Classes="ww-secondary" MinHeight="36" Padding="14,0"
+                                    Content="Read icons from game" Command="{Binding ExtractIconsCommand}"
+                                    ToolTip.Tip="Decode the item icons from your own game files (vanilla folder, else the patched one). They stay on this PC." />
+                        </Grid>
+                    </Border>
+
+                    <!-- Bug report -->
+                    <Border Classes="ww-card" Padding="20,14">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                            <TextBlock Text="BUG REPORT" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="13"
+                                       Foreground="{StaticResource Text2Brush}" Margin="0,0,12,0"
+                                       Text="{Binding BugReportStatus, TargetNullValue='', FallbackValue=''}"
+                                       IsVisible="{Binding BugReportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="13"
+                                       Foreground="{StaticResource Text2Brush}" Margin="0,0,12,0"
+                                       Text="Something went wrong? Save your recent logs to a zip and attach it to an issue."
+                                       IsVisible="{Binding BugReportStatus, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+                            <Button Grid.Column="2" Classes="ww-secondary" MinHeight="36" Padding="14,0" Margin="0,0,8,0"
+                                    AutomationProperties.Name="Open the issues page"
+                                    Command="{Binding OpenIssuesCommand}">
+                                <TextBlock Text="Report an issue" VerticalAlignment="Center" />
+                            </Button>
+                            <Button Grid.Column="3" Classes="ww-secondary" MinHeight="36" Padding="14,0"
+                                    AutomationProperties.Name="Save bug report"
+                                    Command="{Binding SaveBugReportCommand}">
+                                <TextBlock Text="Save bug report" VerticalAlignment="Center" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- About -->
+                    <Border Classes="ww-card" Padding="20,14">
+                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto">
+                            <TextBlock Text="ABOUT" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
+                            <!-- A Grid, not a horizontal StackPanel, so a long error message trims instead of running under the button -->
+                            <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,*" VerticalAlignment="Center" Margin="0,0,12,0">
+                                <TextBlock Text="{Binding Updates.CurrentVersionText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="·" Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" Margin="10,0" />
+                                <TextBlock Grid.Column="2" Text="{Binding Updates.StatusText}" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                           ToolTip.Tip="{Binding Updates.StatusText}" />
+                            </Grid>
+                            <Button Grid.Column="2" Classes="ww-secondary" MinHeight="36" Padding="14,0"
+                                    AutomationProperties.Name="Check for updates"
+                                    Command="{Binding Updates.CheckForUpdatesCommand}" IsVisible="{Binding Updates.IsEnabled}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                                        <Path Classes="icon" Data="{StaticResource IconRefresh}" Stroke="{StaticResource TextBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Text="Check for updates" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Margin="0,10,0,0" FontSize="13" TextWrapping="Wrap"
+                                       Foreground="{StaticResource Text2Brush}"
+                                       Text="Game engine: Seaborne, based on SwitchWaker by Pulpparty and depende3000 (github.com/centollOS/SwitchWaker, MIT) and the zeldaret/tww decompilation (CC0)." />
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <Panel IsVisible="{Binding IsGameTab}">
+                    <views:GameSettingsView DataContext="{Binding Game}" />
+                </Panel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
 </UserControl>

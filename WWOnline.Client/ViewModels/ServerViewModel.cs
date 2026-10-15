@@ -426,8 +426,8 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
                 : Path.Combine(AppPaths.LogsDirectory, "server.log");
             // One-time token so THIS client becomes host even if another client connects first.
             var hostToken = Guid.NewGuid().ToString("N");
-            // The rules the host last left a hosted room on (null: never hosted, every rule on).
-            var savedRules = _gameSettingsService.Load().HostedRoomRules;
+            // The rules the host last left a hosted room on (null: never hosted, every rule on); --pvp: the PVP arena's.
+            var savedRules = Program.StartupOptions.Pvp ? HostedRoomRules.PvpArena() : _gameSettingsService.Load().HostedRoomRules;
             var serverArgs = $"{port} --log-file \"{serverLog}\" --host-token {hostToken}" + HostedRoomRules.ServerArgs(savedRules);
             if (savedRules != null)
                 Logger.Information("[room] hosting with the rules last used: {Rules}", savedRules.RulesSummary());

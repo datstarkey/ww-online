@@ -1,4 +1,5 @@
 using WWOnline.Data;
+using WWOnline.Native;
 using WWOnline.Shared.Models;
 
 namespace WWOnline.Services;
@@ -141,14 +142,8 @@ public static class SpoilsBagMemory
     }
 
     /// <summary>play.mItemBeastNumCounts, or null. Non-zero: the game hasn't applied a count change yet.</summary>
-    public static short[]? ReadPending(IDolphinService dolphin)
-    {
-        var b = dolphin.ReadMemory(GameMemoryAddresses.Inventory.PendingSpoilsDeltas, 2 * SpoilsCounts.TypeCount);
-        if (b == null || b.Length < 2 * SpoilsCounts.TypeCount) return null;
-        var p = new short[SpoilsCounts.TypeCount];
-        for (int t = 0; t < p.Length; t++) p[t] = (short)(b[2 * t] << 8 | b[2 * t + 1]);
-        return p;
-    }
+    public static short[]? ReadPending(IDolphinService dolphin) =>
+        dolphin.Play.ReadPending() is { } p ? p[(int)TwwInvCounter.Beast..].Select(v => (short)v).ToArray() : null;
 
     /// <summary>
     /// Write <paramref name="plan"/> over <paramref name="expected"/>, but only if the bag still is
@@ -171,7 +166,7 @@ public static class SpoilsBagMemory
         {
             short p = plan.Pending[t];
             if (p == 0) continue;
-            if (!dolphin.WriteMemory(GameMemoryAddresses.Inventory.PendingSpoilsDeltas + (uint)(2 * t), [(byte)(p >> 8), (byte)p]))
+            if (!dolphin.Play.Add(TwwInvCounter.Beast + (uint)t, p))
                 return BagWriteResult.Failed;
         }
         return BagWriteResult.Written;

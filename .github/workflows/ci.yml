@@ -1,7 +1,8 @@
 name: CI
 
-# Every push and pull request: no Nintendo files, a 0-warning build, both test projects, and the
-# dedicated server's Docker image (built for amd64 and smoke-tested, never pushed).
+# Every push and pull request: no Nintendo files, a 0-warning build, both test projects, the
+# dedicated server's Docker image (built for amd64 and smoke-tested, never pushed), and the native game
+# (libtww) built from seaborne/ on macOS the way the setup builds it, with no disc (never uploaded).
 
 on:
   push:
@@ -53,6 +54,42 @@ jobs:
 
       - name: Test patcher
         run: dotnet test WWOnline.Patcher.Tests/WWOnline.Patcher.Tests.csproj -c Release --no-build
+
+  native-build:
+    name: Native game (libtww from seaborne/, no disc)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # The engine needs C++20's std::jthread (Aurora), which older Xcode versions' libc++ lacks.
+      - name: Newest Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          clang++ --version
+          printf '#include <thread>\nint main() { std::jthread t([] {}); }\n' | clang++ -std=c++20 -x c++ - -o /dev/null
+
+      # Before anything is fetched or built, so it sees the vendored source alone.
+      - name: No Nintendo data in seaborne/
+        run: python3 seaborne/scripts/check-no-nintendo-data.py
+
+      - name: Build tools
+        run: brew install ninja
+
+      # NativeBuild's steps (WWOnline.Client/Native/NativeBuild.cs), outside the source folder.
+      - name: Fetch the audio sources (RecompCore)
+        run: seaborne/native/tools/fetch_recompcore.sh "$RUNNER_TEMP/recompcore"
+
+      - name: Configure
+        run: cmake -S seaborne/native -B "$RUNNER_TEMP/libtww" -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCOS_RECOMPCORE_DIR="$RUNNER_TEMP/recompcore"
+
+      - name: Build libtww
+        run: ninja -C "$RUNNER_TEMP/libtww" tww
+
+      # The lib is discarded with the runner: no game binary ever leaves CI.
+      - name: The embedding API is exported
+        run: nm -gU "$RUNNER_TEMP/libtww/libtww.dylib" | grep -q ' _tww_api_version$'
 
   server-image:
     name: Server image (build + smoke test)

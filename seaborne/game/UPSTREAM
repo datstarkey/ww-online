@@ -1,0 +1,16 @@
+url=https://github.com/zeldaret/tww.git
+commit=f99fcde4f1092bfe00472becbf9eb70b459c370f
+decomp_commit=e5da9115884060577c26d58dfdabd0ae613d2d7b
+tag=link-100-gzle01
+seaborne_base_url=https://github.com/snrubrm/tww.git
+seaborne_base_commit=b09eebc39852e18397031d9a563a8eae124f21f1
+converged_url=https://github.com/zeldaret/tww.git
+converged_commit=a1854d47ce5aa9d0f21c7fb5a71aaade63659693
+# game/ is our decompilation at tag link-100-gzle01 (decomp_commit=: every unit Matching for GZLE01;
+# not published, so provenance only: it branches from zeldaret/tww at url=, commit=, and
+# native/tools/gen_assets.sh needs COS_DECOMP_URL or a checkout to regenerate the stubs from it),
+# with Seaborne's host hunks re-applied by a 3-way merge per file whose base was the tree Seaborne
+# had imported: snrubrm/tww seaborne_base_commit, or zeldaret/tww converged_commit for the units it
+# had converged. Inline disc data (d_a_mant, d_a_obj_buoyflag, the JAudio DSP microcode in dsptask.c,
+# the fonts of JUTFontData_Ascfont_fix12.cpp and JUTDirectPrint.cpp, the SDK blobs of OSAudioSystem.c,
+# CARDUnlock.c and GBAJoyBoot.c) is replaced by headers that native/tools/extract_data_assets.py writes.

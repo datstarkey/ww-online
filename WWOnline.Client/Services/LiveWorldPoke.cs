@@ -157,11 +157,11 @@ public sealed class LiveWorldPoke
     /// one for another stage, so it can acknowledge. Null when there is no usable block yet (the REL
     /// allocates it when a puppet is created).
     /// </summary>
-    public TickResult? Tick(IDolphinService dolphin)
+    public TickResult? Tick(IWorldGame world)
     {
         lock (_lock)
         {
-            if (Read(dolphin) is not { } b)
+            if (world.ReadLiveWorld() is not { } b)
                 return null;
             Adopt(b.Address, b.Boot);
 
@@ -207,7 +207,7 @@ public sealed class LiveWorldPoke
             if (!any && relIdle)
                 return new TickResult(acknowledged, b.PokeCount, null);
 
-            var published = Publish(dolphin, b.Address, b.Seq, slot, fresh);
+            var published = Publish(world, b, slot, fresh);
             _inFlight = published;
             Changed();
             return new TickResult(acknowledged, b.PokeCount, published);
@@ -308,20 +308,24 @@ public sealed class LiveWorldPoke
         Array.Clear(_handled);
     }
 
-    /// <summary>Write one batch under the seqlock: SEQ odd, TAG / ZONE_ROOM / BITS, SEQ even.</summary>
-    private Batch Publish(IDolphinService dolphin, uint block, uint seq, int slot, uint[] bits)
+    private Batch Publish(IWorldGame world, BlockState block, int slot, uint[] bits)
     {
-        uint writing = (seq + 1) | 1;
-        uint done = writing + 1;
-        dolphin.WriteMemory(block + PuppetLayout.LIVEWORLD_OFF_SEQ, BootStampedBlock.U32(writing));
+        uint done = ((block.Seq + 1) | 1) + 1;
+        world.PublishLiveWorld(block, done, slot, _zoneRoom, bits);
+        return new Batch(done, slot, _zoneRoom, bits);
+    }
+
+    /// <summary>Write one batch into the REL's block under the seqlock: SEQ odd, TAG / ZONE_ROOM / BITS, SEQ even (<paramref name="done"/>).</summary>
+    public static void Write(IDolphinService dolphin, uint block, uint done, int slot, int zoneRoom, uint[] bits)
+    {
+        dolphin.WriteMemory(block + PuppetLayout.LIVEWORLD_OFF_SEQ, BootStampedBlock.U32(done - 1));
         var payload = new byte[8 + Words * 4];
         BootStampedBlock.U32((uint)PuppetLayout.LIVEWORLD_TAG_MAGIC | (uint)slot).CopyTo(payload, 0);
-        BootStampedBlock.U32((uint)_zoneRoom).CopyTo(payload, 4);
+        BootStampedBlock.U32((uint)zoneRoom).CopyTo(payload, 4);
         for (int i = 0; i < Words; i++)
             BootStampedBlock.U32(bits[i]).CopyTo(payload, 8 + i * 4);
         dolphin.WriteMemory(block + PuppetLayout.LIVEWORLD_OFF_TAG, payload);
         dolphin.WriteMemory(block + PuppetLayout.LIVEWORLD_OFF_SEQ, BootStampedBlock.U32(done));
-        return new Batch(done, slot, _zoneRoom, bits);
     }
 
     private void Changed()

@@ -173,11 +173,17 @@ public class HeartTableTests(ITestOutputHelper output)
     /// exactly the catalogue's 34 named sources, and every flag set derives 20 hearts (12 + 44 + 24 = 80).
     /// </summary>
     [VanillaGameFact]
-    public void VanillaGame_Has44PiecesAnd6Containers_AndEveryFlagDerives20Hearts()
-    {
+    public void VanillaGame_Has44PiecesAnd6Containers_AndEveryFlagDerives20Hearts() => AssertVanillaHearts(TestRepo.VanillaGamePath()!);
+
+    /// <summary>The same, from the disc image (the native backend has no extracted game).</summary>
+    [DiscFact]
+    public void TheDisc_HasTheVanillaHearts() => AssertVanillaHearts(Environment.GetEnvironmentVariable(DiscFactAttribute.Variable)!);
+
+    private void AssertVanillaHearts(string game)
+{
         var watch = Stopwatch.StartNew();
         var skipped = new List<string>();
-        var table = HeartTableBuilder.BuildFromGame(TestRepo.VanillaGamePath()!, skipped.Add);
+        var table = HeartTableBuilder.BuildFromGame(game, skipped.Add);
         output.WriteLine($"built in {watch.ElapsedMilliseconds} ms from {table?.StageCount} stages; {table?.Summary()}");
         Assert.NotNull(table);
         Assert.Empty(skipped);

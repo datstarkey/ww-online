@@ -280,14 +280,6 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
 
     private void OnStateChanged(object? sender, GameStateChangedEventArgs e)
     {
-        // Read stage name on background thread before dispatching
-        string? rawStageName = null;
-        try
-        {
-            rawStageName = _dolphinService.ReadString(GameMemoryAddresses.Stage.CurrentStageName);
-        }
-        catch { /* Dolphin read may fail */ }
-
         // StateChanged fires from background thread, dispatch to UI
         Dispatcher.UIThread.Post(() =>
         {
@@ -310,8 +302,7 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
             SwordName = ItemIDs.GetItemName((byte)p.CurrentSword);
             ShieldName = ItemIDs.GetItemName((byte)p.CurrentShield);
 
-            if (rawStageName != null)
-                StageName = StageIDs.GetStageName(rawStageName.TrimEnd('\0'));
+            StageName = StageIDs.GetStageName(e.NewState.StageName);
         });
     }
 
