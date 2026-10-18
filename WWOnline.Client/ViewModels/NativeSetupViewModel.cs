@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Serilog;
@@ -15,6 +17,10 @@ namespace WWOnline.ViewModels;
 /// </summary>
 public partial class NativeSetupViewModel : ViewModelBase, IDisposable
 {
+    // ninja's "[done/total] ..." progress lines.
+    [GeneratedRegex(@"^\[(\d+)/(\d+)\]")]
+    private static partial Regex NinjaProgress();
+
     private static readonly ILogger Logger = Log.ForContext<NativeSetupViewModel>();
 
     public delegate Task<DiscCheck> VerifyDiscFunc(string path, IProgress<double>? progress, CancellationToken ct);
@@ -25,6 +31,7 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
     private readonly Action<Action> _post;
     private readonly CancellationTokenSource _lifetime = new();
     private CancellationTokenSource? _buildCts;
+    private CancellationTokenSource? _discCts;
     private bool _loading;
 
     /// <summary>Set by the view: pickers (null result = cancelled).</summary>
@@ -45,10 +52,17 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(VerifyDiscCommand))]
+    [NotifyPropertyChangedFor(nameof(ShowDiscProblem))]
     private bool _isVerifyingDisc;
 
     /// <summary>The share of the image hashed, 0..1.</summary>
     [ObservableProperty] private double _discProgress;
+
+    /// <summary>A real problem with the disc (not the check in progress).</summary>
+    public bool ShowDiscProblem => !DiscOk && !IsVerifyingDisc && !string.IsNullOrEmpty(DiscStatus);
+
+    partial void OnDiscOkChanged(bool value) => OnPropertyChanged(nameof(ShowDiscProblem));
+    partial void OnDiscStatusChanged(string? value) => OnPropertyChanged(nameof(ShowDiscProblem));
 
     // ── Building the game ─────────────────────────────────────────
 
@@ -61,26 +75,57 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
     private string? _sourceError;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsGameReady))]
+    [NotifyPropertyChangedFor(nameof(IsGameReady), nameof(BuildButtonText))]
     private string _libraryPath = "";
 
     /// <summary>The build tools found, or what is missing.</summary>
-    [ObservableProperty] private string? _toolchainStatus;
-    [ObservableProperty] private bool _toolchainOk;
-    [ObservableProperty] private bool _isCheckingTools;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanBuild), nameof(ToolchainMissing), nameof(NeedsCommandLineTools))]
+    private string? _toolchainStatus;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanBuild), nameof(IsGameReady))]
+    [NotifyPropertyChangedFor(nameof(CanBuild), nameof(ToolchainMissing), nameof(NeedsCommandLineTools))]
+    private bool _toolchainOk;
+
+    [ObservableProperty] private bool _isCheckingTools;
+
+    /// <summary>The tool check ran and found something missing: Build stays off until it passes.</summary>
+    public bool ToolchainMissing => ToolchainStatus != null && !ToolchainOk;
+
+    /// <summary>Xcode's command line tools are what is missing: offer their installer.</summary>
+    public bool NeedsCommandLineTools => ToolchainMissing && ToolchainStatus!.Contains("xcode-select", StringComparison.Ordinal);
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanBuild), nameof(IsGameReady), nameof(BuildButtonText), nameof(HasBuildLog))]
     private bool _isBuilding;
 
     /// <summary>"Step 3 of 5: Read your disc", then the step's latest output line.</summary>
     [ObservableProperty] private string _buildStep = "";
     [ObservableProperty] private string _buildProgress = "";
-    [ObservableProperty] private string? _buildError;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasBuildLog))]
+    private string? _buildError;
     [ObservableProperty] private bool _buildSucceeded;
 
-    /// <summary>The build reads no disc: only a source is needed.</summary>
-    public bool CanBuild => !IsBuilding && SourceError == null && !string.IsNullOrWhiteSpace(SourcePath);
+    /// <summary>ninja's share done, 0..1, or -1 before it starts compiling (the bar is indeterminate).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(BuildPercentKnown))]
+    private double _buildPercent = -1;
+
+    public bool BuildPercentKnown => BuildPercent >= 0;
+
+    /// <summary>"3:12 elapsed · usually 5-10 minutes the first time".</summary>
+    [ObservableProperty] private string _buildElapsed = "";
+    private readonly Stopwatch _buildClock = new();
+
+    /// <summary>The build reads no disc: only a source is needed (and the tools, once a check has found them missing).</summary>
+    public bool CanBuild => !IsBuilding && SourceError == null && !string.IsNullOrWhiteSpace(SourcePath) && !ToolchainMissing;
+
+    /// <summary>"Build the game", or "Rebuild" once there is one.</summary>
+    public string BuildButtonText => IsGameReady ? "Rebuild" : "Build the game";
+
+    /// <summary>A log from the last build exists (Show log).</summary>
+    public bool HasBuildLog => !IsBuilding && File.Exists(_build.LogPath);
 
     /// <summary>A built (or chosen) libtww is there: the game can start.</summary>
     public bool IsGameReady => !IsBuilding && !string.IsNullOrWhiteSpace(LibraryPath) && File.Exists(LibraryPath);
@@ -150,14 +195,18 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
         DiscOk = false;
         DiscStatus = "Checking your disc image…";
         DiscProgress = 0;
+        _discCts?.Dispose();
+        var cts = _discCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         DiscCheck result;
         try
         {
             var progress = new Progress<double>(p => _post(() => DiscProgress = p));
-            result = await _verifyDisc(path, progress, _lifetime.Token);
+            result = await _verifyDisc(path, progress, cts.Token);
         }
         catch (OperationCanceledException)
         {
+            IsVerifyingDisc = false;
+            DiscStatus = _lifetime.IsCancellationRequested ? null : "Check cancelled. Verify the disc to use it.";
             return;
         }
         catch (Exception ex)
@@ -174,6 +223,40 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
         DiscStatus = result.Message;
         if (result.Ok)
             Save(s => s.DiscImagePath = path);
+    }
+
+    [RelayCommand]
+    private void CancelVerifyDisc() => _discCts?.Cancel();
+
+    /// <summary>Run Xcode's command line tools installer (macOS asks the player), then check again.</summary>
+    [RelayCommand]
+    private async Task InstallCommandLineTools()
+    {
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo("xcode-select", "--install") { UseShellExecute = false });
+            if (p != null) await p.WaitForExitAsync(_lifetime.Token);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Logger.Warning(ex, "[native-setup] xcode-select --install failed");
+        }
+        ToolchainStatus = "Finish the installer macOS opened, then check the build tools again.";
+    }
+
+    /// <summary>Open the last build's full log (TextEdit / Console).</summary>
+    [RelayCommand]
+    private void ShowBuildLog()
+    {
+        if (!File.Exists(_build.LogPath)) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo(_build.LogPath) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "[native-setup] opening the build log failed");
+        }
     }
 
     [RelayCommand]
@@ -230,6 +313,9 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
         BuildError = null;
         BuildStep = "Starting…";
         BuildProgress = "";
+        BuildPercent = -1;
+        BuildElapsed = "";
+        _buildClock.Restart();
         _buildCts?.Dispose();
         var cts = _buildCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         var steps = _build.Steps(source).Count;
@@ -238,6 +324,10 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
         {
             BuildStep = $"Step {e.StepNumber} of {steps}: {e.StepName}";
             BuildProgress = e.Message;
+            if (NinjaProgress().Match(e.Message) is { Success: true } m &&
+                double.TryParse(m.Groups[2].Value, out var total) && total > 0)
+                BuildPercent = double.Parse(m.Groups[1].Value) / total;
+            BuildElapsed = $"{_buildClock.Elapsed:m\\:ss} elapsed · usually 5-15 minutes the first time, less after";
         });
         try
         {
@@ -258,6 +348,7 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
         }
         finally
         {
+            _buildClock.Stop();
             IsBuilding = false;
         }
     }
@@ -277,6 +368,7 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
         _lifetime.Cancel();
         _lifetime.Dispose();
         _buildCts?.Dispose();
+        _discCts?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

@@ -74,7 +74,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public GameWindowViewModel GameWindow { get; }
 
     /// <summary>The game page's name in the sidebar.</summary>
-    public string LiveStateLabel => _nativeHost != null ? "Game" : "Dolphin";
+    public string LiveStateLabel => GameText.PageName;
 
     public bool IsDashboardActive => CurrentViewName == ViewName.Dashboard;
     public bool IsAppearanceActive => CurrentViewName == ViewName.Appearance;
@@ -130,7 +130,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _gameStateViewModel = gameStateViewModel;
         _gameLogViewModel = gameLogViewModel;
         _debugToolsViewModel = debugToolsViewModel;
-        GameWindow = new GameWindowViewModel(ShowLiveState);
+        GameWindow = new GameWindowViewModel(ShowLiveState, _dashboardViewModel);
 
         // Check if settings are configured, show appropriate view
         var settings = _gameSettingsService.Load();
@@ -157,15 +157,43 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             OpenSetup();
 
         if (_nativeHost != null)
+        {
             _nativeHost.Started += OnNativeGameStarted;
+            _nativeHost.RunningChanged += OnNativeRunningChanged;
+            _gameStateViewModel.PropertyChanged += OnLaunchPropertyChanged;
+        }
     }
 
-    // The game thread waits for its view: host it now, on the game page.
+    // The game thread waits for its view: host it now. The game page shows it, unless the player is busy on another page.
     private void OnNativeGameStarted() => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
     {
         NativeGame = _nativeHost;
-        ShowLiveState();
+        UpdateGameStatus();
+        if (CurrentViewName is ViewName.Dashboard or ViewName.LiveState)
+            ShowLiveState();
     });
+
+    private void OnNativeRunningChanged(bool running) => Avalonia.Threading.Dispatcher.UIThread.Post(UpdateGameStatus);
+
+    private void OnLaunchPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(GameStateViewModel.LaunchMessage) or nameof(GameStateViewModel.LaunchProblem))
+            UpdateGameStatus();
+    }
+
+    /// <summary>The game bar's status: starting, failed (with what to do), or nothing while the game runs.</summary>
+    private void UpdateGameStatus()
+    {
+        if (_nativeHost is not { } host) return;
+        bool failed = host.HasFailed, starting = host.IsStarted && !host.IsRunning && !failed;
+        GameWindow.IsAvailable = host.IsStarted && !failed;
+        GameWindow.HasFailed = failed;
+        GameWindow.IsStarting = starting;
+        GameWindow.Status = failed ? host.FailureReason
+            : starting ? (_gameStateViewModel.LaunchMessage is { Length: > 0 } message ? message : "Starting the game…")
+            : "";
+        if (failed) GameWindow.DockCommand.Execute(null);
+    }
 
     /// <summary>Show the setup from the start (first run, Settings → Run setup, the banner's Run setup).</summary>
     [RelayCommand]
@@ -280,6 +308,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _settingsViewModel.SetupRequested -= OpenSetup;
         Wizard.Closed -= OnWizardClosed;
         if (_nativeHost != null)
+        {
             _nativeHost.Started -= OnNativeGameStarted;
+            _nativeHost.RunningChanged -= OnNativeRunningChanged;
+            _gameStateViewModel.PropertyChanged -= OnLaunchPropertyChanged;
+        }
     }
 }

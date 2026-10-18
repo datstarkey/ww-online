@@ -60,6 +60,7 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
     private int _sector;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LiveText))]
     private string _stageName = "";
 
     [ObservableProperty]
@@ -103,6 +104,20 @@ public partial class GameStateViewModel : ViewModelBase, IDisposable
     // Keep Hearts/HealthText in sync no matter who changes health (live sync or Debug stat editor).
     partial void OnCurrentHealthChanged(int value) => RebuildHearts();
     partial void OnMaxHealthChanged(int value) => RebuildHearts();
+
+    // === Backend wording: the built-in game has no Dolphin to pick or attach ===
+
+    public bool IsNative => GameText.IsNative;
+    public string PageTitle => GameText.PageName;
+    public string SourceHeader => IsNative ? "BUILT-IN GAME" : "DOLPHIN";
+    public string IdleText => IsNative
+        ? "Start the game to play. It also starts when you host or join a room."
+        : "Attach to Dolphin to stream your game's live state.";
+    public string StartGameTip => IsNative ? "Start the built-in game" : "Start your patched game in Dolphin and attach to it";
+    public string WaitingHint => IsNative
+        ? "Start the game and load a save to see your live state."
+        : "Start the game (or attach to a running Dolphin) and load a save to see your live state.";
+    public string LiveText => IsNative ? $"{StageName} · live" : $"{StageName} · streaming from Dolphin";
 
     // === Dolphin picker state ===
 

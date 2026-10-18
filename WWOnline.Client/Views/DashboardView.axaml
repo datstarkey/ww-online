@@ -335,10 +335,10 @@
                     </Border>
 
                     <Grid ColumnDefinitions="Auto,*,Auto" Margin="4,0">
-                        <Button Classes="ww-textlink" Command="{Binding GoLiveStateCommand}" AutomationProperties.Name="Dolphin page">
+                        <Button Classes="ww-textlink" Command="{Binding GoLiveStateCommand}" AutomationProperties.Name="{Binding GamePageLink}">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <TextBlock Text="{Binding Server.DolphinLinkText}" VerticalAlignment="Center" />
-                                <TextBlock Text="· Dolphin page" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding GamePageLink, StringFormat='· {0}'}" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
                         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="18">

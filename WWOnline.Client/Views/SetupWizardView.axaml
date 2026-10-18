@@ -99,8 +99,8 @@
                 </StackPanel>
 
                 <Button DockPanel.Dock="Bottom" Classes="ww-ghost" HorizontalAlignment="Left"
-                        Content="Skip setup" Command="{Binding SkipSetupCommand}" IsEnabled="{Binding !IsPatching}"
-                        ToolTip.Tip="Close the setup. You can run it again from Settings." />
+                        Content="Skip setup" Command="{Binding SkipSetupCommand}" IsEnabled="{Binding CanSkipSetup}"
+                        ToolTip.Tip="{Binding SkipSetupTip}" />
 
                 <ItemsControl ItemsSource="{Binding Steps}">
                     <ItemsControl.ItemTemplate>
@@ -173,7 +173,7 @@
                                     </Border>
                                     <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                         <TextBlock Text="Build the game" FontWeight="SemiBold" />
-                                        <TextBlock Classes="hint" Text="Builds the game on this Mac from the native port's source and your disc." />
+                                        <TextBlock Classes="hint" Text="Builds the game on this Mac from the source that comes with WW-Online." />
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
@@ -462,7 +462,7 @@
                         <StackPanel Spacing="10">
                             <TextBlock Text="Build the game" Classes="ww-title" />
                             <TextBlock Classes="lead"
-                                       Text="WW-Online builds the game on this Mac from the native port's source and your disc. It needs Xcode's command line tools, cmake, ninja and Python (brew install cmake ninja python)." />
+                                       Text="WW-Online builds the game on this Mac from the source that comes with it. Your disc is read when the game starts, not now. It needs Xcode's command line tools, cmake, ninja and git (brew install cmake ninja git)." />
                         </StackPanel>
                         <Border Classes="ww-card" Padding="22,18">
                             <views:NativeBuildView DataContext="{Binding Native}" />

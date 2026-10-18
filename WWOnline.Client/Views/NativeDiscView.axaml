@@ -9,19 +9,29 @@
         <TextBlock FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
                    Text="The Wind Waker, USA (GZLE01), revision 0, as a plain .iso dumped from your own disc. The game reads everything from it every time it starts; nothing is copied out of it." />
         <Grid ColumnDefinitions="*,Auto,Auto">
-            <TextBox Grid.Column="0" Text="{Binding DiscImagePath}" Classes="mono" Watermark="Path to GZLE01.iso" />
-            <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDiscCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
-            <Button Grid.Column="2" Content="Verify" Command="{Binding VerifyDiscCommand}" Classes="ww-ghost" Margin="6,0,0,0" />
+            <TextBox Grid.Column="0" Text="{Binding DiscImagePath}" Classes="mono" Watermark="Path to GZLE01.iso"
+                     IsEnabled="{Binding !IsVerifyingDisc}" AutomationProperties.Name="Disc image path" />
+            <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDiscCommand}" Classes="ww-secondary" Margin="10,0,0,0"
+                    IsEnabled="{Binding !IsVerifyingDisc}" AutomationProperties.Name="Browse for the disc image" />
+            <Button Grid.Column="2" Content="Verify" Command="{Binding VerifyDiscCommand}" Classes="ww-ghost" Margin="6,0,0,0"
+                    IsVisible="{Binding !IsVerifyingDisc}" AutomationProperties.Name="Verify the disc image" />
+            <Button Grid.Column="2" Content="Cancel" Command="{Binding CancelVerifyDiscCommand}" Classes="ww-ghost" Margin="6,0,0,0"
+                    IsVisible="{Binding IsVerifyingDisc}" AutomationProperties.Name="Cancel the disc check" />
         </Grid>
-        <ProgressBar Minimum="0" Maximum="1" Value="{Binding DiscProgress}" IsVisible="{Binding IsVerifyingDisc}"
-                     Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+        <StackPanel Spacing="6" IsVisible="{Binding IsVerifyingDisc}">
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding DiscProgress}" ShowProgressText="True"
+                         Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+            <TextBlock Text="{Binding DiscStatus}" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                       AutomationProperties.LiveSetting="Polite" />
+        </StackPanel>
         <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding DiscOk}">
             <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0">
                 <Path Classes="icon bold" Data="{StaticResource IconCheck}" Stroke="{StaticResource RupeeBrush}" />
             </Viewbox>
-            <TextBlock Grid.Column="1" Text="{Binding DiscStatus}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource RupeeLightBrush}" />
+            <TextBlock Grid.Column="1" Text="{Binding DiscStatus}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource RupeeLightBrush}"
+                       AutomationProperties.LiveSetting="Polite" />
         </Grid>
         <TextBlock Text="{Binding DiscStatus}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}"
-                   IsVisible="{Binding !DiscOk}" />
+                   IsVisible="{Binding ShowDiscProblem}" AutomationProperties.LiveSetting="Polite" />
     </StackPanel>
 </UserControl>

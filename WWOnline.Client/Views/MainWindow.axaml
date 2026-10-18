@@ -12,6 +12,19 @@
         Foreground="{StaticResource TextBrush}"
         Background="{StaticResource GroundBrush}">
 
+    <!-- macOS menu bar: its key equivalents work while the game's view has the keyboard, which F11 does not -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="View">
+                <NativeMenu>
+                    <NativeMenuItem Header="Pop Out Game" Command="{Binding GameWindow.PopOutCommand}" />
+                    <NativeMenuItem Header="Game Full Screen" Gesture="Ctrl+Cmd+F"
+                                    Command="{Binding GameWindow.ToggleFullScreenCommand}" />
+                </NativeMenu>
+            </NativeMenuItem>
+        </NativeMenu>
+    </NativeMenu.Menu>
+
     <Panel>
     <DockPanel Background="{StaticResource GroundBrush}" IsVisible="{Binding !IsWizardOpen}">
         <!-- ═══ Sidebar: brand · nav · local player ═══ -->

@@ -481,6 +481,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void GoLiveState() => NavigateRequested?.Invoke(ViewName.LiveState);
 
+    /// <summary>The Set sail card's link to the game page.</summary>
+    public string GamePageLink => $"{GameText.PageName} page";
+
     [RelayCommand]
     private void GoActivity() => NavigateRequested?.Invoke(ViewName.Activity);
 

@@ -92,7 +92,7 @@ public sealed class GameBackendTests : IDisposable
         var disc = Path.Combine(_dir, "GZLE01.iso");
 
         Assert.Contains(NativePaths.LibraryVariable, LaunchReadiness.EvaluateNative(null, disc).Problem);
-        Assert.Contains("not found", LaunchReadiness.EvaluateNative(lib, disc).Problem);
+        Assert.Contains("Build it again", LaunchReadiness.EvaluateNative(lib, disc).Problem);
         File.WriteAllText(lib, "");
         Assert.Contains(NativePaths.DiscVariable, LaunchReadiness.EvaluateNative(lib, null).Problem);
         Assert.Contains("not found", LaunchReadiness.EvaluateNative(lib, disc).Problem);

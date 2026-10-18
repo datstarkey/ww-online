@@ -276,7 +276,7 @@ public partial class RoomFlagsViewModel : ViewModelBase, IDisposable
     public string SyncedText => IsRoomMode ? "Shared with the room" : "Your game only";
     public string WaitingText => IsRoomMode
         ? "Waiting for the story flags. They appear once your game has a save loaded or the room's story arrives."
-        : "Attach to Dolphin on the Dolphin page and load a save to see your story flags.";
+        : $"{GameText.StartHint} and load a save to see your story flags.";
     public string CardNote => IsRoomMode
         ? "Shared story is on: the room keeps everyone's story progress."
         : "Shared story is off: these are your own game's flags.";
@@ -511,7 +511,7 @@ public partial class RoomFlagsViewModel : ViewModelBase, IDisposable
     {
         if (!_dolphin.IsConnected)
         {
-            StatusMessage = "Dolphin not connected";
+            StatusMessage = GameText.NotConnected;
             return false;
         }
         if (!_sceneStable)

@@ -10,9 +10,20 @@ public sealed class GameWindowViewModelTests
 
     private GameWindowViewModel Vm()
     {
-        var vm = new GameWindowViewModel(() => _docked++);
+        var vm = new GameWindowViewModel(() => _docked++) { IsAvailable = true };
         vm.PropertyChanged += (_, e) => _changes.Add(e.PropertyName!);
         return vm;
+    }
+
+    [Fact]
+    public void BeforeTheGameStarts_NothingToPopOut()
+    {
+        var vm = new GameWindowViewModel(() => _docked++);
+        Assert.False(vm.PopOutCommand.CanExecute(null));
+        Assert.False(vm.ToggleFullScreenCommand.CanExecute(null));
+        vm.IsAvailable = true;
+        Assert.True(vm.PopOutCommand.CanExecute(null));
+        Assert.True(vm.ToggleFullScreenCommand.CanExecute(null));
     }
 
     [Fact]

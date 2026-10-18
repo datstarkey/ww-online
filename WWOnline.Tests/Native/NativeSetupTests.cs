@@ -177,6 +177,23 @@ public sealed class NativeSetupTests : IDisposable
     }
 
     [Fact]
+    public async Task Build_ANinjaFailure_ReportsTheCompilerError_AndKeepsTheLog()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        _runner.Handler = (_, args) => args[1].Contains("ninja -C")
+            ? new ProcessResult(1, "[12/1300] CXX a.o\nsrc/a.cpp:3:1: error: unknown type name 'foo'\nninja: build stopped: subcommand failed.\n")
+            : new ProcessResult(0, "ok\n");
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _build.BuildAsync(Source(), new PipelineProgress()));
+
+        Assert.Equal("src/a.cpp:3:1: error: unknown type name 'foo'", ex.Message);
+        var log = File.ReadAllText(_build.LogPath);
+        Assert.Contains("== Step 4: Build the game (exit code 1)", log);
+        Assert.Contains("ninja: build stopped", log);
+    }
+
+    [Fact]
     public async Task Toolchain_ReportsWhatIsMissing()
     {
         if (!OperatingSystem.IsMacOS())

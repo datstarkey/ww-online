@@ -14,7 +14,36 @@ public partial class GameWindowViewModel : ViewModelBase
     private readonly Action _docked;
 
     /// <param name="docked">Called once the game is back in the main window (shows the game page).</param>
-    public GameWindowViewModel(Action docked) => _docked = docked;
+    /// <param name="room">The room, for the game bar's players, warp and PVP badge.</param>
+    public GameWindowViewModel(Action docked, DashboardViewModel? room = null)
+    {
+        _docked = docked;
+        Room = room;
+    }
+
+    /// <summary>The room, for the game bar (null in tests).</summary>
+    public DashboardViewModel? Room { get; }
+
+    /// <summary>The game has started (its view exists): pop out and full screen have something to move.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(PopOutCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ToggleFullScreenCommand))]
+    private bool _isAvailable;
+
+    /// <summary>The game bar's status: starting, or why the game isn't running ("" while it runs).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasStatus))]
+    private string _status = "";
+
+    /// <summary>The game is starting (the status shows progress, not a problem).</summary>
+    [ObservableProperty]
+    private bool _isStarting;
+
+    /// <summary>The game couldn't start or stopped: its view is hidden and the status says what to do.</summary>
+    [ObservableProperty]
+    private bool _hasFailed;
+
+    public bool HasStatus => Status.Length > 0;
 
     [ObservableProperty]
     private bool _isPoppedOut;
@@ -23,7 +52,7 @@ public partial class GameWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isFullScreen;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(IsAvailable))]
     private void PopOut() => IsPoppedOut = true;
 
     /// <summary>Back into the main window (its Bring back, the pop-out's button, or the pop-out window closing).
@@ -37,8 +66,8 @@ public partial class GameWindowViewModel : ViewModelBase
         _docked();
     }
 
-    /// <summary>F11 and the Full screen buttons. Docked, the game pops out full screen.</summary>
-    [RelayCommand]
+    /// <summary>F11, Ctrl+Cmd+F (View menu) and the Full screen buttons. Docked, the game pops out full screen.</summary>
+    [RelayCommand(CanExecute = nameof(IsAvailable))]
     private void ToggleFullScreen()
     {
         if (!IsPoppedOut)

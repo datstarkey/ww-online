@@ -59,6 +59,13 @@ public sealed unsafe partial class GameHost : INativeGame
     /// <summary>The fatal callback's code, or -1.</summary>
     public int FatalCode => _fatalCode;
 
+    /// <summary>Why <see cref="HasFailed"/>, in the player's words, with what fixes it.</summary>
+    public string FailureReason => _fatalCode >= 0
+        ? $"The game stopped (error {_fatalCode}). Restart WW-Online to play again; Activity has the details."
+        : _failureReason ?? "The game couldn't start. Restart WW-Online to try again; Activity has the details.";
+
+    private volatile string? _failureReason;
+
     public NativeSnapshot? Snapshot => _snapshot;
 
     /// <param name="libraryPath">libtww (<see cref="NativePaths.Library(Services.GameSettings)"/>).</param>
@@ -131,6 +138,7 @@ public sealed unsafe partial class GameHost : INativeGame
             if (version != TwwNative.ApiVersion)
             {
                 Logger.Error("[native] {Lib} has API version {Version}; this client needs {Needed}", libraryPath, version, TwwNative.ApiVersion);
+                _failureReason = "The built game doesn't match this version of WW-Online. Build it again in Settings → Game files, then restart WW-Online.";
                 _failed = true;
                 return;
             }
@@ -140,6 +148,7 @@ public sealed unsafe partial class GameHost : INativeGame
         catch (Exception ex) when (ex is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException)
         {
             Logger.Error(ex, "[native] couldn't load {Lib}", libraryPath);
+            _failureReason = "The built game couldn't be loaded. Build it again in Settings → Game files, then restart WW-Online.";
             _failed = true;
             return;
         }
@@ -155,6 +164,7 @@ public sealed unsafe partial class GameHost : INativeGame
         if (result != 0)
         {
             Logger.Error("[native] tww_init failed: {Result}", result);
+            _failureReason = $"The game couldn't start (error {result}). Check your disc in Settings → Game files, then restart WW-Online.";
             _failed = true;
             return;
         }

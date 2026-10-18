@@ -275,7 +275,7 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
     {
         if (!_dolphinService.IsConnected)
         {
-            StatusMessage = "Dolphin not connected";
+            StatusMessage = GameText.NotConnected;
             return;
         }
 
@@ -408,7 +408,7 @@ public partial class DebugToolsViewModel : ViewModelBase, IDisposable
     {
         if (!_dolphinService.IsConnected)
         {
-            StatusMessage = "Dolphin not connected";
+            StatusMessage = GameText.NotConnected;
             return;
         }
 
