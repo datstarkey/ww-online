@@ -243,3 +243,7 @@ dmap 0 --stage M_NewD2:0:0
 sun-glare 0 --preset sailing --input native/check/input/sun-glare.txt --env COS_BOOT_TIME=17.5 --env COS_MSAA=4
 picto-box 0 --stage sea:11:9 --input native/check/input/picto-box.txt --env COS_MSAA=4
 run 0 --stage sea:44:8 --frames 900 --aspect auto --env COS_FPS60_TEST=1 --env COS_TARGET_FPS=display --env COS_MSAA=4
+# COS_SMOKE=sea-chart (issue #14): the sea chart's island check points (FmapDat.bin) were read in host order
+# (count 0) with char sectors (unsigned on ARM), so no sector found its island: every zoom showed an empty
+# sector, then Forsaken Fortress
+sea-chart 0 --stage sea:44:206

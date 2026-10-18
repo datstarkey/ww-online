@@ -3,38 +3,51 @@
              xmlns:vm="using:WWOnline.ViewModels"
              x:Class="WWOnline.Views.NativeBuildView"
              x:DataType="vm:NativeSetupViewModel">
-    <!-- Building libtww from Seaborne's source (NativeBuild), or a libtww chosen by hand -->
+    <!-- Building libtww from Seaborne's source (NativeBuild), or a libtww chosen by hand (Advanced) -->
     <StackPanel Spacing="12">
-        <StackPanel Spacing="6">
-            <TextBlock Text="Game engine source (Seaborne)" FontWeight="SemiBold" />
-            <TextBlock FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
-                       Text="WW-Online comes with it and builds the game from it on this Mac. The game reads your disc when it starts, not while building. The first build needs the network and takes a few minutes." />
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBox Grid.Column="0" Text="{Binding SourcePath}" Classes="mono" Watermark="Path to Seaborne's source" />
-                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseSourceCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
-            </Grid>
-            <TextBlock Text="{Binding SourceError}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}"
-                       IsVisible="{Binding SourceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-        </StackPanel>
+        <TextBlock FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
+                   Text="WW-Online comes with the game's source and builds it on this Mac. Your disc is read when the game starts, not while building. The first build needs the network and takes a few minutes." />
 
-        <Grid ColumnDefinitions="*,Auto">
+        <!-- Build tools: green when found, red with the fix when not -->
+        <Grid ColumnDefinitions="*,Auto,Auto">
             <TextBlock Grid.Column="0" Text="{Binding ToolchainStatus}" FontSize="13" TextWrapping="Wrap" VerticalAlignment="Center"
-                       Foreground="{StaticResource Text2Brush}" />
-            <Button Grid.Column="1" Content="Check build tools" Command="{Binding CheckToolsCommand}" Classes="ww-ghost"
+                       Classes.ok="{Binding ToolchainOk}" Classes.missing="{Binding ToolchainMissing}"
+                       AutomationProperties.LiveSetting="Polite">
+                <TextBlock.Styles>
+                    <Style Selector="TextBlock">
+                        <Setter Property="Foreground" Value="{StaticResource Text2Brush}" />
+                    </Style>
+                    <Style Selector="TextBlock.ok">
+                        <Setter Property="Foreground" Value="{StaticResource RupeeLightBrush}" />
+                    </Style>
+                    <Style Selector="TextBlock.missing">
+                        <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                    </Style>
+                </TextBlock.Styles>
+            </TextBlock>
+            <Button Grid.Column="1" Content="Install command line tools" Command="{Binding InstallCommandLineToolsCommand}"
+                    Classes="ww-secondary" Margin="10,0,0,0" IsVisible="{Binding NeedsCommandLineTools}" />
+            <Button Grid.Column="2" Content="Check build tools" Command="{Binding CheckToolsCommand}" Classes="ww-ghost"
                     IsEnabled="{Binding !IsCheckingTools}" Margin="10,0,0,0" />
         </Grid>
 
         <Border Classes="ww-terminal">
             <StackPanel Spacing="10">
                 <StackPanel Orientation="Horizontal" Spacing="12">
-                    <Button Content="Build the game" Command="{Binding BuildCommand}" Classes="ww-accent"
+                    <Button Content="{Binding BuildButtonText}" Command="{Binding BuildCommand}" Classes="ww-accent"
                             IsEnabled="{Binding CanBuild}" IsVisible="{Binding !IsBuilding}" />
                     <Button Content="Cancel" Command="{Binding CancelBuildCommand}" Classes="ww-ghost" IsVisible="{Binding IsBuilding}" />
+                    <Button Content="Show log" Command="{Binding ShowBuildLogCommand}" Classes="ww-ghost" IsVisible="{Binding HasBuildLog}"
+                            ToolTip.Tip="The last build's full output, for a bug report" />
                 </StackPanel>
                 <StackPanel Spacing="8" IsVisible="{Binding IsBuilding}">
-                    <ProgressBar IsIndeterminate="True" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
-                    <TextBlock Text="{Binding BuildStep}" FontSize="13" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding BuildProgress}" FontSize="12" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap" />
+                    <ProgressBar Minimum="0" Maximum="1" Value="{Binding BuildPercent}" IsIndeterminate="{Binding !BuildPercentKnown}"
+                                 ShowProgressText="{Binding BuildPercentKnown}"
+                                 Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="{Binding BuildStep}" FontSize="13" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" />
+                    <TextBlock Text="{Binding BuildElapsed}" FontSize="12" Foreground="{StaticResource Text2Brush}" />
+                    <TextBlock Text="{Binding BuildProgress}" FontSize="12" Foreground="{StaticResource Text3Brush}"
+                               TextTrimming="CharacterEllipsis" Classes="mono" />
                 </StackPanel>
                 <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding IsGameReady}">
                     <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,8,0">
@@ -43,17 +56,38 @@
                     <TextBlock Grid.Column="1" Text="The game is built and ready." FontSize="13" Foreground="{StaticResource RupeeLightBrush}" />
                 </Grid>
                 <Border Classes="ww-error-banner" IsVisible="{Binding BuildError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <TextBlock Text="{Binding BuildError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding BuildError}" Foreground="{StaticResource DangerBrush}" FontSize="13" TextWrapping="Wrap"
+                               AutomationProperties.LiveSetting="Polite" />
                 </Border>
             </StackPanel>
         </Border>
 
-        <StackPanel Spacing="6">
-            <TextBlock Text="Built game (libtww)" FontWeight="SemiBold" />
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBox Grid.Column="0" Text="{Binding LibraryPath}" Classes="mono" IsReadOnly="True" Watermark="Filled in by the build" />
-                <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseLibraryCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
-            </Grid>
-        </StackPanel>
+        <!-- Developers: another Seaborne checkout, or a libtww built elsewhere -->
+        <Expander HorizontalAlignment="Stretch" AutomationProperties.Name="Advanced: game source and built library"
+                  IsExpanded="{Binding SourceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}, Mode=OneWay}">
+            <Expander.Header>
+                <TextBlock Text="Advanced" FontWeight="SemiBold" />
+            </Expander.Header>
+            <StackPanel Spacing="12">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Game source (Seaborne)" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0" Text="{Binding SourcePath}" Classes="mono" Watermark="Path to Seaborne's source"
+                                 AutomationProperties.Name="Game source folder" />
+                        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseSourceCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+                    </Grid>
+                    <TextBlock Text="{Binding SourceError}" FontSize="13" TextWrapping="Wrap" Foreground="{StaticResource DangerBrush}"
+                               IsVisible="{Binding SourceError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Built game (libtww)" FontWeight="SemiBold" />
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0" Text="{Binding LibraryPath}" Classes="mono" IsReadOnly="True" Watermark="Filled in by the build"
+                                 AutomationProperties.Name="Built game library" />
+                        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseLibraryCommand}" Classes="ww-secondary" Margin="10,0,0,0" />
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+        </Expander>
     </StackPanel>
 </UserControl>

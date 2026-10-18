@@ -10,10 +10,10 @@
             <!-- Header -->
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="6">
-                    <TextBlock Text="Dolphin" Classes="ww-title" />
-                    <TextBlock Text="{Binding StageName, StringFormat='{}{0} · streaming from Dolphin'}"
+                    <TextBlock Text="{Binding PageTitle}" Classes="ww-title" />
+                    <TextBlock Text="{Binding LiveText}"
                                FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding HasData}" />
-                    <TextBlock Text="Attach to Dolphin to stream your game's live state."
+                    <TextBlock Text="{Binding IdleText}"
                                FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding !HasData}" />
                 </StackPanel>
                 <Border Grid.Column="1" Classes="ww-chip" Background="{StaticResource RupeeTintBrush}"
@@ -30,7 +30,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                     <Button Grid.Column="4" Classes="ww-primary" Margin="10,0,0,0" Command="{Binding StartGameCommand}"
                             IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding CanAttach}"
-                            ToolTip.Tip="Start your patched game in Dolphin and attach to it">
+                            ToolTip.Tip="{Binding StartGameTip}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Viewbox Width="15" Height="15" VerticalAlignment="Center">
                                 <Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{Binding $parent[Button].Foreground}" />
@@ -38,21 +38,33 @@
                             <TextBlock Text="Start game" VerticalAlignment="Center" />
                         </StackPanel>
                     </Button>
-                    <TextBlock Grid.Column="0" Text="DOLPHIN" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
+                    <TextBlock Grid.Column="0" Text="{Binding SourceHeader}" Classes="ww-section-header" VerticalAlignment="Center" Margin="0,0,16,0" />
                     <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableDolphins}"
                               SelectedItem="{Binding SelectedDolphin}"
                               DisplayMemberBinding="{Binding DisplayName}"
                               PlaceholderText="No Dolphin processes found"
                               HorizontalAlignment="Stretch" Margin="0,0,10,0"
-                              IsEnabled="{Binding !IsBusy}" />
+                              IsEnabled="{Binding !IsBusy}" IsVisible="{Binding !IsNative}" />
                     <Button Grid.Column="2" Content="Refresh" Margin="0,0,10,0" Classes="ww-secondary"
-                            Command="{Binding RefreshDolphinsCommand}" IsEnabled="{Binding !IsBusy}" />
+                            Command="{Binding RefreshDolphinsCommand}" IsEnabled="{Binding !IsBusy}" IsVisible="{Binding !IsNative}" />
                     <Button Grid.Column="3" Content="Attach" Classes="ww-accent"
-                            Command="{Binding ConnectDolphinCommand}"
-                            IsVisible="{Binding !IsDolphinConnected}" IsEnabled="{Binding CanAttach}" />
+                            Command="{Binding ConnectDolphinCommand}" IsEnabled="{Binding CanAttach}">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="!IsDolphinConnected" />
+                                <Binding Path="!IsNative" />
+                            </MultiBinding>
+                        </Button.IsVisible>
+                    </Button>
                     <Button Grid.Column="3" Content="Detach" Classes="ww-danger"
-                            Command="{Binding DisconnectDolphinCommand}"
-                            IsVisible="{Binding IsDolphinConnected}" IsEnabled="{Binding !IsBusy}" />
+                            Command="{Binding DisconnectDolphinCommand}" IsEnabled="{Binding !IsBusy}">
+                        <Button.IsVisible>
+                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                <Binding Path="IsDolphinConnected" />
+                                <Binding Path="!IsNative" />
+                            </MultiBinding>
+                        </Button.IsVisible>
+                    </Button>
                 </Grid>
             </Border>
 
@@ -91,7 +103,7 @@
                     <TextBlock Text="Waiting for game data…" FontSize="18" FontFamily="{StaticResource FontHeading}" FontWeight="SemiBold"
                                HorizontalAlignment="Center" />
                     <ProgressBar IsIndeterminate="True" Width="200" Classes="ww-generic" Foreground="{StaticResource AccentBrush}" />
-                    <TextBlock Text="Start the game (or attach to a running Dolphin) and load a save to see your live state."
+                    <TextBlock Text="{Binding WaitingHint}"
                                FontSize="13" HorizontalAlignment="Center" Foreground="{StaticResource Text2Brush}"
                                TextWrapping="Wrap" TextAlignment="Center" />
                 </StackPanel>

@@ -81,7 +81,7 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     private readonly GameBackend _runningBackend;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsNative), nameof(IsDolphin), nameof(BackendRestartNeeded))]
+    [NotifyPropertyChangedFor(nameof(IsNative), nameof(IsDolphin), nameof(BackendRestartNeeded), nameof(CanUseDolphin), nameof(CanUseNative), nameof(RunSetupTip))]
     private GameBackend _backend;
 
     /// <summary>The embedded native game (radio button; <see cref="IsDolphin"/> is the other one).</summary>
@@ -98,6 +98,18 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
     }
 
     public bool BackendRestartNeeded => Backend != _runningBackend;
+
+    /// <summary>Dolphin is only on Windows, the built-in game only on macOS: the other radio button is off.</summary>
+    public bool CanUseDolphin => OperatingSystem.IsWindows() || Backend == GameBackend.Dolphin;
+    public bool CanUseNative => OperatingSystem.IsMacOS() || Backend == GameBackend.Native;
+
+
+    [RelayCommand]
+    private void RestartApp() => AppRestart.Restart();
+
+    public string RunSetupTip => IsNative
+        ? "Walk through your disc, building the game and your name again"
+        : "Walk through the game, Dolphin, patches and your name again";
 
     public event Action? SettingsSaved;
 
@@ -194,10 +206,14 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         if (Game != null) Game.IsShown = value == SettingsTab.Game;
     }
 
-    // The patches tab goes with Dolphin.
+    // The patches tab goes with Dolphin. The backend saves as soon as it is picked: the restart prompt then means what it says.
     partial void OnBackendChanged(GameBackend value)
     {
         if (value != GameBackend.Dolphin && Tab == SettingsTab.Patches) Tab = SettingsTab.GameFiles;
+        var settings = _gameSettingsService.Load();
+        if (settings.Backend == value) return;
+        settings.Backend = value;
+        _gameSettingsService.Save(settings);
     }
 
     /// <summary>Show the saved paths again (after the setup wizard changed them).</summary>
@@ -314,7 +330,6 @@ public partial class SettingsViewModel : ViewModelBase, IDisposable
         settings.GamePath = GamePath;
         settings.VanillaGamePath = VanillaGamePath;
         settings.AutoLaunchDolphin = AutoLaunchDolphin;
-        settings.Backend = Backend;
 
         var error = _gameSettingsService.ValidatePaths(settings);
         if (error != null)

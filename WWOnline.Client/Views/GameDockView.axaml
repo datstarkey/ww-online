@@ -6,7 +6,75 @@
     <DockPanel>
         <!-- Above the game, never over it: nothing Avalonia draws can sit on the game's native view -->
         <Border DockPanel.Dock="Top" Classes="ww-game-bar" IsVisible="{Binding !IsPoppedOut}">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
+            <Grid ColumnDefinitions="*,Auto">
+            <!-- Left: starting / why the game isn't running; else the room at a glance (players, warp, PVP) -->
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="10" IsVisible="{Binding HasStatus}"
+                        AutomationProperties.LiveSetting="Polite">
+                <Ellipse Classes="ww-status-dot ww-pulse" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center"
+                         IsVisible="{Binding IsStarting}" />
+                <TextBlock Text="{Binding Status}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           Classes.failed="{Binding HasFailed}" ToolTip.Tip="{Binding Status}">
+                    <TextBlock.Styles>
+                        <Style Selector="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource AccentHoverBrush}" />
+                        </Style>
+                        <Style Selector="TextBlock.failed">
+                            <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                        </Style>
+                    </TextBlock.Styles>
+                </TextBlock>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="12">
+                <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="!HasStatus" />
+                        <Binding Path="Room.Server.IsConnected" FallbackValue="False" />
+                    </MultiBinding>
+                </StackPanel.IsVisible>
+                <TextBlock Text="{Binding Room.RoomTitle}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center"
+                           MaxWidth="180" TextTrimming="CharacterEllipsis" />
+                <Border Classes="ww-pill" Background="{StaticResource DangerTintBrush}" Padding="10,3"
+                        IsVisible="{Binding Room.PvpOn, FallbackValue=False}"
+                        ToolTip.Tip="PVP is on in this room: other players can target and hit you">
+                    <TextBlock Text="PVP ON" FontSize="11" FontWeight="Bold" LetterSpacing="1" Foreground="{StaticResource DangerBrush}" />
+                </Border>
+                <!-- Players: click someone to warp to them (room rule Allow warping) -->
+                <ItemsControl ItemsSource="{Binding Room.Server.Players}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PlayerRowViewModel">
+                            <Button Classes="ww-ghost ww-game-bar" Padding="2" MinHeight="0" CornerRadius="16"
+                                    Command="{Binding $parent[ItemsControl].((vm:GameWindowViewModel)DataContext).Room.WarpToPlayerCommand}"
+                                    CommandParameter="{Binding}" AutomationProperties.Name="{Binding WarpButtonName}">
+                                <Button.IsEnabled>
+                                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                        <Binding Path="!IsLocal" />
+                                        <Binding Path="$parent[ItemsControl].((vm:GameWindowViewModel)DataContext).Room.AllowWarpingOn" />
+                                    </MultiBinding>
+                                </Button.IsEnabled>
+                                <ToolTip.Tip>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding PlayerName}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding StageText}" FontSize="12" />
+                                        <TextBlock Text="Click to warp to them" FontSize="12" IsVisible="{Binding !IsLocal}" />
+                                    </StackPanel>
+                                </ToolTip.Tip>
+                                <Border Classes="ww-avatar" Width="28" Height="28" CornerRadius="14" Background="{Binding TunicBrush}">
+                                    <TextBlock Text="{Binding Initials}" FontSize="11" Foreground="{Binding AvatarForeground}" />
+                                </Border>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding Room.WarpStatus}" IsVisible="{Binding Room.HasWarpStatus, FallbackValue=False}"
+                           FontSize="12" VerticalAlignment="Center" MaxWidth="320" TextTrimming="CharacterEllipsis"
+                           Foreground="{StaticResource Text2Brush}" ToolTip.Tip="{Binding Room.WarpStatus}"
+                           AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
                 <Button Classes="ww-ghost ww-game-bar" Command="{Binding PopOutCommand}"
                         ToolTip.Tip="Play in a window of its own" AutomationProperties.Name="Pop out">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -15,18 +83,38 @@
                     </StackPanel>
                 </Button>
                 <Button Classes="ww-ghost ww-game-bar" Command="{Binding ToggleFullScreenCommand}"
-                        ToolTip.Tip="Full screen in a window of its own (F11)" AutomationProperties.Name="Full screen">
+                        ToolTip.Tip="Full screen in a window of its own (Ctrl+Cmd+F)" AutomationProperties.Name="Full screen">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Viewbox Width="16" Height="16"><Path Classes="icon" Data="{StaticResource IconFullScreen}" /></Viewbox>
                         <TextBlock Text="Full screen" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
             </StackPanel>
+            </Grid>
         </Border>
 
         <Panel>
             <!-- The game's view, while docked (MainWindow moves it) -->
-            <Panel x:Name="Slot" IsVisible="{Binding !IsPoppedOut}" />
+            <Panel x:Name="Slot">
+                <Panel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                        <Binding Path="!IsPoppedOut" />
+                        <Binding Path="!HasFailed" />
+                    </MultiBinding>
+                </Panel.IsVisible>
+            </Panel>
+
+            <!-- The game couldn't start or stopped: it can't restart in this process -->
+            <StackPanel IsVisible="{Binding HasFailed}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Spacing="10" MaxWidth="460">
+                <Viewbox Width="40" Height="40" HorizontalAlignment="Center" Margin="0,0,0,6">
+                    <Path Classes="icon" Data="{StaticResource IconWarning}" Stroke="{StaticResource DangerBrush}" />
+                </Viewbox>
+                <TextBlock Text="The game isn't running" FontFamily="{StaticResource FontHeading}"
+                           FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding Status}" FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
+                           TextAlignment="Center" />
+            </StackPanel>
 
             <StackPanel IsVisible="{Binding IsPoppedOut}" HorizontalAlignment="Center" VerticalAlignment="Center"
                         Spacing="10" MaxWidth="420">

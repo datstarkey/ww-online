@@ -1844,6 +1844,7 @@ void pc_frame_end(void) {
     kyProcsFrame(frames);
     chestFrame(frames);
     dmapFrame(frames);
+    seaChartFrame(frames);
     itemSweepFrame(frames);
     saveSweepFrame(frames);
     eventSweepFrame(frames);

@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Serilog;
 using WWOnline.Native;
+using WWOnline.Services;
 
 namespace WWOnline.ViewModels;
 
@@ -147,8 +149,14 @@ public partial class GameSettingsViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _error = "";
 
     public string StatusText => IsLive
-        ? "The game is running: changes apply now, except those marked Restart."
-        : $"The game isn't running: changes are saved to {_settings.SettingsPath} and apply when it starts.";
+        ? "The game is running: changes apply now, except those marked Restart, which apply when WW-Online restarts."
+        : "The game isn't running: changes are saved and apply when it starts.";
+
+    /// <summary>Where the changes are saved (the status line's tooltip).</summary>
+    public string SettingsPath => _settings.SettingsPath;
+
+    [RelayCommand]
+    private void RestartApp() => AppRestart.Restart();
 
     /// <summary>The latest load or change (tests await it).</summary>
     public Task Pending { get; private set; }

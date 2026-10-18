@@ -88,7 +88,7 @@ public partial class ServerViewModel : ViewModelBase, IDisposable
     public string DolphinStatusText => DolphinConnected ? "Connected" : "Not connected";
 
     /// <summary>Sidebar status line under the local player's name.</summary>
-    public string DolphinLinkText => DolphinConnected ? "Dolphin linked" : "Dolphin not linked";
+    public string DolphinLinkText => GameText.LinkText(DolphinConnected);
 
     /// <summary>The local player's tunic colour (Appearance page), for avatars.</summary>
     [ObservableProperty]

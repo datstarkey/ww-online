@@ -3,9 +3,9 @@
 This folder is a snapshot of the Seaborne repository, made by `scripts/vendor-seaborne.sh`. It
 holds no history of that repository. Do not edit it here: change Seaborne upstream and vendor again.
 
-- Commit: `9357bf4dd56662ac707933ced09c59230ff82409`
-- Commit date: 2026-10-15T16:32:24+01:00
-- Commit subject: Regression fixes: the link census allows ww_online's peer boat's daShip_c references (expected_unresolved_phase2.txt takes '#' comments, regress.sh and the README diff without them); menu-controls goes down one more row for COS_PAD_BACKGROUND, which sits above the bindings on the Controls tab
+- Commit: `67d28ebeb47a19fbdbf2849ccb236c175569c0e0`
+- Commit date: 2026-10-18T16:15:17+01:00
+- Commit subject: Sea chart: each sector's zoom shows its own island (issue #14)
 
 Left out (the desktop libtww reads none of them; links to them in Seaborne's own docs are dangling here):
 

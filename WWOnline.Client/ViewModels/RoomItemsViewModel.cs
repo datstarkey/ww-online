@@ -243,7 +243,7 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
         : "Your game only";
     public string WaitingText => IsRoomMode
         ? "Waiting for the room's items. They appear once the room owner's game is attached."
-        : "Attach to Dolphin on the Dolphin page to see your items.";
+        : $"{GameText.StartHint} to see your items.";
 
     partial void OnIsRoomModeChanged(bool value)
     {
@@ -485,7 +485,7 @@ public partial class RoomItemsViewModel : ViewModelBase, IDisposable
     {
         if (!_dolphinService.IsConnected)
         {
-            StatusMessage = "Dolphin not connected";
+            StatusMessage = GameText.NotConnected;
             return false;
         }
         if (!_sceneStable)

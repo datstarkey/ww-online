@@ -74,7 +74,7 @@ One player hosts a room and becomes the **room owner**. The owner picks how much
 
 [Room rules](https://github.com/datstarkey/ww-online/wiki/Room-Rules) on the wiki explains every rule in detail.
 
-**Planned:** shared weather, wind and time of day (off by default), a "no player collision" option (players bump into each other today), PVP and riding in each other's boats.
+**Planned:** shared weather, wind and time of day (off by default), a "no player collision" option (players bump into each other today) and riding in each other's boats.
 
 <table>
   <tr>
@@ -145,12 +145,12 @@ More on the wiki: **[Troubleshooting](https://github.com/datstarkey/ww-online/wi
 On a Mac, WW-Online runs the game itself instead of Dolphin. Its game engine, **Seaborne** (in [`seaborne/`](seaborne/VENDORED.md)), is a native port built from the [zeldaret/tww](https://github.com/zeldaret/tww) decompilation and based on [SwitchWaker](https://github.com/centollOS/SwitchWaker) by Pulpparty and depende3000. It runs inside the app, is compiled on your Mac from the source in this repository, and reads everything of the game from your disc image every time it starts. No game binary is downloaded.
 
 - **Status:** macOS on Apple silicon only, and early. There is no macOS installer yet: run the client from source (see [Building from source](#building-from-source)). On Windows, WW-Online keeps using Dolphin; a native Windows build comes later.
-- **You need:** Xcode's command line tools (`xcode-select --install`), Homebrew's `cmake` and `ninja` (`brew install cmake ninja`), git, the network for the first build, about 1 GB of free disk, and your own disc image: the US version (`GZLE01`, revision 0) as an uncompressed `.iso`.
+- **You need:** Xcode's command line tools (`xcode-select --install`), Homebrew's `cmake`, `ninja` and `git` (`brew install cmake ninja git`), the network for the first build, about 1 GB of free disk, and your own disc image: the US version (`GZLE01`, revision 0) as an uncompressed `.iso`.
 - **How to play:**
   1. Start the client (`dotnet run --project WWOnline.Client/WWOnline.Client.csproj`). On a Mac the setup picks the native game.
   2. **Your disc:** choose your `.iso`. WW-Online checks it against the known good dump (SHA-1) and saves only its path: the image is never copied or changed.
   3. **Build the game:** press **Build the game**. The setup builds the game library (`libtww`) from `seaborne/` in four steps: it checks the build tools, fetches the audio sources (Dolphin's DSP HLE, from [RecompCore](https://github.com/elliotttate/RecompCore)), configures (CMake also fetches [Aurora](https://github.com/encounter/aurora), the graphics and input layer) and compiles. The build reads no disc. Everything it makes goes in `~/Library/Application Support/WWOnline/game/`, never into the repository. The first build takes about a minute on a 14-core Mac and a few minutes on smaller ones; after an update only what changed is rebuilt. You can rebuild from **Settings → Game files**.
-  4. **Play:** host or join a room as usual. The game starts inside the WW-Online window.
+  4. **Play:** host or join a room as usual. The game starts inside the WW-Online window. The bar above it shows the room's players (click one to warp to them) and whether PVP is on. **Pop out** moves the game to a window of its own, and **View → Game Full Screen** (Ctrl+Cmd+F) makes it full screen.
 
 ## Building from source
 

@@ -191,6 +191,7 @@ public partial class App : Application
     public static void AddGameBackend(IServiceCollection services, GameBackend backend)
     {
         Log.Information("Game backend: {Backend}", backend);
+        GameText.IsNative = backend == GameBackend.Native;
         if (backend == GameBackend.Native)
         {
             services.AddSingleton<GameHost>();

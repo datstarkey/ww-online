@@ -13,12 +13,24 @@
         <KeyBinding Gesture="F11" Command="{Binding ToggleFullScreenCommand}" />
     </Window.KeyBindings>
 
+    <!-- The pop-out's own menu bar while it is the key window: full screen and back, with the game's view focused -->
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="View">
+                <NativeMenu>
+                    <NativeMenuItem Header="Game Full Screen" Gesture="Ctrl+Cmd+F" Command="{Binding ToggleFullScreenCommand}" />
+                    <NativeMenuItem Header="Back to the Main Window" Command="{Binding DockCommand}" />
+                </NativeMenu>
+            </NativeMenuItem>
+        </NativeMenu>
+    </NativeMenu.Menu>
+
     <DockPanel>
         <!-- Above the game, never over it; full screen is the game alone (F11 or the green button leave it) -->
         <Border x:Name="Bar" DockPanel.Dock="Top" Classes="ww-game-bar" IsVisible="{Binding !IsFullScreen}">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="8">
                 <Button Classes="ww-ghost ww-game-bar" Command="{Binding ToggleFullScreenCommand}"
-                        ToolTip.Tip="Full screen (F11)" AutomationProperties.Name="Full screen">
+                        ToolTip.Tip="Full screen (Ctrl+Cmd+F)" AutomationProperties.Name="Full screen">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Viewbox Width="16" Height="16"><Path Classes="icon" Data="{StaticResource IconFullScreen}" /></Viewbox>
                         <TextBlock Text="Full screen" VerticalAlignment="Center" />

@@ -176,7 +176,7 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     private string _extractFolder = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanGoBack), nameof(CanGoNext), nameof(CanExtractNow))]
+    [NotifyPropertyChangedFor(nameof(CanGoBack), nameof(CanGoNext), nameof(CanExtractNow), nameof(CanSkipSetup))]
     private bool _isExtracting;
 
     [ObservableProperty] private string _extractProgress = "";
@@ -224,8 +224,16 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     // ── Patch ─────────────────────────────────────────────────────
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanGoBack), nameof(CanGoNext), nameof(CanSkipStep), nameof(CanPatch), nameof(ShowPatchButton))]
+    [NotifyPropertyChangedFor(nameof(CanGoBack), nameof(CanGoNext), nameof(CanSkipStep), nameof(CanPatch), nameof(ShowPatchButton),
+        nameof(CanSkipSetup))]
     private bool _isPatching;
+
+    /// <summary>Skip setup: not while patching or extracting. A native build carries on (Settings → Game files shows it).</summary>
+    public bool CanSkipSetup => !IsPatching && !IsExtracting;
+
+    public string SkipSetupTip => Native.IsBuilding
+        ? "Close the setup. The build keeps going: Settings → Game files shows it."
+        : "Close the setup. You can run it again from Settings.";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanGoNext), nameof(ShowPatchButton), nameof(PatchButtonText))]
@@ -445,6 +453,7 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
         Refresh();
         OnPropertyChanged(nameof(CanGoBack));
         OnPropertyChanged(nameof(CanSkipStep));
+        OnPropertyChanged(nameof(SkipSetupTip));
     }
 
     private void OnPatchOptionsPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -498,7 +507,7 @@ public partial class SetupWizardViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void SkipSetup()
     {
-        if (IsPatching || IsExtracting || Native.IsBuilding) return;
+        if (!CanSkipSetup) return;
         Logger.Information("[setup] skipped at {Step}", Step);
         Close();
     }

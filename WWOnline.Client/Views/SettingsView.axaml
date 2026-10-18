@@ -19,13 +19,13 @@
                 <StackPanel Spacing="6">
                     <TextBlock Text="Settings" Classes="ww-title" />
                     <TextBlock Text="Your emulator, game folders and the patches that go into your game."
-                               FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding !HasGame}" />
+                               FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding IsDolphin}" />
                     <TextBlock Text="Your game files, the app, and the game's own options."
-                               FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding HasGame}" />
+                               FontSize="14" Foreground="{StaticResource Text2Brush}" IsVisible="{Binding IsNative}" />
                 </StackPanel>
                 <Button Grid.Column="1" Classes="ww-secondary" VerticalAlignment="Center" Margin="16,0,0,0"
                         Command="{Binding RunSetupCommand}" AutomationProperties.Name="Run setup again"
-                        ToolTip.Tip="Walk through the game, Dolphin, patches and your name again">
+                        ToolTip.Tip="{Binding RunSetupTip}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <Viewbox Width="15" Height="15" VerticalAlignment="Center">
                             <Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource TextBrush}" />
@@ -77,11 +77,16 @@
                         <StackPanel Spacing="10">
                             <TextBlock Text="Game" Classes="ww-card-title" />
                             <StackPanel Orientation="Horizontal" Spacing="24">
-                                <RadioButton GroupName="Backend" Content="Dolphin (Windows)" IsChecked="{Binding IsDolphin}" />
-                                <RadioButton GroupName="Backend" Content="Built-in game (macOS)" IsChecked="{Binding IsNative}" />
+                                <RadioButton GroupName="Backend" Content="Dolphin (Windows)" IsChecked="{Binding IsDolphin}"
+                                             IsEnabled="{Binding CanUseDolphin}" />
+                                <RadioButton GroupName="Backend" Content="Built-in game (macOS)" IsChecked="{Binding IsNative}"
+                                             IsEnabled="{Binding CanUseNative}" />
                             </StackPanel>
-                            <TextBlock Text="Save, then restart WW-Online to switch." FontSize="12" Foreground="{StaticResource GoldTextSoftBrush}"
-                                       IsVisible="{Binding BackendRestartNeeded}" />
+                            <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding BackendRestartNeeded}">
+                                <TextBlock Text="Saved. WW-Online switches when it restarts." FontSize="12" VerticalAlignment="Center"
+                                           Foreground="{StaticResource GoldTextSoftBrush}" />
+                                <Button Content="Restart now" Classes="ww-secondary" Command="{Binding RestartAppCommand}" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -96,11 +101,6 @@
                                     IsVisible="{Binding ValidationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                                 <TextBlock Text="{Binding ValidationError}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
                             </Border>
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Button Content="Save settings" Command="{Binding SaveSettingsCommand}" Classes="ww-primary" />
-                                <TextBlock Text="&#x2713; Settings saved" Foreground="{StaticResource RupeeLightBrush}" FontWeight="SemiBold"
-                                           VerticalAlignment="Center" IsVisible="{Binding IsSaved}" />
-                            </StackPanel>
                         </StackPanel>
                     </Border>
 

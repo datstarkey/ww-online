@@ -24,7 +24,7 @@ public sealed class NativeBuild
     private const string ToolCheck = PathSetup +
         "xcode-select -p >/dev/null 2>&1 || { echo \"Xcode's command line tools are missing: run xcode-select --install\"; exit 1; }; " +
         "for t in clang cmake ninja git; do command -v $t >/dev/null 2>&1 || " +
-        "{ echo \"$t is missing (Homebrew: brew install cmake ninja)\"; exit 1; }; done; " +
+        "{ echo \"$t is missing (Homebrew: brew install cmake ninja git)\"; exit 1; }; done; " +
         // The engine needs C++20's std::jthread, which older Xcode versions' libc++ lacks.
         "printf '#include <thread>\\nint main() { std::jthread t([] {}); }\\n' | clang++ -std=c++20 -x c++ - -o /dev/null 2>/dev/null || " +
         "{ echo \"Your Xcode is too old to build the game (it needs C++20's std::jthread): update Xcode or its command line tools\"; exit 1; }; " +
@@ -52,6 +52,9 @@ public sealed class NativeBuild
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(source))))[..12]);
 
     public string LibraryPath(string source) => Path.Combine(BuildDirectory(source), "libtww.dylib");
+
+    /// <summary>The last build's full output, every step's (for "Show log" and bug reports).</summary>
+    public string LogPath => Path.Combine(_cache, "build.log");
 
     /// <summary>Why <paramref name="source"/> isn't Seaborne's source, or null.</summary>
     public static string? CheckSource(string? source)
@@ -89,6 +92,8 @@ public sealed class NativeBuild
     {
         if (!OperatingSystem.IsMacOS())
             throw new PlatformNotSupportedException(NotSupported);
+        Directory.CreateDirectory(_cache);
+        await File.WriteAllTextAsync(LogPath, $"WW-Online game build, {DateTime.Now:u}, source {source}\n", ct);
         await PipelineRunner.RunStepsAsync(Steps(source), progress, ct);
         var library = LibraryPath(source);
         if (!File.Exists(library))
@@ -102,6 +107,16 @@ public sealed class NativeBuild
     private static string? LastLine(string output) =>
         output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).LastOrDefault();
 
+    /// <summary>The line that says why a step failed: the last compiler/CMake error, else the last line
+    /// (ninja's own last line is only "build stopped: subcommand failed").</summary>
+    public static string? FailureLine(string output)
+    {
+        var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return lines.LastOrDefault(l => l.Contains("error:", StringComparison.OrdinalIgnoreCase) ||
+                                        l.StartsWith("CMake Error", StringComparison.Ordinal))
+               ?? lines.LastOrDefault();
+    }
+
     private sealed class ShellStep(NativeBuild build, int number, string name, string script, string source) : IPipelineStep
     {
         public string Name => name;
@@ -110,8 +125,10 @@ public sealed class NativeBuild
         public async Task ExecuteAsync(PipelineProgress progress, CancellationToken ct = default)
         {
             var result = await build.RunShellAsync(script, source, line => progress.Report(number, name, line), ct);
+            if (build.LogPath is var log && File.Exists(log))
+                await File.AppendAllTextAsync(log, $"\n== Step {number}: {name} (exit code {result.ExitCode})\n{result.Output}\n", ct);
             if (result.ExitCode != 0)
-                throw new InvalidOperationException(LastLine(result.Output) ?? $"exit code {result.ExitCode}");
+                throw new InvalidOperationException(FailureLine(result.Output) ?? $"exit code {result.ExitCode}");
         }
     }
 }

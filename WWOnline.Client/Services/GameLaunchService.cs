@@ -72,13 +72,13 @@ public sealed record LaunchReadiness(bool CanLaunch, string? Problem)
     public static LaunchReadiness EvaluateNative(string? library, string? disc)
     {
         if (library == null)
-            return new(false, $"The native game isn't built yet. Set {NativePaths.LibraryVariable} to your libtww.dylib.");
+            return new(false, $"The game isn't built yet. Build it in Settings → Game files (developers: or set {NativePaths.LibraryVariable}).");
         if (!File.Exists(library))
-            return new(false, $"libtww not found: {library}");
+            return new(false, $"The built game was not found: {library}. Build it again in Settings → Game files.");
         if (disc == null)
-            return new(false, $"No disc image is set. Set {NativePaths.DiscVariable} to your Wind Waker (GZLE01) disc image.");
+            return new(false, $"No disc image is set. Choose your Wind Waker (GZLE01) disc in Settings → Game files (developers: or set {NativePaths.DiscVariable}).");
         if (!File.Exists(disc))
-            return new(false, $"Disc image not found: {disc}");
+            return new(false, $"Disc image not found: {disc}. Choose it again in Settings → Game files.");
         return Ready;
     }
 
@@ -369,8 +369,8 @@ public sealed class GameLaunchService : IDisposable
         }
     }
 
-    /// <summary>How long tww_init may take before Start game gives up waiting (the game keeps starting).</summary>
-    private static readonly TimeSpan NativeStartTimeout = TimeSpan.FromMinutes(2);
+    /// <summary>How long tww_init may take before the status says it is slow (it keeps waiting).</summary>
+    private static readonly TimeSpan NativeSlowStart = TimeSpan.FromMinutes(1);
 
     /// <summary>
     /// Start the embedded game (once per process: it cannot restart), wait until it runs, then start the sync.
@@ -381,9 +381,7 @@ public sealed class GameLaunchService : IDisposable
         if (host.IsRunning && _nativeSyncStarted)
             return SetStatus(new(GameLaunchState.Attached, "The game is running."));
         if (host.HasFailed)
-            return SetStatus(new(GameLaunchState.Failed, host.FatalCode >= 0
-                ? $"The game stopped (code {host.FatalCode}). Restart WW-Online to start it again."
-                : "The game couldn't start (see the log). Restart WW-Online to try again."));
+            return SetStatus(new(GameLaunchState.Failed, host.FailureReason));
         if (!host.IsStarted)
         {
             var settings = _settings.Load();
@@ -399,13 +397,16 @@ public sealed class GameLaunchService : IDisposable
         if (!host.IsRunning)
         {
             SetStatus(new(GameLaunchState.WaitingForGame, "Starting the game…"));
-            var deadline = DateTime.UtcNow + NativeStartTimeout;
+            var slow = DateTime.UtcNow + NativeSlowStart;
             while (!host.IsRunning)
             {
                 if (host.HasFailed)
-                    return SetStatus(new(GameLaunchState.Failed, "The game couldn't start (see the log). Restart WW-Online to try again."));
-                if (DateTime.UtcNow > deadline)
-                    return SetStatus(new(GameLaunchState.Failed, "The game is taking too long to start. Press Start game again to keep waiting."));
+                    return SetStatus(new(GameLaunchState.Failed, host.FailureReason));
+                if (slow != default && DateTime.UtcNow > slow)
+                {
+                    slow = default;
+                    SetStatus(new(GameLaunchState.WaitingForGame, "Still starting the game… The first start after a build takes longest."));
+                }
                 await Task.Delay(100, ct).ConfigureAwait(false);
             }
         }
