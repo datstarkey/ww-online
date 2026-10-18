@@ -6,7 +6,7 @@ WW-Online is in early development. These are the known gaps; the [releases](http
 
 - You see up to three other players at once.
 - Players bump into each other. A "no player collision" option is planned.
-- Players can't hurt each other, and other players' projectiles never hurt you. PVP is planned.
+- PVP is a room rule (off by default) and only works between players on the built-in game (macOS). With Dolphin, players can't hurt each other, and other players' projectiles never hurt you.
 - Other players' boomerang and hookshot show in their hands, but the thrown boomerang, the hookshot chain and the grappling hook don't. Carrying a pot or barrel shows the pose only.
 - Props that go with an animation aren't shown: the rope, the item held up after a chest, a Boko weapon in hand. Animations that come from cutscene data aren't copied.
 - Some moves are a best guess: a knock-back always looks like a hit from the front, and a side hop with the stick let go goes left.

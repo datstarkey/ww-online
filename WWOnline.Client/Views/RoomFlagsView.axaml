@@ -199,7 +199,7 @@
                 <Viewbox Width="18" Height="18" VerticalAlignment="Center">
                     <Path Classes="icon" Data="{StaticResource IconInfo}" Stroke="{StaticResource AccentBrush}" />
                 </Viewbox>
-                <TextBlock Grid.Column="1" Margin="12,0,0,0" Text="{Binding WaitingText}" TextWrapping="Wrap" Foreground="#BDEFE8" />
+                <TextBlock Grid.Column="1" Margin="12,0,0,0" Text="{Binding WaitingText}" TextWrapping="Wrap" Foreground="{StaticResource InfoTextBrush}" />
             </Grid>
         </Border>
 

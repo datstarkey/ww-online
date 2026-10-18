@@ -393,6 +393,17 @@
                             <TextBlock Text="{Binding RoomTitle}" Classes="ww-title" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="16,0,0,0">
+                            <!-- PVP: on in this room (no preset sets it, so say it where everyone looks) -->
+                            <Border Classes="ww-chip" Background="{StaticResource DangerTintBrush}" IsVisible="{Binding PvpOn}"
+                                    ToolTip.Tip="Players can target and hurt each other in this room (built-in game only)">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Viewbox Width="15" Height="15" VerticalAlignment="Center">
+                                        <Path Classes="icon" StrokeThickness="1.9" Data="{StaticResource IconSwords}" Stroke="{StaticResource DangerBrush}" />
+                                    </Viewbox>
+                                    <TextBlock Text="PVP on" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{StaticResource DangerBrush}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
                             <!-- Owner badge / view-only badge -->
                             <Border Classes="ww-chip" Background="{StaticResource GoldTintBrush}" IsVisible="{Binding IsOwner}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -440,7 +451,8 @@
                                 </StackPanel>
                             </Button>
 
-                            <Button Classes="ww-danger" Content="{Binding LeaveText}" Command="{Binding Server.DisconnectCommand}" />
+                            <Button Classes="ww-danger" Content="{Binding LeaveText}" Command="{Binding LeaveCommand}"
+                                    ToolTip.Tip="{Binding LeaveTip}" />
                         </StackPanel>
                     </Grid>
 
@@ -466,7 +478,7 @@
                                 <Path Classes="icon" StrokeThickness="1.9" Data="{StaticResource IconCrown}" Stroke="{StaticResource AccentBrush}" />
                             </Viewbox>
                             <TextBlock Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap"
-                                       FontSize="14" Foreground="#BDEFE8">
+                                       FontSize="14" Foreground="{StaticResource InfoTextBrush}">
                                 <Run Text="{Binding OwnerBannerName}" FontWeight="Bold" Foreground="{StaticResource TextBrush}" /><Run Text=" owns this room" FontWeight="Bold" Foreground="{StaticResource TextBrush}" /><Run Text=" and sets the rules and room items. Anything you pick up still counts for everyone." />
                             </TextBlock>
                         </Grid>
@@ -495,7 +507,7 @@
                                         <Border Grid.Column="1" Classes="ww-pill light" Margin="12,0">
                                             <TextBlock Text="{Binding PresetText}" FontSize="13" LetterSpacing="0" />
                                         </Border>
-                                        <TextBlock Grid.Column="2" Text="{Binding PresetNote}" FontSize="13" Foreground="{StaticResource Text2Brush}"
+                                        <TextBlock Grid.Column="2" Text="{Binding PresetSummary}" FontSize="13" Foreground="{StaticResource Text2Brush}"
                                                    VerticalAlignment="Center" TextWrapping="Wrap" />
                                     </Grid>
                                 </Border>
@@ -515,7 +527,7 @@
                                                     ToolTip.Tip="Lit when the switches below are a mix. Pick a preset to reset." />
                                         </Grid>
                                     </Border>
-                                    <TextBlock Text="{Binding PresetNote}" FontSize="13" Foreground="{StaticResource Text2Brush}" />
+                                    <TextBlock Text="{Binding PresetSummary}" FontSize="13" Foreground="{StaticResource Text2Brush}" />
                                 </StackPanel>
 
                                 <!-- Rule rows -->
@@ -749,12 +761,6 @@
                                                    Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" />
                                         <Border Grid.Column="2" Classes="ww-pill outline"><TextBlock Text="Off by default" /></Border>
                                     </Grid>
-                                    <Grid ColumnDefinitions="Auto,*,Auto" Height="44">
-                                        <Viewbox Width="18" Height="18" VerticalAlignment="Center"><Path Classes="icon" Data="{StaticResource IconSwords}" Stroke="{StaticResource Text3Brush}" /></Viewbox>
-                                        <TextBlock Grid.Column="1" Text="PVP" Margin="14,0" FontSize="14"
-                                                   Foreground="{StaticResource Text3Brush}" VerticalAlignment="Center" />
-                                        <Border Grid.Column="2" Classes="ww-pill outline"><TextBlock Text="Planned" /></Border>
-                                    </Grid>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -782,7 +788,7 @@
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconRupeeOutline}" Stroke="{StaticResource RupeeBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Shared wallet" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Shared wallet" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedWalletOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedWalletOn}" />
                                         </Grid>
@@ -790,7 +796,7 @@
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconGlobe}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Shared world" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Shared world" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedWorldOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedWorldOn}" />
                                         </Grid>
@@ -798,7 +804,7 @@
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconChest}" Stroke="{StaticResource GoldCBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Shared items" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Shared items" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedItemsOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedItemsOn}" />
                                         </Grid>
@@ -806,7 +812,7 @@
                                     <Border BorderThickness="0,1,0,0" BorderBrush="{StaticResource CardLineBrush}" Height="44">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconBook}" Stroke="{StaticResource StoryBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Shared story" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Shared story" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedStoryOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedStoryOn}" />
                                         </Grid>
@@ -815,7 +821,7 @@
                                             ToolTip.Tip="The bait bag's All-Purpose Bait and Hyoi Pears are one room total.">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconBag}" Stroke="{StaticResource GoldCBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Shared bait bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Shared bait bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedBaitOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedBaitOn}" />
                                         </Grid>
@@ -824,7 +830,7 @@
                                             ToolTip.Tip="The spoils bag's counts (Joy Pendants, Chu Jellies...) are one room total.">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconBag}" Stroke="{StaticResource StoryBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Shared spoils bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Shared spoils bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedSpoilsOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedSpoilsOn}" />
                                         </Grid>
@@ -833,7 +839,7 @@
                                             ToolTip.Tip="The delivery bag's quest items (trade goods, letters...) are one room bag.">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconBag}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Shared delivery bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Shared delivery bag" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedDeliveryOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedDeliveryOn}" />
                                         </Grid>
@@ -842,7 +848,7 @@
                                             ToolTip.Tip="Other players' bombs, boat-cannon shots and arrows fly, explode and hit things in your game.">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconSwords}" Stroke="{StaticResource HeartBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Other players' projectiles" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Other players' projectiles" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding SharedProjectilesOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !SharedProjectilesOn}" />
                                         </Grid>
@@ -851,7 +857,7 @@
                                             ToolTip.Tip="Players can hurt each other (built-in game only).">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconHeart}" Stroke="{StaticResource HeartBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="PVP" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="PVP" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding PvpOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !PvpOn}" />
                                         </Grid>
@@ -860,7 +866,7 @@
                                             ToolTip.Tip="Players can warp to each other from the Players list.">
                                         <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                                             <Viewbox Width="18" Height="18"><Path Classes="icon" Data="{StaticResource IconSail}" Stroke="{StaticResource AccentBrush}" /></Viewbox>
-                                            <TextBlock Grid.Column="1" Text="Allow warping" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="1" Text="Allow warping" Margin="12,0" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="2" Text="ON" FontSize="12" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" IsVisible="{Binding AllowWarpingOn}" />
                                             <TextBlock Grid.Column="2" Text="OFF" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Text3Brush}" IsVisible="{Binding !AllowWarpingOn}" />
                                         </Grid>

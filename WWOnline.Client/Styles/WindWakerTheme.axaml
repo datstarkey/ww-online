@@ -79,6 +79,8 @@
         <SolidColorBrush x:Key="Text3Brush" Color="{StaticResource Text3}" />
         <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}" />
         <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHover}" />
+        <!-- Body text on an info (accent-tinted) banner -->
+        <SolidColorBrush x:Key="InfoTextBrush" Color="#BDEFE8" />
         <SolidColorBrush x:Key="AccentTintBrush" Color="{StaticResource AccentTint}" />
         <SolidColorBrush x:Key="AccentTint2Brush" Color="{StaticResource AccentTint2}" />
         <SolidColorBrush x:Key="AccentLineBrush" Color="{StaticResource AccentLine}" />

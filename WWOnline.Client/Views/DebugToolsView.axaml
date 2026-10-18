@@ -42,7 +42,8 @@
             <!-- Tab bar -->
             <Border Classes="ww-inset" Padding="4" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal" Spacing="4">
-                    <Button Classes="ww-seg" Classes.active="{Binding IsToolWarp}" Content="Warp" Command="{Binding PickWarpCommand}" />
+                    <Button Classes="ww-seg" Classes.active="{Binding IsToolWarp}" Content="Stage warp" Command="{Binding PickWarpCommand}"
+                            ToolTip.Tip="Load any stage in your own game. To join another player, use Warp to on the Room page." />
                     <Button Classes="ww-seg" Classes.active="{Binding IsToolStats}" Content="Stats" Command="{Binding PickStatsCommand}" />
                     <Border Width="1" Margin="6,8" Background="{StaticResource InputLineBrush}" />
                     <Button Classes="ww-seg mono dev" Classes.active="{Binding IsToolMemory}" Content="Memory" Command="{Binding PickMemoryCommand}"
@@ -183,13 +184,6 @@
                                     Margin="10,0,0,0" HorizontalAlignment="Left" />
                         </Grid>
                     </Border>
-                    <Grid ColumnDefinitions="Auto,*">
-                        <Viewbox Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,0,0">
-                            <Path Classes="icon" Data="{StaticResource IconInfo}" Stroke="{StaticResource Text2Brush}" />
-                        </Viewbox>
-                        <TextBlock Grid.Column="1" Margin="10,0,0,0" FontSize="13" Foreground="{StaticResource Text2Brush}" TextWrapping="Wrap"
-                                   Text="Items, sword and shield, heart containers and capacities moved to Room → Room items. Event flags moved to Room → Story flags." />
-                    </Grid>
                 </StackPanel>
             </Border>
 

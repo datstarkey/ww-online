@@ -31,13 +31,15 @@
 
     <!-- One of the game's tabs on Settings: where changes go, and the picked tab's settings -->
     <StackPanel Spacing="20">
-        <Grid ColumnDefinitions="Auto,*">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            <Button Grid.Column="2" Content="Restart WW-Online" Classes="ww-ghost" IsVisible="{Binding IsLive}" Margin="12,0,0,0"
+                    Command="{Binding RestartAppCommand}" ToolTip.Tip="Applies the settings marked Restart (the game can't restart on its own)" />
             <Ellipse Classes="ww-status-dot" Fill="{StaticResource RupeeBrush}" VerticalAlignment="Center"
                      IsVisible="{Binding IsLive}" />
             <Ellipse Classes="ww-status-dot" Fill="{StaticResource Text3Brush}" VerticalAlignment="Center"
                      IsVisible="{Binding !IsLive}" />
             <TextBlock Grid.Column="1" Text="{Binding StatusText}" FontSize="13" Foreground="{StaticResource Text2Brush}"
-                       TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
+                       TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" ToolTip.Tip="{Binding SettingsPath}" />
         </Grid>
 
         <Border Classes="ww-error-banner" IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -70,12 +72,12 @@
                                                     <TextBlock Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center"
                                                                Margin="0,0,8,0" />
                                                     <Border Classes="tag" IsVisible="{Binding NeedsRestart}"
-                                                            ToolTip.Tip="Applies the next time the game starts">
+                                                            ToolTip.Tip="Applies the next time WW-Online starts">
                                                         <TextBlock Text="Restart" />
                                                     </Border>
                                                     <Border Classes="tag pending" IsVisible="{Binding RestartPending}"
-                                                            ToolTip.Tip="Changed since the game started: restart it to apply">
-                                                        <TextBlock Text="Restart to apply" />
+                                                            ToolTip.Tip="Changed since the game started: restart WW-Online to apply">
+                                                        <TextBlock Text="Restart WW-Online to apply" />
                                                     </Border>
                                                     <Border Background="Transparent" VerticalAlignment="Center"
                                                             IsVisible="{Binding !IsEditable}" ToolTip.Tip="{Binding Tip}">

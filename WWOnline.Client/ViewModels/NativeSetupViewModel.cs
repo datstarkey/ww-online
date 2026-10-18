@@ -327,7 +327,7 @@ public partial class NativeSetupViewModel : ViewModelBase, IDisposable
             if (NinjaProgress().Match(e.Message) is { Success: true } m &&
                 double.TryParse(m.Groups[2].Value, out var total) && total > 0)
                 BuildPercent = double.Parse(m.Groups[1].Value) / total;
-            BuildElapsed = $"{_buildClock.Elapsed:m\\:ss} elapsed · usually 5-15 minutes the first time, less after";
+            BuildElapsed = $"{_buildClock.Elapsed:m\\:ss} elapsed · the first build takes a few minutes, later ones less";
         });
         try
         {

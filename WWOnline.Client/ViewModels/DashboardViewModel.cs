@@ -63,7 +63,9 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _sharedSpoilsOn = true;
     [ObservableProperty] private bool _sharedDeliveryOn = true;
     [ObservableProperty] private bool _allowWarpingOn = true;
-    [ObservableProperty] private bool _pvpOn;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PresetSummary))]
+    private bool _pvpOn;
     [ObservableProperty] private string _roomOwnerText = "";
     [ObservableProperty] private string _ownerName = "";
 
@@ -72,7 +74,12 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _isCoopPreset;
     [ObservableProperty] private bool _isCustomPreset;
     [ObservableProperty] private string _presetText = "Full sync";
-    [ObservableProperty] private string _presetNote = "Everything is shared: wallet, world, items, story and bags.";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PresetSummary))]
+    private string _presetNote = "Everything is shared: wallet, world, items, story and bags.";
+
+    /// <summary>The preset's note, and PVP when it is on (no preset turns it on, so the note alone would hide it).</summary>
+    public string PresetSummary => PvpOn ? $"{PresetNote} PVP is on: players can hurt each other." : PresetNote;
     private bool _applyingServerRules;
 
     /// <summary>Show the Room items sub-page instead of the room overview.</summary>
@@ -111,7 +118,29 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
 
     public string OnlineText => $"{Server.Players.Count} online";
     public bool IsWaitingForPlayers => Server.Players.Count <= 1;
-    public string LeaveText => Server.IsHosting ? "Close room" : "Leave room";
+    public string LeaveText => _confirmClose ? "Close for everyone?" : Server.IsHosting ? "Close room" : "Leave room";
+
+    public string LeaveTip => Server.IsHosting ? "Closes the room for every player in it" : "Leave this room; it carries on without you";
+
+    // Closing a room with other players in it asks once more (the button's text), then closes on the second click.
+    private bool _confirmClose;
+
+    [RelayCommand]
+    private async Task Leave()
+    {
+        if (Server.IsHosting && Server.Players.Count > 1 && !_confirmClose)
+        {
+            _confirmClose = true;
+            OnPropertyChanged(nameof(LeaveText));
+            await Task.Delay(TimeSpan.FromSeconds(4));
+            _confirmClose = false;
+            OnPropertyChanged(nameof(LeaveText));
+            return;
+        }
+        _confirmClose = false;
+        OnPropertyChanged(nameof(LeaveText));
+        await Server.DisconnectCommand.ExecuteAsync(null);
+    }
     public string ItemsLinkText => IsOwner && SharedItemsOn ? (IsEditing ? "Edit items" : "View items") : "View items";
     public string ItemsCardTitle => SharedItemsOn ? "Room items" : "Your items";
     public string FlagsLinkText => Flags.Edit.CanEdit ? "Edit flags" : "View flags";
@@ -191,6 +220,7 @@ public partial class DashboardViewModel : ViewModelBase, IDisposable
                 UpdateCanEdit();
                 UpdateAddress();
                 OnPropertyChanged(nameof(LeaveText));
+                OnPropertyChanged(nameof(LeaveTip));
                 break;
             case nameof(ServerViewModel.ServerHost):
             case nameof(ServerViewModel.ServerPort):
